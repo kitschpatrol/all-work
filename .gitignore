@@ -1,21 +1,21 @@
-node_modules
+# Git Ignore
+# Also used by CSpell and Stylelint
 
-# Output
-.output
-.vercel
-/.svelte-kit
-/build
-
-# OS
+# @kitschpatrol/repo-config boilerplate
+.astro/
 .DS_Store
-Thumbs.db
-
-# Env
 .env
 .env.*
 !.env.example
-!.env.test
+.svelte-kit/
+{tmp,temp}/
+**/*.min.js
+/scratch/
+bower_components/
+build/
+coverage/
+dist/
+node_modules/
+vendor/
 
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+# Customizations
