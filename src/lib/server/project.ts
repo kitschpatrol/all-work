@@ -38,6 +38,21 @@ export class Project {
 		}
 	}
 
+	public async getNpmDownloadCount(): Promise<number> {
+		// eslint-disable-next-line n/no-unsupported-features/node-builtins
+		const result = await fetch(
+			`https://api.npmjs.org/downloads/point/1970-01-01:3000-01-01/${this.packageData.name}`,
+		)
+		const json = (await result.json()) as {
+			downloads: number
+			end: string
+			package: string
+			start: string
+		}
+
+		return json.downloads
+	}
+
 	public async getOutdatedPackageList(
 		mode:
 			| 'default'
@@ -146,9 +161,74 @@ export class Project {
 		return results
 	}
 
+	public async getStarCount(): Promise<number> {
+		const { stdout } = await execa(
+			'gh',
+			['repo', 'view', '--json', 'stargazerCount', '--jq', '.stargazerCount'],
+			{
+				cwd: this.repositoryPath,
+			},
+		)
+
+		return Number.parseInt(stdout, 10)
+	}
+
+	public async getTableRow() {
+		const outdatedPackageList = await this.getOutdatedPackageList()
+		const gitIsClean = await this.getGitIsClean()
+		const isRemoteAheadInitial = await this.isRemoteAhead()
+
+		const starCount = this.isOnMyGitHub ? await this.getStarCount() : undefined
+		const npmDownloadCount =
+			this.isOnMyGitHub && this.isOnNpm ? await this.getNpmDownloadCount() : undefined
+
+		const isPublic = this.isOnMyGitHub ? await this.isPublic() : false
+
+		return {
+			gitHubLink: this.gitHubLink,
+			gitHubStarCount: starCount,
+			gitIsClean,
+			gitIsDirty: !gitIsClean,
+			gitRemoteCount: await this.getGitRemoteCount(),
+			isAuthoredByMe: this.isAuthoredByMe,
+			isOnMyGitHub: this.isOnMyGitHub,
+			isOnNpm: this.isOnNpm,
+			isPublic,
+			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
+			npmDownloadCount,
+			outdatedPackageCount: outdatedPackageList.length,
+			outdatedPackageList,
+			repositoryPath: this.repositoryPath,
+			title: this.title,
+			type: this.status,
+			usesPnpm: this.usesPnpm,
+			usesSharedConfig: this.usesSharedConfig,
+		}
+	}
+
+	public async isPublic(): Promise<boolean> {
+		try {
+			const { stdout } = await execa(
+				'gh',
+				['repo', 'view', '--json', 'isPrivate', '--jq', '.isPrivate'],
+				{
+					cwd: this.repositoryPath,
+				},
+			)
+
+			return stdout === 'false'
+		} catch {
+			return false
+		}
+	}
+
 	public async isRemoteAhead(): Promise<boolean> {
 		const forkStatus = await this.getRemoteStatus()
 		return Object.values(forkStatus).some((value) => value > 0)
+	}
+
+	public get gitHubLink(): string | undefined {
+		return this.packageData.repository?.url.replace('git+', '').replace('.git', '')
 	}
 
 	public get isAuthoredByMe(): boolean {
@@ -173,6 +253,10 @@ export class Project {
 			: this.isAuthoredByMe
 				? 'source'
 				: 'unmaintained'
+	}
+
+	public get title(): string {
+		return this.packageData.name ?? path.basename(this.repositoryPath)
 	}
 
 	public get usesPnpm(): boolean {
@@ -220,49 +304,4 @@ export async function getProjects(
 	}
 
 	return projects
-}
-
-export function loadProject(project: Project): {
-	gitIsClean: Promise<boolean>
-	gitRemoteCount: Promise<number>
-	isAuthoredByMe: boolean
-	isOnMyGitHub: boolean
-	isOnNpm: boolean
-	isRemoteAhead: Promise<boolean>
-	outdatedPackageList: Promise<string[]>
-	// OutdatedPackageListMinor: Promise<string[]>
-	// remoteStatus: ReturnType<Project['getRemoteStatus']>
-	repositoryPath: string
-	type: Project['status']
-	usesPnpm: boolean
-	usesSharedConfig: boolean
-} {
-	const { repositoryPath } = project
-	const gitIsClean = project.getGitIsClean()
-	const gitRemoteCount = project.getGitRemoteCount()
-	const outdatedPackageList = project.getOutdatedPackageList()
-	// Const outdatedPackageListMajor = project.getOutdatedPackageList('major')
-	// const remoteStatus = project.getRemoteStatus()
-	const isRemoteAhead = project.isRemoteAhead()
-	const { isAuthoredByMe } = project
-	const { isOnMyGitHub } = project
-	const { isOnNpm } = project
-	const type = project.status
-	const { usesPnpm } = project
-	const { usesSharedConfig } = project
-
-	return {
-		gitIsClean,
-		gitRemoteCount,
-		isAuthoredByMe,
-		isOnMyGitHub,
-		isOnNpm,
-		isRemoteAhead,
-		outdatedPackageList,
-		// OutdatedPackageListMinor,
-		repositoryPath,
-		type,
-		usesPnpm,
-		usesSharedConfig,
-	}
 }
