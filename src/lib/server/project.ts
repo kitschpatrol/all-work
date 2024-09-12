@@ -1,4 +1,4 @@
-import { $, execa } from 'execa'
+import { execa } from 'execa'
 import { globby } from 'globby'
 import path from 'node:path'
 import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
@@ -39,9 +39,47 @@ export class Project {
 	}
 
 	public async getOutdatedPackageList(
-		mode: 'default' | 'latest' | 'major' | 'minor' | 'newest' | 'next' | 'patch',
+		mode:
+			| 'default'
+			| 'latest'
+			| 'major'
+			| 'minor'
+			| 'newest'
+			| 'next'
+			| 'patch'
+			| undefined = undefined,
 	): Promise<string[]> {
-		const { stdout } = await $`taze ${mode} --cwd ${this.repositoryPath} --recursive`
+		if (mode !== undefined) {
+			console.log(`Mode not yet implemented`)
+		}
+
+		const { stdout } = await execa('ncu', ['--deep'], {
+			cwd: this.repositoryPath,
+		})
+
+		// Const result = await ncu.run({
+		// 	// Pass any cli option
+
+		// 	packageFile: '../package.json',
+		// 	upgrade: true,
+		// 	// Defaults:
+		// 	// jsonUpgraded: true,
+		// 	// silent: true,
+		// })
+
+		// Let output
+		// if (mode === undefined) {
+		// 	const { stdout } = await execa('pnpm', ['outdated', '--recursive', '--no-table'], {
+		// 		cwd: this.repositoryPath,
+		// 	})
+
+		// 	output = stdout
+		// } else {
+		// 	// Taze crashing...
+		// 	const { stdout } = await $`taze ${mode} --cwd ${this.repositoryPath} --recursive`
+		// 	output = stdout
+		// }
+
 		return stdout
 			.split('\n')
 			.filter((line) => line.includes('→'))
@@ -182,4 +220,49 @@ export async function getProjects(
 	}
 
 	return projects
+}
+
+export function loadProject(project: Project): {
+	gitIsClean: Promise<boolean>
+	gitRemoteCount: Promise<number>
+	isAuthoredByMe: boolean
+	isOnMyGitHub: boolean
+	isOnNpm: boolean
+	isRemoteAhead: Promise<boolean>
+	outdatedPackageList: Promise<string[]>
+	// OutdatedPackageListMinor: Promise<string[]>
+	// remoteStatus: ReturnType<Project['getRemoteStatus']>
+	repositoryPath: string
+	type: Project['status']
+	usesPnpm: boolean
+	usesSharedConfig: boolean
+} {
+	const { repositoryPath } = project
+	const gitIsClean = project.getGitIsClean()
+	const gitRemoteCount = project.getGitRemoteCount()
+	const outdatedPackageList = project.getOutdatedPackageList()
+	// Const outdatedPackageListMajor = project.getOutdatedPackageList('major')
+	// const remoteStatus = project.getRemoteStatus()
+	const isRemoteAhead = project.isRemoteAhead()
+	const { isAuthoredByMe } = project
+	const { isOnMyGitHub } = project
+	const { isOnNpm } = project
+	const type = project.status
+	const { usesPnpm } = project
+	const { usesSharedConfig } = project
+
+	return {
+		gitIsClean,
+		gitRemoteCount,
+		isAuthoredByMe,
+		isOnMyGitHub,
+		isOnNpm,
+		isRemoteAhead,
+		outdatedPackageList,
+		// OutdatedPackageListMinor,
+		repositoryPath,
+		type,
+		usesPnpm,
+		usesSharedConfig,
+	}
 }

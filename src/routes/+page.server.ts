@@ -1,4 +1,4 @@
-import { getProjectPaths } from '$lib/server/project'
+import { getProjectPaths, loadProject, Project } from '$lib/server/project'
 import type { PageServerLoad } from './$types'
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -11,7 +11,10 @@ export const load: PageServerLoad = async () => {
 		[],
 	)
 
+	const projects = projectPaths.map((projectPath) => new Project(projectPath))
+	const activeProjects = projects.filter((project) => project.status !== 'unmaintained')
+
 	return {
-		projectPaths,
+		projects: activeProjects.map((projectPath) => loadProject(projectPath)),
 	}
 }
