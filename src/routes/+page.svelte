@@ -1,11 +1,9 @@
-
 <script lang="ts">
-	import type { PageData } from './$types';
-	
-	export let data: PageData;
+	import type { PageData } from './$types'
+
+	export let data: PageData
 </script>
 
-
 {#each data.projectPaths as projectPath}
-<p>{projectPath}</p>
+	<p>{projectPath}</p>
 {/each}

@@ -1,13 +1,40 @@
 {
 	"name": "allwork",
 	"version": "0.0.1",
+	"type": "module",
+	"description": "High-level view of your maintained repositories.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kitschpatrol/allwork.git"
+	},
+	"homepage": "https://github.com/kitschpatrol/allwork",
+	"bugs": {
+		"url": "https://github.com/kitschpatrol/allwork/issues",
+		"email": "eric@ericmika.com"
+	},
+	"author": {
+		"name": "Eric Mika",
+		"email": "eric@ericmika.com",
+		"url": "https://ericmika.com"
+	},
+	"license": "MIT",
 	"private": true,
+	"packageManager": "pnpm@9.10.0",
+	"engines": {
+		"node": ">=18.0.0",
+		"pnpm": ">=9.0.0"
+	},
+	"keywords": [
+		"github"
+	],
 	"scripts": {
-		"dev": "vite dev",
 		"build": "vite build",
-		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"dev": "vite dev",
+		"fix": "shared-config --fix",
+		"lint": "shared-config --lint",
+		"preview": "vite preview",
 		"test": "vitest"
 	},
 	"devDependencies": {
@@ -23,7 +50,5 @@
 		"typescript": "^5.6.2",
 		"vite": "^5.4.4",
 		"vitest": "^2.0.5"
-	},
-	"type": "module",
-	"packageManager": "pnpm@9.10.0"
+	}
 }
