@@ -1,5 +1,5 @@
-appId: com.hollama.desktop
-productName: Hollama
+appId: com.ericmika.allwork
+productName: AllWork
 artifactName: ${productName}_${version}-${os}-${arch}.${ext}
 
 files:
@@ -13,7 +13,7 @@ mac:
   entitlementsInherit: electron/resources/mac/entitlements.mac.plist
   hardenedRuntime: true
   gatekeeperAssess: false
-  target: dmg
+  target: zip
 
 win:
   target: nsis
@@ -26,7 +26,7 @@ nsis:
 linux:
   target: tar.gz
   icon: electron/resources/icons/png/1024x1024.png
-
+#
 # publish:
 #   provider: github
 #   releaseType: release

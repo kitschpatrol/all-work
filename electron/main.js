@@ -1,21 +1,39 @@
-import net from 'net'
-import { join } from 'path'
-import { app, BrowserWindow, dialog, utilityProcess } from 'electron'
+import { app, BrowserWindow, dialog, shell, utilityProcess } from 'electron'
+import net from 'node:net'
+import path from 'node:path'
 
 // Vite default dev & production ports
-const hollamaPort = app.isPackaged ? '4173' : '5173'
-const HOLLAMA_HOST = '127.0.0.1'
+const sveltePort = app.isPackaged ? '4173' : '5173'
+const SVELTE_HOST = '127.0.0.1'
 
 function createWindow() {
 	const mainWindow = new BrowserWindow({
-		width: 1280,
-		height: 800,
-		minWidth: 400,
+		height: 1024,
 		minHeight: 640,
+		minWidth: 400,
+		title: 'AllWork',
+		width: 768,
 	})
 
 	mainWindow.menuBarVisible = false // Windows: hides the menu bar
-	mainWindow.loadURL(`http://${HOLLAMA_HOST}:${hollamaPort}`)
+	mainWindow.loadURL(`http://${SVELTE_HOST}:${sveltePort}`)
+
+	// Intercept new window events (e.g., links with target="_blank")
+	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+		// Open the url in the default browser
+		shell.openExternal(url)
+		// Prevent Electron from opening a new window
+		return { action: 'deny' }
+	})
+
+	// Intercept navigation events within the current window
+	mainWindow.webContents.on('will-navigate', (event, url) => {
+		// If the url is different from the app's url, open in default browser
+		if (url !== mainWindow.webContents.getURL()) {
+			event.preventDefault()
+			shell.openExternal(url)
+		}
+	})
 }
 
 function checkServerAvailability(port) {
@@ -32,7 +50,7 @@ function checkServerAvailability(port) {
 				socket.destroy()
 
 				if (retries >= MAX_RETRIES) {
-					reject(new Error(`Couldn't connect to Hollama server after ${MAX_RETRIES} attempts`))
+					reject(new Error(`Couldn't connect to SvelteKit server after ${MAX_RETRIES} attempts`))
 				} else {
 					retries++
 					setTimeout(tryConnection, RETRY_INTERVAL_IN_MS)
@@ -43,7 +61,7 @@ function checkServerAvailability(port) {
 			socket.once('error', onError)
 			socket.once('timeout', onError)
 
-			socket.connect(port, HOLLAMA_HOST, () => {
+			socket.connect(port, SVELTE_HOST, () => {
 				socket.destroy()
 				resolve()
 			})
@@ -57,28 +75,29 @@ app
 	.whenReady()
 	.then(async () => {
 		if (app.isPackaged) {
-			utilityProcess.fork(join(app.getAppPath(), 'build', 'index.js'), {
-				env: { ...process.env, PORT: hollamaPort },
+			utilityProcess.fork(path.join(app.getAppPath(), 'build', 'index.js'), {
+				env: { ...process.env, PORT: sveltePort },
 			})
 		} else {
 			console.warn('##### Running Electron in development mode')
-			console.log('##### Run `npm run dev` to start the Hollama server separately')
+			console.log('##### Run `npm run dev` to start the SvelteKit server separately')
 		}
 
-		await checkServerAvailability(parseInt(hollamaPort))
+		await checkServerAvailability(Number.parseInt(sveltePort, 10))
 		createWindow()
 	})
+	// eslint-disable-next-line unicorn/prefer-top-level-await
 	.catch((error) => {
 		dialog.showErrorBox('Error', error.message)
 		app.quit()
 	})
 
 // Quit when all windows are closed, except on macOS.
-app.on('window-all-closed', function () {
+app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') app.quit()
 })
 
-// macOS: Open a window if none are open
-app.on('activate', function () {
+// MacOS: Open a window if none are open
+app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })

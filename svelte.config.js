@@ -4,8 +4,8 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 // TODO needed?
 const adapterConfig = {
 	routes: {
-		include: ['/*'],
 		exclude: ['<all>'],
+		include: ['/*'],
 	},
 }
 

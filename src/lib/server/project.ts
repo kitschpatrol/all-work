@@ -8,13 +8,43 @@ export class Project {
 	private readonly packageData: NormalizedPackageJson
 
 	constructor(public readonly repositoryPath: string) {
-		console.log('----------------------------------')
-		console.log(repositoryPath)
-
 		this.packageData = readPackageSync({
 			cwd: repositoryPath,
 			normalize: true,
 		})
+	}
+
+	public async getGitHubInfo(): Promise<
+		| {
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				open_issues_count: number
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				stargazers_count: number
+		  }
+		| undefined
+	> {
+		const author = 'kitschpatrol'
+		const repo = this.packageData.name.replace('@kitschpatrol/', '')
+		// eslint-disable-next-line n/no-unsupported-features/node-builtins
+		const result = await fetch(`https://api.github.com/repos/${author}/${repo}`)
+		const json = (await result.json()) as {
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			open_issues_count: number
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			stargazers_count: number
+			status: string | undefined
+		}
+
+		if (json.status !== undefined && json.status === '404') {
+			return undefined
+		}
+
+		return {
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			open_issues_count: json.open_issues_count,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			stargazers_count: json.stargazers_count,
+		}
 	}
 
 	public async getGitIsClean(): Promise<boolean> {
@@ -163,19 +193,13 @@ export class Project {
 	}
 
 	public async getStarCount(): Promise<number> {
-		try {
-			const { stdout } = await execa(
-				'gh',
-				['repo', 'view', '--json', 'stargazerCount', '--jq', '.stargazerCount'],
-				{
-					cwd: this.repositoryPath,
-				},
-			)
+		const info = await this.getGitHubInfo()
 
-			return Number.parseInt(stdout, 10)
-		} catch {
+		if (info === undefined) {
 			return 0
 		}
+
+		return info.stargazers_count
 	}
 
 	public async getTableRow() {
@@ -183,11 +207,15 @@ export class Project {
 		const gitIsClean = await this.getGitIsClean()
 		const isRemoteAheadInitial = await this.isRemoteAhead()
 
-		const starCount = this.isOnMyGitHub ? await this.getStarCount() : undefined
+		const gitHubInfo = await this.getGitHubInfo()
+		const issueCount =
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo?.open_issues_count : undefined
+		const starCount =
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo?.stargazers_count : undefined
 		const npmDownloadCount =
 			this.isOnMyGitHub && this.isOnNpm ? await this.getNpmDownloadCount() : undefined
 
-		const isPublic = this.isOnMyGitHub ? await this.isPublic() : false
+		const isPublic = this.isOnMyGitHub && gitHubInfo !== undefined
 
 		return {
 			gitHubLink: this.gitHubLink,
@@ -200,6 +228,7 @@ export class Project {
 			isOnNpm: this.isOnNpm,
 			isPublic,
 			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
+			issueCount,
 			npmDownloadCount,
 			outdatedPackageCount: outdatedPackageList.length,
 			outdatedPackageList,
@@ -212,19 +241,8 @@ export class Project {
 	}
 
 	public async isPublic(): Promise<boolean> {
-		try {
-			const { stdout } = await execa(
-				'gh',
-				['repo', 'view', '--json', 'isPrivate', '--jq', '.isPrivate'],
-				{
-					cwd: this.repositoryPath,
-				},
-			)
-
-			return stdout === 'false'
-		} catch {
-			return false
-		}
+		const info = await this.getGitHubInfo()
+		return info !== undefined
 	}
 
 	public async isRemoteAhead(): Promise<boolean> {

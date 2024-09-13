@@ -52,15 +52,13 @@
 
 	onMount(() => {
 		for (const projectPromise of data.projects) {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 			projectPromise
 				// eslint-disable-next-line @typescript-eslint/no-loop-func
 				.then((project) => {
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 					resolvedProjects = [...resolvedProjects, project]
 					resolvedProjects.sort(compareProjects)
 				})
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
 				.catch((error: unknown) => {
 					// Handle errors if necessary
 					console.error('Error resolving project:', error)
@@ -90,8 +88,11 @@
 			<TableHeadCell on:click={() => sortBy('isRemoteAhead')}
 				>Behind {sortIcon('isRemoteAhead')}</TableHeadCell
 			>
-			<TableHeadCell on:click={() => sortBy('npmDownloadCount')}
-				>Outdated {sortIcon('npmDownloadCount')}</TableHeadCell
+			<TableHeadCell on:click={() => sortBy('outdatedPackageCount')}
+				>Outdated {sortIcon('outdatedPackageCount')}</TableHeadCell
+			>
+			<TableHeadCell on:click={() => sortBy('issueCount')}
+				>Issues {sortIcon('issueCount')}</TableHeadCell
 			>
 			<TableHeadCell on:click={() => sortBy('gitHubStarCount')}
 				>Stars {sortIcon('gitHubStarCount')}</TableHeadCell
@@ -128,6 +129,11 @@
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{project.outdatedPackageCount}
+					</TableBodyCell>
+					<TableBodyCell tdClass="px-6 py-1">
+						{#if project.issueCount}
+							{project.issueCount}
+						{/if}
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.gitHubStarCount}
