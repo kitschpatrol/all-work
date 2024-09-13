@@ -1,10 +1,17 @@
 import { execa } from 'execa'
 import { globby } from 'globby'
+// Maybe later
+// import hostedGitInfo from 'hosted-git-info'
 import path from 'node:path'
-import * as ncu from 'npm-check-updates'
 import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
+import { CheckPackages } from 'taze'
+
+// Maybe later
+// type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
 
 export class Project {
+	// Maybe later
+	// private readonly gitInfo: HostedGitInfo
 	private readonly packageData: NormalizedPackageJson
 
 	constructor(public readonly repositoryPath: string) {
@@ -12,6 +19,9 @@ export class Project {
 			cwd: repositoryPath,
 			normalize: true,
 		})
+
+		// Maybe later
+		// this.gitInfo = hostedGitInfo.fromUrl(this.packageData.repository?.url ?? '')
 	}
 
 	public async getGitHubInfo(): Promise<
@@ -87,51 +97,6 @@ export class Project {
 		return json.downloads
 	}
 
-	public async getOutdatedPackageList(
-		mode:
-			| 'default'
-			| 'latest'
-			| 'major'
-			| 'minor'
-			| 'newest'
-			| 'next'
-			| 'patch'
-			| undefined = undefined,
-	): Promise<string[]> {
-		if (mode !== undefined) {
-			console.log(`Mode not yet implemented`)
-		}
-
-		try {
-			const results = await ncu.run({
-				cache: true,
-				cwd: this.repositoryPath,
-				pre: false,
-				target: 'greatest',
-				upgrade: false,
-				workspaces: this.packageData.workspaces !== undefined,
-			})
-
-			if (typeof results !== 'object') {
-				return []
-			}
-
-			const updateSet = new Set<string>()
-			for (const value of Object.values(results)) {
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-				for (const [key2, value2] of Object.entries(value)) {
-					// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-					updateSet.add(`${key2}: ${value2}`)
-				}
-			}
-
-			return [...updateSet]
-		} catch (error) {
-			console.error('Error getting outdated packages:', error)
-			return [] // Return empty array in case of an error
-		}
-	}
-
 	public async getRemoteStatus(skipOrigin = true): Promise<Record<string, number>> {
 		// Get the current branch name
 		const { stdout: currentBranch } = await execa('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -203,7 +168,9 @@ export class Project {
 	}
 
 	public async getTableRow() {
-		const outdatedPackageList: string[] = await this.getOutdatedPackageList()
+		const semverUpdateList: string[] = await this.getUpdateList('default')
+
+		const majorUpdateList: string[] = await this.getUpdateList('major')
 		const gitIsClean = await this.getGitIsClean()
 		const isRemoteAheadInitial = await this.isRemoteAhead()
 
@@ -229,14 +196,49 @@ export class Project {
 			isPublic,
 			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
 			issueCount,
+			majorUpdateCount: majorUpdateList.length - semverUpdateList.length,
+			majorUpdateList,
 			npmDownloadCount,
-			outdatedPackageCount: outdatedPackageList.length,
-			outdatedPackageList,
 			repositoryPath: this.repositoryPath,
+			semverUpdateCount: semverUpdateList.length,
+			semverUpdateList,
 			title: this.title,
 			type: this.status,
 			usesPnpm: this.usesPnpm,
 			usesSharedConfig: this.usesSharedConfig,
+		}
+	}
+
+	public async getUpdateList(
+		mode: 'default' | 'latest' | 'major' | 'minor' | 'newest' | 'next' | 'patch' = 'default',
+	): Promise<string[]> {
+		// Via Taze
+
+		try {
+			// eslint-disable-next-line new-cap
+			const checked = await CheckPackages({
+				cwd: this.repositoryPath,
+				force: true,
+				mode,
+				recursive: true,
+			})
+
+			const results: string[] = []
+
+			for (const pkg of checked.packages) {
+				for (const resolved of pkg.resolved) {
+					if (resolved.update) {
+						results.push(
+							`${resolved.name}: ${resolved.currentVersion} -> ${resolved.targetVersion}`,
+						)
+					}
+				}
+			}
+
+			return results
+		} catch (error) {
+			console.error(`Error getting package update list for "${this.repositoryPath}"`, error)
+			return []
 		}
 	}
 
@@ -297,6 +299,7 @@ export class Project {
 export async function getProjectPaths(
 	projectsDirectory: string,
 	extraProjectPaths: string[] = [],
+	excludedProjectPaths: string[] = [],
 ): Promise<string[]> {
 	const projectsDirectoryPackageJsonPaths = await globby(
 		path.join(projectsDirectory, '*/package.json'),
@@ -311,7 +314,12 @@ export async function getProjectPaths(
 	// Unique project paths
 	const allProjectPaths = [...new Set([...extraProjectPaths, ...projectsDirectoryProjectPaths])]
 
-	return allProjectPaths
+	// Filter out excluded project paths
+	const filteredProjectPaths = allProjectPaths.filter(
+		(projectPath) => !excludedProjectPaths.includes(projectPath),
+	)
+
+	return filteredProjectPaths
 }
 
 export async function getProjects(

@@ -88,8 +88,11 @@
 			<TableHeadCell on:click={() => sortBy('isRemoteAhead')}
 				>Behind {sortIcon('isRemoteAhead')}</TableHeadCell
 			>
-			<TableHeadCell on:click={() => sortBy('outdatedPackageCount')}
-				>Outdated {sortIcon('outdatedPackageCount')}</TableHeadCell
+			<TableHeadCell on:click={() => sortBy('semverUpdateCount')}
+				>Semver Updates {sortIcon('semverUpdateCount')}</TableHeadCell
+			>
+			<TableHeadCell on:click={() => sortBy('majorUpdateCount')}
+				>Major Updates {sortIcon('majorUpdateCount')}</TableHeadCell
 			>
 			<TableHeadCell on:click={() => sortBy('issueCount')}
 				>Issues {sortIcon('issueCount')}</TableHeadCell
@@ -119,16 +122,23 @@
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if !project.gitIsClean}
-							🚨
+							📝
 						{/if}
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.isRemoteAhead === true}
-							🚨
+							📥
 						{/if}
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
-						{project.outdatedPackageCount}
+						{#if project.semverUpdateCount > 0}
+							{project.semverUpdateCount}
+						{/if}
+					</TableBodyCell>
+					<TableBodyCell tdClass="px-6 py-1">
+						{#if project.majorUpdateCount > 0}
+							{project.majorUpdateCount}
+						{/if}
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.issueCount}

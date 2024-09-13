@@ -7,6 +7,12 @@ export const load: PageServerLoad = async () => {
 		'/Users/mika/Code/',
 		// Any extra repos not detected by getProjectPaths filters...
 		[],
+		// Exclusions
+		[
+			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
+			'/Users/mika/Code/parcel-optimizer-friendly-urls',
+			'/Users/mika/Code/eleventy-plugin-parcel-test',
+		],
 	)
 
 	const projects = projectPaths
