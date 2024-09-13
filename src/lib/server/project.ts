@@ -1,12 +1,16 @@
 import { execa } from 'execa'
 import { globby } from 'globby'
 import path from 'node:path'
+import * as ncu from 'npm-check-updates'
 import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
 
 export class Project {
 	private readonly packageData: NormalizedPackageJson
 
 	constructor(public readonly repositoryPath: string) {
+		console.log('----------------------------------')
+		console.log(repositoryPath)
+
 		this.packageData = readPackageSync({
 			cwd: repositoryPath,
 			normalize: true,
@@ -68,37 +72,34 @@ export class Project {
 			console.log(`Mode not yet implemented`)
 		}
 
-		const { stdout } = await execa('ncu', ['--deep'], {
-			cwd: this.repositoryPath,
-		})
+		try {
+			const results = await ncu.run({
+				cache: true,
+				cwd: this.repositoryPath,
+				pre: false,
+				target: 'greatest',
+				upgrade: false,
+				workspaces: this.packageData.workspaces !== undefined,
+			})
 
-		// Const result = await ncu.run({
-		// 	// Pass any cli option
+			if (typeof results !== 'object') {
+				return []
+			}
 
-		// 	packageFile: '../package.json',
-		// 	upgrade: true,
-		// 	// Defaults:
-		// 	// jsonUpgraded: true,
-		// 	// silent: true,
-		// })
+			const updateSet = new Set<string>()
+			for (const value of Object.values(results)) {
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+				for (const [key2, value2] of Object.entries(value)) {
+					// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+					updateSet.add(`${key2}: ${value2}`)
+				}
+			}
 
-		// Let output
-		// if (mode === undefined) {
-		// 	const { stdout } = await execa('pnpm', ['outdated', '--recursive', '--no-table'], {
-		// 		cwd: this.repositoryPath,
-		// 	})
-
-		// 	output = stdout
-		// } else {
-		// 	// Taze crashing...
-		// 	const { stdout } = await $`taze ${mode} --cwd ${this.repositoryPath} --recursive`
-		// 	output = stdout
-		// }
-
-		return stdout
-			.split('\n')
-			.filter((line) => line.includes('→'))
-			.map((line) => line.trim())
+			return [...updateSet]
+		} catch (error) {
+			console.error('Error getting outdated packages:', error)
+			return [] // Return empty array in case of an error
+		}
 	}
 
 	public async getRemoteStatus(skipOrigin = true): Promise<Record<string, number>> {
@@ -162,19 +163,23 @@ export class Project {
 	}
 
 	public async getStarCount(): Promise<number> {
-		const { stdout } = await execa(
-			'gh',
-			['repo', 'view', '--json', 'stargazerCount', '--jq', '.stargazerCount'],
-			{
-				cwd: this.repositoryPath,
-			},
-		)
+		try {
+			const { stdout } = await execa(
+				'gh',
+				['repo', 'view', '--json', 'stargazerCount', '--jq', '.stargazerCount'],
+				{
+					cwd: this.repositoryPath,
+				},
+			)
 
-		return Number.parseInt(stdout, 10)
+			return Number.parseInt(stdout, 10)
+		} catch {
+			return 0
+		}
 	}
 
 	public async getTableRow() {
-		const outdatedPackageList = await this.getOutdatedPackageList()
+		const outdatedPackageList: string[] = await this.getOutdatedPackageList()
 		const gitIsClean = await this.getGitIsClean()
 		const isRemoteAheadInitial = await this.isRemoteAhead()
 

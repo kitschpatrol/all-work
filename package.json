@@ -24,6 +24,7 @@
 		"node": ">=18.0.0",
 		"pnpm": ">=9.0.0"
 	},
+	"main": "./electron/main.js",
 	"keywords": [
 		"github"
 	],
@@ -32,7 +33,9 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"clean": "rimraf pnpm-lock.yaml ; git clean -fdX",
-		"dev": "vite dev",
+		"dev": "vite dev --host",
+		"electron": "electron .",
+		"electron:build": "vite build && electron-builder",
 		"fix": "shared-config --fix",
 		"lint": "shared-config --lint",
 		"preview": "vite preview",
@@ -40,11 +43,13 @@
 	},
 	"devDependencies": {
 		"@kitschpatrol/shared-config": "^4.7.5",
-		"@sveltejs/adapter-auto": "^3.2.4",
+		"@sveltejs/adapter-node": "^5.2.2",
 		"@sveltejs/kit": "^2.5.26",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",
 		"@tailwindcss/typography": "^0.5.14",
 		"autoprefixer": "^10.4.20",
+		"electron": "^31.3.1",
+		"electron-builder": "^25.0.3",
 		"execa": "^9.3.1",
 		"flowbite": "^2.5.1",
 		"flowbite-svelte": "^0.46.16",
