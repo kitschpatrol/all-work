@@ -82,6 +82,22 @@ export class Project {
 		}
 	}
 
+	public async getLastCommitDate(): Promise<string | undefined> {
+		try {
+			const { stdout: lastCommitDate } = await execa(
+				'git',
+				['log', '-1', '--format=%cd', '--date=short'],
+				{
+					cwd: this.repositoryPath,
+				},
+			)
+			return lastCommitDate
+		} catch (error) {
+			console.error('Error getting last commit date:', error)
+			return undefined
+		}
+	}
+
 	public async getNpmDownloadCount(): Promise<number> {
 		// eslint-disable-next-line n/no-unsupported-features/node-builtins
 		const result = await fetch(
@@ -169,7 +185,7 @@ export class Project {
 
 	public async getTableRow() {
 		const semverUpdateList: string[] = await this.getUpdateList('default')
-
+		const lastCommitDate = await this.getLastCommitDate()
 		const majorUpdateList: string[] = await this.getUpdateList('major')
 		const gitIsClean = await this.getGitIsClean()
 		const isRemoteAheadInitial = await this.isRemoteAhead()
@@ -196,6 +212,7 @@ export class Project {
 			isPublic,
 			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
 			issueCount,
+			lastCommitDate,
 			majorUpdateCount: majorUpdateList.length - semverUpdateList.length,
 			majorUpdateList,
 			npmDownloadCount,

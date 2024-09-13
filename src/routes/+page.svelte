@@ -82,6 +82,9 @@
 		<TableHead>
 			<TableHeadCell on:click={() => sortBy('title')}>Project {sortIcon('title')}</TableHeadCell>
 			<TableHeadCell on:click={() => sortBy('type')}>Type {sortIcon('type')}</TableHeadCell>
+			<TableHeadCell on:click={() => sortBy('lastCommitDate')}
+				>Last Commit {sortIcon('lastCommitDate')}</TableHeadCell
+			>
 			<TableHeadCell on:click={() => sortBy('gitIsDirty')}
 				>Dirty {sortIcon('gitIsDirty')}</TableHeadCell
 			>
@@ -122,6 +125,11 @@
 						<a href={`file://${project.repositoryPath}`}>{project.title}</a>
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
+					<TableBodyCell tdClass="px-6 py-1">
+						{#if project.lastCommitDate !== undefined}
+							{project.lastCommitDate}
+						{/if}
+					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if !project.gitIsClean}
 							📝

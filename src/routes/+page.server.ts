@@ -1,17 +1,17 @@
 import { getProjectPaths, Project } from '$lib/server/project'
 import type { PageServerLoad } from './$types'
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const load: PageServerLoad = async () => {
 	const projectPaths = await getProjectPaths(
 		'/Users/mika/Code/',
 		// Any extra repos not detected by getProjectPaths filters...
-		[],
+		['/Users/mika/Notes'],
 		// Exclusions
 		[
 			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
 			'/Users/mika/Code/parcel-optimizer-friendly-urls',
 			'/Users/mika/Code/eleventy-plugin-parcel-test',
+			'/Users/mika/Code/tp-test-astro',
 		],
 	)
 
