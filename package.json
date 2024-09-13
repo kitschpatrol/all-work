@@ -46,10 +46,10 @@
 		"@sveltejs/adapter-node": "^5.2.2",
 		"@sveltejs/kit": "^2.5.26",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",
-		"@tailwindcss/typography": "^0.5.14",
+		"@tailwindcss/typography": "^0.5.15",
 		"autoprefixer": "^10.4.20",
-		"electron": "^31.3.1",
-		"electron-builder": "^25.0.3",
+		"electron": "^32.1.0",
+		"electron-builder": "^25.0.5",
 		"execa": "^9.3.1",
 		"flowbite": "^2.5.1",
 		"flowbite-svelte": "^0.46.16",
@@ -60,10 +60,10 @@
 		"rimraf": "^6.0.1",
 		"sortable-tablesort": "^3.2.3",
 		"svelte": "^4.2.19",
-		"svelte-check": "^4.0.1",
-		"tailwindcss": "^3.4.9",
+		"svelte-check": "^4.0.2",
+		"tailwindcss": "^3.4.11",
 		"typescript": "^5.6.2",
 		"vite": "^5.4.4",
-		"vitest": "^2.0.5"
+		"vitest": "^2.1.0"
 	}
 }
