@@ -3,15 +3,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"description": "High-level view of your maintained repositories.",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/kitschpatrol/allwork.git"
-	},
+	"repository": "github:kitschpatrol/allwork",
 	"homepage": "https://github.com/kitschpatrol/allwork",
-	"bugs": {
-		"url": "https://github.com/kitschpatrol/allwork/issues",
-		"email": "eric@ericmika.com"
-	},
+	"bugs": "https://github.com/kitschpatrol/allwork/issues",
 	"author": {
 		"name": "Eric Mika",
 		"email": "eric@ericmika.com",
@@ -32,7 +26,7 @@
 		"build": "vite build",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"clean": "rimraf pnpm-lock.yaml ; git clean -fdX",
+		"clean": "git rm -f pnpm-lock.yaml ; git clean -fdX",
 		"dev": "vite dev --host",
 		"electron": "electron .",
 		"electron:build": "vite build && electron-builder",
@@ -42,9 +36,9 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@kitschpatrol/shared-config": "^4.7.5",
+		"@kitschpatrol/shared-config": "^4.7.6",
 		"@sveltejs/adapter-node": "^5.2.2",
-		"@sveltejs/kit": "^2.5.26",
+		"@sveltejs/kit": "^2.5.27",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",
 		"@tailwindcss/typography": "^0.5.15",
 		"autoprefixer": "^10.4.20",
@@ -55,15 +49,15 @@
 		"flowbite-svelte": "^0.46.16",
 		"flowbite-svelte-icons": "^1.6.1",
 		"globby": "^14.0.2",
-		"npm-check-updates": "^17.1.1",
+		"hosted-git-info": "^8.0.0",
 		"read-pkg": "^9.0.1",
-		"rimraf": "^6.0.1",
 		"sortable-tablesort": "^3.2.3",
 		"svelte": "^4.2.19",
 		"svelte-check": "^4.0.2",
 		"tailwindcss": "^3.4.11",
+		"taze": "^0.16.8",
 		"typescript": "^5.6.2",
-		"vite": "^5.4.4",
-		"vitest": "^2.1.0"
+		"vite": "^5.4.5",
+		"vitest": "^2.1.1"
 	}
 }
