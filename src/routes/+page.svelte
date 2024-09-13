@@ -118,7 +118,9 @@
 		<TableBody tableBodyClass="divide-y">
 			{#each resolvedProjects as project}
 				<TableBodyRow>
-					<TableBodyCell tdClass="px-6 py-1 font-bold">{project.title}</TableBodyCell>
+					<TableBodyCell tdClass="px-6 py-1 font-bold">
+						<a href={`file://${project.repositoryPath}`}>{project.title}</a>
+					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if !project.gitIsClean}

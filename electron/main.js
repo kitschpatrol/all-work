@@ -29,7 +29,7 @@ function createWindow() {
 	// Intercept navigation events within the current window
 	mainWindow.webContents.on('will-navigate', (event, url) => {
 		// If the url is different from the app's url, open in default browser
-		if (url !== mainWindow.webContents.getURL()) {
+		if (url.startsWith('file://') || url !== mainWindow.webContents.getURL()) {
 			event.preventDefault()
 			shell.openExternal(url)
 		}
