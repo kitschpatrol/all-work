@@ -37,7 +37,7 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@kitschpatrol/shared-config": "^4.7.6",
+		"@kitschpatrol/shared-config": "^4.7.9",
 		"@sveltejs/adapter-node": "^5.2.2",
 		"@sveltejs/kit": "^2.5.27",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",

@@ -5,7 +5,11 @@ export const load: PageServerLoad = async () => {
 	const projectPaths = await getProjectPaths(
 		'/Users/mika/Code/',
 		// Any extra repos not detected by getProjectPaths filters...
-		['/Users/mika/Notes'],
+		[
+			'/Users/mika/Notes',
+			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-stuff',
+			'/Users/mika/.local/share/chezmoi',
+		],
 		// Exclusions
 		[
 			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
