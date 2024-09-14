@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, shell, utilityProcess } from 'electron'
+import { execa } from 'execa'
 import net from 'node:net'
 import path from 'node:path'
 
@@ -12,8 +13,13 @@ function createWindow() {
 		minHeight: 640,
 		minWidth: 400,
 		title: 'AllWork',
+		webPreferences: {
+			webSecurity: false, // Disable web security to allow loading local resources
+		},
 		width: 768,
 	})
+
+	console.log('window created')
 
 	mainWindow.menuBarVisible = false // Windows: hides the menu bar
 	mainWindow.loadURL(`http://${SVELTE_HOST}:${sveltePort}`)
@@ -27,11 +33,28 @@ function createWindow() {
 	})
 
 	// Intercept navigation events within the current window
+
 	mainWindow.webContents.on('will-navigate', (event, url) => {
 		// If the url is different from the app's url, open in default browser
-		if (url.startsWith('file://') || url !== mainWindow.webContents.getURL()) {
+
+		if (
+			url.startsWith('file://') ||
+			url.startsWith('gittower://') ||
+			url.startsWith('vscode://') ||
+			url !== mainWindow.webContents.getURL()
+		) {
 			event.preventDefault()
-			shell.openExternal(url)
+
+			if (url.startsWith('vscode://')) {
+				const path = url.replace('vscode://', '')
+
+				execa('code', [path]).catch((error) => {
+					dialog.showErrorBox('Error', error.message)
+				})
+			} else {
+				// All other protocols handled
+				shell.openExternal(url)
+			}
 		}
 	})
 }

@@ -31,8 +31,8 @@
 		"electron": "electron .",
 		"electron:build": "vite build && electron-builder",
 		"fix": "shared-config --fix",
-		"install": "mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"lint": "shared-config --lint",
+		"move": "mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"preview": "vite preview",
 		"test": "vitest"
 	},

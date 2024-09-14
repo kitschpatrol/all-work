@@ -3,8 +3,6 @@
 	import type { PageData } from './$types'
 	export let data: PageData
 
-	export let showFinderLink = false
-
 	import {
 		Table,
 		TableBody,
@@ -109,20 +107,36 @@
 			<TableHeadCell on:click={() => sortBy('isPublic')}
 				>Public {sortIcon('isPublic')}</TableHeadCell
 			>
-			<TableHeadCell on:click={() => sortBy('gitHubLink')}
-				>GitHub {sortIcon('gitHubLink')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('isOnNpm')}>NPM {sortIcon('isOnNpm')}</TableHeadCell>
-
-			{#if showFinderLink}
-				<TableHeadCell>Finder</TableHeadCell>
-			{/if}
 		</TableHead>
 		<TableBody tableBodyClass="divide-y">
 			{#each resolvedProjects as project}
 				<TableBodyRow>
 					<TableBodyCell tdClass="px-6 py-1 font-bold">
-						<a href={`file://${project.repositoryPath}`}>{project.title}</a>
+						{project.title}
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`file://${project.repositoryPath}`}>Finder</a
+						>
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`gittower://${project.repositoryPath}`}>Tower</a
+						>
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`vscode://${project.repositoryPath}`}>Code</a
+						>
+						{#if project.gitHubLink}
+							<a
+								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								href={project.gitHubLink}>GitHub</a
+							>
+						{/if}
+						{#if project.isOnNpm}
+							<a
+								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								href={`https://www.npmjs.com/package/${project.title}`}>NPM</a
+							>
+						{/if}
 					</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
 					<TableBodyCell tdClass="px-6 py-1">
@@ -170,32 +184,6 @@
 							✅
 						{/if}
 					</TableBodyCell>
-					<TableBodyCell tdClass="px-6 py-1">
-						{#if project.gitHubLink}
-							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-								href={project.gitHubLink}>GitHub</a
-							>
-						{/if}
-					</TableBodyCell>
-
-					<TableBodyCell tdClass="px-6 py-1">
-						{#if project.isOnNpm}
-							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-								href={`https://www.npmjs.com/package/${project.title}`}>NPM</a
-							>
-						{/if}
-					</TableBodyCell>
-
-					{#if showFinderLink}
-						<TableBodyCell tdClass="px-6 py-1">
-							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-								href={`file://${project.repositoryPath}`}>Finder</a
-							>
-						</TableBodyCell>
-					{/if}
 				</TableBodyRow>
 			{/each}
 		</TableBody>

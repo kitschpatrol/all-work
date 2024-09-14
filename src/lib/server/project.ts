@@ -6,6 +6,13 @@ import path from 'node:path'
 import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
 import { CheckPackages } from 'taze'
 
+// Future structure
+// path
+// package
+// github
+// git
+// npm
+
 // Maybe later
 // type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
 
