@@ -11,6 +11,13 @@
 		TableHead,
 		TableHeadCell,
 	} from 'flowbite-svelte'
+	import {
+		ArchiveSolid,
+		FileCodeSolid,
+		FolderSolid,
+		GithubSolid,
+		NpmSolid,
+	} from 'flowbite-svelte-icons'
 
 	type ProjectType = Awaited<(typeof data.projects)[number]>
 	type SortKey = keyof ProjectType
@@ -107,81 +114,140 @@
 			<TableHeadCell on:click={() => sortBy('isPublic')}
 				>Public {sortIcon('isPublic')}</TableHeadCell
 			>
+
+			<TableHeadCell></TableHeadCell>
+			<TableHeadCell></TableHeadCell>
+			<TableHeadCell></TableHeadCell>
+			<TableHeadCell></TableHeadCell>
+			<TableHeadCell></TableHeadCell>
 		</TableHead>
 		<TableBody tableBodyClass="divide-y">
 			{#each resolvedProjects as project}
 				<TableBodyRow>
+					<!-- Title -->
 					<TableBodyCell tdClass="px-6 py-1 font-bold">
 						{project.title}
-						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-							href={`file://${project.repositoryPath}`}>Finder</a
-						>
-						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-							href={`gittower://${project.repositoryPath}`}>Tower</a
-						>
-						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-							href={`vscode://${project.repositoryPath}`}>Code</a
-						>
-						{#if project.gitHubLink}
-							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-								href={project.gitHubLink}>GitHub</a
-							>
-						{/if}
-						{#if project.isOnNpm}
-							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
-								href={`https://www.npmjs.com/package/${project.title}`}>NPM</a
-							>
-						{/if}
 					</TableBodyCell>
+
+					<!-- Source or Fork -->
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
+
+					<!-- Last commit -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.lastCommitDate !== undefined}
 							{project.lastCommitDate}
 						{/if}
 					</TableBodyCell>
+
+					<!-- Git clean -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if !project.gitIsClean}
 							📝
 						{/if}
 					</TableBodyCell>
+
+					<!-- Remote ahead -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.isRemoteAhead === true}
 							📥
 						{/if}
 					</TableBodyCell>
+
+					<!-- Semver Updates -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.semverUpdateCount > 0}
 							{project.semverUpdateCount}
 						{/if}
 					</TableBodyCell>
+
+					<!-- Major Updates -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.majorUpdateCount > 0}
 							{project.majorUpdateCount}
 						{/if}
 					</TableBodyCell>
+
+					<!-- Open Issues -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.issueCount}
 							{project.issueCount}
 						{/if}
 					</TableBodyCell>
+
+					<!-- GitHub Stars -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.gitHubStarCount}
 							{project.gitHubStarCount}
 						{/if}
 					</TableBodyCell>
+
+					<!-- NPM downloads -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.npmDownloadCount}
 							{project.npmDownloadCount}
 						{/if}
 					</TableBodyCell>
+
+					<!-- Public -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.isPublic}
 							✅
+						{/if}
+					</TableBodyCell>
+
+					<!-- Bare links -->
+
+					<!-- Finder Link -->
+					<TableBodyCell tdClass="px-0">
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`file://${project.repositoryPath}`}
+							title="Open in Finder"
+						>
+							<FolderSolid color="red" />
+						</a>
+					</TableBodyCell>
+					<!-- Tower Link -->
+					<TableBodyCell tdClass="px-0">
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`gittower://${project.repositoryPath}`}
+							title="Open in Tower"
+						>
+							<ArchiveSolid color="red" />
+						</a>
+					</TableBodyCell>
+					<!-- VS Code Link  -->
+					<TableBodyCell tdClass="px-0">
+						<a
+							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							href={`vscode://file/${project.repositoryPath}`}
+							title="Open in VS Code"
+						>
+							<FileCodeSolid color="red" />
+						</a>
+					</TableBodyCell>
+					<!-- GitHub -->
+					<TableBodyCell tdClass="px-0">
+						{#if project.gitHubLink}
+							<a
+								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								href={project.gitHubLink}
+								title="Open in GitHub"
+							>
+								<GithubSolid color="red" />
+							</a>
+						{/if}
+					</TableBodyCell>
+					<TableBodyCell tdClass="px-0">
+						{#if project.isOnNpm}
+							<a
+								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								href={`https://www.npmjs.com/package/${project.title}`}
+								title="Open in NPM"
+							>
+								<NpmSolid color="red" />
+							</a>
 						{/if}
 					</TableBodyCell>
 				</TableBodyRow>

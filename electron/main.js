@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, shell, utilityProcess } from 'electron'
-import { execa } from 'execa'
 import net from 'node:net'
 import path from 'node:path'
 
@@ -45,16 +44,8 @@ function createWindow() {
 		) {
 			event.preventDefault()
 
-			if (url.startsWith('vscode://')) {
-				const path = url.replace('vscode://', '')
-
-				execa('code', [path]).catch((error) => {
-					dialog.showErrorBox('Error', error.message)
-				})
-			} else {
-				// All other protocols handled
-				shell.openExternal(url)
-			}
+			// All other protocols handled
+			shell.openExternal(url)
 		}
 	})
 }

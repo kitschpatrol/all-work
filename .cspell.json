@@ -2,10 +2,5 @@
 	"$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
 	"import": "@kitschpatrol/cspell-config",
 	"ignorePaths": [],
-	"words": [
-		"gittower",
-		"icns",
-		"nsis",
-		"syntaxhighlight"
-	]
+	"words": ["gittower", "icns", "nsis", "syntaxhighlight"]
 }
