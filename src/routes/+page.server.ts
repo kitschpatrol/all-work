@@ -7,7 +7,7 @@ export const load: PageServerLoad = async () => {
 		// Any extra repos not detected by getProjectPaths filters...
 		[
 			'/Users/mika/Notes',
-			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-stuff',
+			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-tap',
 			'/Users/mika/.local/share/chezmoi',
 		],
 		// Exclusions
