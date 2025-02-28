@@ -1,6 +1,6 @@
 {
 	"name": "allwork",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"private": true,
 	"description": "High-level view of your maintained repositories.",
 	"keywords": [
@@ -27,10 +27,10 @@
 		"clean": "git rm -f pnpm-lock.yaml ; git clean -fdX",
 		"dev": "vite dev --host",
 		"electron": "electron .",
-		"electron:build": "vite build && electron-builder",
+		"electron:build": "svelte-kit sync && vite build && electron-builder",
 		"fix": "kpi fix",
 		"lint": "kpi lint",
-		"move": "mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
+		"move": "rm -rf /Applications/AllWork.app ; mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"preview": "vite preview",
 		"test": "vitest"
 	},
