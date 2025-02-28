@@ -1,3 +1,4 @@
+/* eslint-disable ts/naming-convention */
 import { execa } from 'execa'
 import { globby } from 'globby'
 // Maybe later
@@ -17,6 +18,49 @@ import { CheckPackages } from 'taze'
 // type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
 
 export class Project {
+	public get gitHubLink(): string | undefined {
+		return this.packageData.repository?.url.replace('git+', '').replace('.git', '')
+	}
+
+	public get isAuthoredByMe(): boolean {
+		return (
+			this.packageData.author?.name?.toLowerCase().includes('eric mika') ??
+			this.packageData.author?.name?.toLowerCase().includes('kitschpatrol') ??
+			false
+		)
+	}
+
+	public get isOnMyGitHub(): boolean {
+		return this.packageData.repository?.url.toLowerCase().includes('kitschpatrol') ?? false
+	}
+
+	public get isOnNpm(): boolean {
+		return this.packageData.publishConfig?.access === 'public'
+	}
+
+	public get status(): 'fork' | 'source' | 'unmaintained' {
+		return !this.isAuthoredByMe && this.isOnMyGitHub
+			? 'fork'
+			: this.isAuthoredByMe
+				? 'source'
+				: 'unmaintained'
+	}
+
+	public get title(): string {
+		return this.packageData.name
+	}
+
+	public get usesPnpm(): boolean {
+		return (
+			this.packageData.packageManager?.toLowerCase().startsWith('pnpm') ??
+			Object.hasOwn(this.packageData.engines ?? {}, 'pnpm')
+		)
+	}
+
+	public get usesSharedConfig(): boolean {
+		return Object.hasOwn(this.packageData.devDependencies ?? {}, '@kitschpatrol/shared-config')
+	}
+
 	// Maybe later
 	// private readonly gitInfo: HostedGitInfo
 	private readonly packageData: NormalizedPackageJson
@@ -32,22 +76,19 @@ export class Project {
 	}
 
 	public async getGitHubInfo(): Promise<
+		| undefined
 		| {
-				// eslint-disable-next-line @typescript-eslint/naming-convention
 				open_issues_count: number
-				// eslint-disable-next-line @typescript-eslint/naming-convention
+
 				stargazers_count: number
 		  }
-		| undefined
 	> {
 		const author = 'kitschpatrol'
 		const repo = this.packageData.name.replace('@kitschpatrol/', '')
-		// eslint-disable-next-line n/no-unsupported-features/node-builtins
 		const result = await fetch(`https://api.github.com/repos/${author}/${repo}`)
 		const json = (await result.json()) as {
-			// eslint-disable-next-line @typescript-eslint/naming-convention
 			open_issues_count: number
-			// eslint-disable-next-line @typescript-eslint/naming-convention
+
 			stargazers_count: number
 			status: string | undefined
 		}
@@ -57,9 +98,8 @@ export class Project {
 		}
 
 		return {
-			// eslint-disable-next-line @typescript-eslint/naming-convention
 			open_issues_count: json.open_issues_count,
-			// eslint-disable-next-line @typescript-eslint/naming-convention
+
 			stargazers_count: json.stargazers_count,
 		}
 	}
@@ -106,7 +146,6 @@ export class Project {
 	}
 
 	public async getNpmDownloadCount(): Promise<number> {
-		// eslint-disable-next-line n/no-unsupported-features/node-builtins
 		const result = await fetch(
 			`https://api.npmjs.org/downloads/point/1970-01-01:3000-01-01/${this.packageData.name}`,
 		)
@@ -199,9 +238,9 @@ export class Project {
 
 		const gitHubInfo = await this.getGitHubInfo()
 		const issueCount =
-			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo?.open_issues_count : undefined
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.open_issues_count : undefined
 		const starCount =
-			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo?.stargazers_count : undefined
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.stargazers_count : undefined
 		const npmDownloadCount =
 			this.isOnMyGitHub && this.isOnNpm ? await this.getNpmDownloadCount() : undefined
 
@@ -275,51 +314,11 @@ export class Project {
 		const forkStatus = await this.getRemoteStatus()
 		return Object.values(forkStatus).some((value) => value > 0)
 	}
-
-	public get gitHubLink(): string | undefined {
-		return this.packageData.repository?.url.replace('git+', '').replace('.git', '')
-	}
-
-	public get isAuthoredByMe(): boolean {
-		return (
-			this.packageData.author?.name?.toLowerCase().includes('eric mika') ??
-			this.packageData.author?.name?.toLowerCase().includes('kitschpatrol') ??
-			false
-		)
-	}
-
-	public get isOnMyGitHub(): boolean {
-		return this.packageData.repository?.url?.toLowerCase().includes('kitschpatrol') ?? false
-	}
-
-	public get isOnNpm(): boolean {
-		return this.packageData.publishConfig?.access === 'public'
-	}
-
-	public get status(): 'fork' | 'source' | 'unmaintained' {
-		return !this.isAuthoredByMe && this.isOnMyGitHub
-			? 'fork'
-			: this.isAuthoredByMe
-				? 'source'
-				: 'unmaintained'
-	}
-
-	public get title(): string {
-		return this.packageData.name ?? path.basename(this.repositoryPath)
-	}
-
-	public get usesPnpm(): boolean {
-		return (
-			this.packageData.packageManager?.toLowerCase().startsWith('pnpm') ??
-			Object.hasOwn(this.packageData.engines ?? {}, 'pnpm')
-		)
-	}
-
-	public get usesSharedConfig(): boolean {
-		return Object.hasOwn(this.packageData.devDependencies ?? {}, '@kitschpatrol/shared-config')
-	}
 }
 
+/**
+ * Get the paths of all projects in the projects directory
+ */
 export async function getProjectPaths(
 	projectsDirectory: string,
 	extraProjectPaths: string[] = [],
@@ -346,6 +345,10 @@ export async function getProjectPaths(
 	return filteredProjectPaths
 }
 
+/**
+ * Get all projects in the projects directory
+ * @public
+ */
 export async function getProjects(
 	projectsDirectory: string,
 	extraProjectPaths: string[] = [],

@@ -1,3 +1,6 @@
+/* eslint-disable ts/no-floating-promises */
+/* eslint-disable ts/naming-convention */
+
 import { app, BrowserWindow, dialog, shell, utilityProcess } from 'electron'
 import net from 'node:net'
 import path from 'node:path'
@@ -50,7 +53,12 @@ function createWindow() {
 	})
 }
 
-function checkServerAvailability(port) {
+/**
+ * Checks if the server is available.
+ * @param {number} port - The port number.
+ * @returns {Promise<void>}
+ */
+async function checkServerAvailability(port) {
 	const MAX_RETRIES = 10
 	const RETRY_INTERVAL_IN_MS = 1000
 
@@ -90,6 +98,7 @@ app
 	.then(async () => {
 		if (app.isPackaged) {
 			utilityProcess.fork(path.join(app.getAppPath(), 'build', 'index.js'), {
+				// @ts-expect-error - string[] index
 				env: { ...process.env, PORT: sveltePort },
 			})
 		} else {
@@ -100,8 +109,9 @@ app
 		await checkServerAvailability(Number.parseInt(sveltePort, 10))
 		createWindow()
 	})
-	// eslint-disable-next-line unicorn/prefer-top-level-await
+	// eslint-disable-next-line unicorn/prefer-top-level-await, ts/use-unknown-in-catch-callback-variable
 	.catch((error) => {
+		// eslint-disable-next-line ts/no-unsafe-argument, ts/no-unsafe-member-access
 		dialog.showErrorBox('Error', error.message)
 		app.quit()
 	})
@@ -111,7 +121,7 @@ app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') app.quit()
 })
 
-// MacOS: Open a window if none are open
+// Open a window if none are open in macOS
 app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })

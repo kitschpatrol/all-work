@@ -1,27 +1,25 @@
 {
 	"name": "allwork",
 	"version": "0.0.1",
-	"type": "module",
+	"private": true,
 	"description": "High-level view of your maintained repositories.",
-	"repository": "github:kitschpatrol/allwork",
+	"keywords": [
+		"github"
+	],
 	"homepage": "https://github.com/kitschpatrol/allwork",
 	"bugs": "https://github.com/kitschpatrol/allwork/issues",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/kitschpatrol/allwork"
+	},
+	"license": "MIT",
 	"author": {
 		"name": "Eric Mika",
 		"email": "eric@ericmika.com",
 		"url": "https://ericmika.com"
 	},
-	"license": "MIT",
-	"private": true,
-	"packageManager": "pnpm@9.14.2",
-	"engines": {
-		"node": ">=18.0.0",
-		"pnpm": ">=9.0.0"
-	},
+	"type": "module",
 	"main": "./electron/main.js",
-	"keywords": [
-		"github"
-	],
 	"scripts": {
 		"build": "vite build",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -30,18 +28,17 @@
 		"dev": "vite dev --host",
 		"electron": "electron .",
 		"electron:build": "vite build && electron-builder",
-		"fix": "shared-config --fix",
-		"lint": "shared-config --lint",
+		"fix": "kpi fix",
+		"lint": "kpi lint",
 		"move": "mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"preview": "vite preview",
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@kitschpatrol/shared-config": "^4.7.12",
+		"@kitschpatrol/shared-config": "^5.0.6",
 		"@sveltejs/adapter-node": "^5.2.9",
 		"@sveltejs/kit": "^2.8.1",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",
-		"@tailwindcss/typography": "^0.5.15",
 		"autoprefixer": "^10.4.20",
 		"electron": "^33.2.0",
 		"electron-builder": "^25.1.8",
@@ -50,9 +47,7 @@
 		"flowbite-svelte": "^0.47.3",
 		"flowbite-svelte-icons": "^1.6.2",
 		"globby": "^14.0.2",
-		"hosted-git-info": "^8.0.2",
 		"read-pkg": "^9.0.1",
-		"sortable-tablesort": "^4.0.0",
 		"svelte": "^4.2.19",
 		"svelte-check": "^4.0.9",
 		"tailwindcss": "^3.4.15",
@@ -60,5 +55,21 @@
 		"typescript": "^5.6.3",
 		"vite": "^5.4.11",
 		"vitest": "^2.1.5"
+	},
+	"packageManager": "pnpm@10.5.2",
+	"engines": {
+		"node": ">=22.0.0",
+		"pnpm": ">=10.0.0"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@sveltejs/kit",
+			"electron",
+			"esbuild",
+			"puppeteer"
+		],
+		"overrides": {
+			"eslint-plugin-markdown": "^5.1.0"
+		}
 	}
 }

@@ -58,7 +58,6 @@
 	onMount(() => {
 		for (const projectPromise of data.projects) {
 			projectPromise
-				// eslint-disable-next-line @typescript-eslint/no-loop-func
 				.then((project) => {
 					resolvedProjects = [...resolvedProjects, project]
 					resolvedProjects.sort(compareProjects)
