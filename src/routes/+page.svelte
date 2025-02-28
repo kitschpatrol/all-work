@@ -1,8 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import type { PageData } from './$types'
-	export let data: PageData
-
 	import {
 		Table,
 		TableBody,
@@ -19,14 +16,16 @@
 		NpmSolid,
 	} from 'flowbite-svelte-icons'
 
+	const { data } = $props()
+
 	type ProjectType = Awaited<(typeof data.projects)[number]>
 	type SortKey = keyof ProjectType
 
-	let sortKey: SortKey = 'title'
-	let sortDirection: 'asc' | 'desc' = 'asc'
+	let sortKey: SortKey = $state('title')
+	let sortDirection: 'asc' | 'desc' = $state('asc')
 
 	// Array to hold resolved projects
-	let resolvedProjects: ProjectType[] = []
+	let resolvedProjects: ProjectType[] = $state([])
 
 	function compareProjects(a: ProjectType, b: ProjectType): number {
 		const aValue = a[sortKey] ?? 0
@@ -78,7 +77,7 @@
 		return ''
 	}
 
-	$: sortUpdateKey = `${sortKey}-${sortDirection}`
+	let sortUpdateKey = $derived(`${sortKey}-${sortDirection}`)
 </script>
 
 {#key sortUpdateKey}

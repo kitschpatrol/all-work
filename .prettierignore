@@ -6,3 +6,4 @@ pnpm-lock.yaml
 package-lock.json
 
 # Customizations
+electron/resources/mac/entitlements.mac.plist
