@@ -99,7 +99,6 @@ export class Project {
 
 		return {
 			open_issues_count: json.open_issues_count,
-
 			stargazers_count: json.stargazers_count,
 		}
 	}

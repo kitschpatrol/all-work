@@ -16,6 +16,7 @@ export default eslintConfig({
 					allowed: ['execa', 'globby'],
 				},
 			],
+			// TODO remove in next patch of shared-config
 			// Knip workaround...
 			// https://github.com/webpro-nl/knip/issues/158#issuecomment-1632648598
 			'jsdoc/check-tag-names': ['error', { definedTags: ['public'] }],

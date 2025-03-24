@@ -120,7 +120,7 @@
 			<TableHeadCell></TableHeadCell>
 		</TableHead>
 		<TableBody tableBodyClass="divide-y">
-			{#each resolvedProjects as project}
+			{#each resolvedProjects as project (project.repositoryPath)}
 				<TableBodyRow>
 					<!-- Title -->
 					<TableBodyCell tdClass="px-6 py-1 font-bold">
