@@ -38,6 +38,10 @@ export class Project {
 		return this.packageData.publishConfig?.access === 'public'
 	}
 
+	public get package(): NormalizedPackageJson {
+		return this.packageData
+	}
+
 	public get status(): 'fork' | 'source' | 'unmaintained' {
 		return !this.isAuthoredByMe && this.isOnMyGitHub
 			? 'fork'
@@ -359,6 +363,34 @@ export async function getProjects(
 	for (const repositoryPath of allProjectPaths) {
 		projects.push(new Project(repositoryPath))
 	}
+
+	return projects
+}
+
+/**
+ * Get all Eric projects
+ */
+export async function getEricProjects(): Promise<Project[]> {
+	const projectPaths = await getProjectPaths(
+		'/Users/mika/Code/',
+		// Any extra repos not detected by getProjectPaths filters...
+		[
+			'/Users/mika/Notes',
+			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-tap',
+			'/Users/mika/.local/share/chezmoi',
+		],
+		// Exclusions
+		[
+			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
+			'/Users/mika/Code/parcel-optimizer-friendly-urls',
+			'/Users/mika/Code/eleventy-plugin-parcel-test',
+			'/Users/mika/Code/tp-test-astro',
+		],
+	)
+
+	const projects = projectPaths
+		.map((projectPath) => new Project(projectPath))
+		.filter((project) => project.status !== 'unmaintained')
 
 	return projects
 }

@@ -1,27 +1,8 @@
-import { getProjectPaths, Project } from '$lib/server/project'
+import { getEricProjects } from '$lib/server/project'
 import type { PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async () => {
-	const projectPaths = await getProjectPaths(
-		'/Users/mika/Code/',
-		// Any extra repos not detected by getProjectPaths filters...
-		[
-			'/Users/mika/Notes',
-			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-tap',
-			'/Users/mika/.local/share/chezmoi',
-		],
-		// Exclusions
-		[
-			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
-			'/Users/mika/Code/parcel-optimizer-friendly-urls',
-			'/Users/mika/Code/eleventy-plugin-parcel-test',
-			'/Users/mika/Code/tp-test-astro',
-		],
-	)
-
-	const projects = projectPaths
-		.map((projectPath) => new Project(projectPath))
-		.filter((project) => project.status !== 'unmaintained')
+	const projects = await getEricProjects()
 
 	// Type ProjectTableRow = Awaited<ReturnType<typeof Project.prototype.getTableRow>>
 
