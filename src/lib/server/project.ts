@@ -40,6 +40,7 @@ export const TableRowSchema = z.object({
 	majorUpdateCount: z.number(),
 	majorUpdateList: z.array(z.string()),
 	npmDownloadCount: z.number().optional(),
+	readmePath: z.string().optional(),
 	repositoryPath: z.string(),
 	semverUpdateCount: z.number(),
 	semverUpdateList: z.array(z.string()),
@@ -212,6 +213,22 @@ export class Project {
 		return json.downloads
 	}
 
+	public async getReadmePath(): Promise<string | undefined> {
+		try {
+			// Look for readme files using case-insensitive search
+			const readmeFiles = await globby(['readme.md', 'readme', 'readme.txt'], {
+				absolute: true,
+				caseSensitiveMatch: false,
+				cwd: this.repositoryPath,
+			})
+
+			// Return the first match found, or undefined if none found
+			return readmeFiles.length > 0 ? readmeFiles[0] : undefined
+		} catch {
+			return undefined
+		}
+	}
+
 	public async getRemoteStatus(skipOrigin = true): Promise<Record<string, number>> {
 		// Get the current branch name
 		const { stdout: currentBranch } = await execa('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -289,6 +306,7 @@ export class Project {
 		const majorUpdateList: string[] = await this.getUpdateList('major')
 		const gitIsClean = await this.getGitIsClean()
 		const isRemoteAheadInitial = await this.isRemoteAhead()
+		const readmePath = await this.getReadmePath()
 
 		const gitHubInfo = await this.getGitHubInfo()
 		const issueCount =
@@ -317,6 +335,7 @@ export class Project {
 			majorUpdateCount: majorUpdateList.length - semverUpdateList.length,
 			majorUpdateList,
 			npmDownloadCount,
+			readmePath,
 			repositoryPath: this.repositoryPath,
 			semverUpdateCount: semverUpdateList.length,
 			semverUpdateList,
