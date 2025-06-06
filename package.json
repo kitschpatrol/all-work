@@ -68,5 +68,8 @@
 			"esbuild",
 			"puppeteer"
 		]
+	},
+	"dependencies": {
+		"zod": "^3.25.56"
 	}
 }

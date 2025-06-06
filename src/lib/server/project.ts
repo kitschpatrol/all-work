@@ -6,6 +6,7 @@ import { globby } from 'globby'
 import path from 'node:path'
 import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
 import { CheckPackages } from 'taze'
+import { z } from 'zod'
 
 // Future structure
 // path
@@ -16,6 +17,34 @@ import { CheckPackages } from 'taze'
 
 // Maybe later
 // type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
+
+// Zod schema for getTableRow return type
+export const TableRowSchema = z.object({
+	gitHubLink: z.string().optional(),
+	gitHubStarCount: z.number().optional(),
+	gitIsClean: z.boolean(),
+	gitIsDirty: z.boolean(),
+	gitRemoteCount: z.number(),
+	isAuthoredByMe: z.boolean(),
+	isOnMyGitHub: z.boolean(),
+	isOnNpm: z.boolean(),
+	isPublic: z.boolean(),
+	isRemoteAhead: z.boolean().optional(),
+	issueCount: z.number().optional(),
+	lastCommitDate: z.string().optional(),
+	majorUpdateCount: z.number(),
+	majorUpdateList: z.array(z.string()),
+	npmDownloadCount: z.number().optional(),
+	repositoryPath: z.string(),
+	semverUpdateCount: z.number(),
+	semverUpdateList: z.array(z.string()),
+	title: z.string(),
+	type: z.enum(['fork', 'source', 'unmaintained']),
+	usesPnpm: z.boolean(),
+	usesSharedConfig: z.boolean(),
+})
+
+export type TableRow = z.infer<typeof TableRowSchema>
 
 export class Project {
 	public get gitHubLink(): string | undefined {
@@ -368,7 +397,7 @@ export async function getProjects(
 }
 
 /**
- * Get all Eric projects
+ * Get all Eric projects as lazily resolved project classes
  */
 export async function getEricProjects(): Promise<Project[]> {
 	const projectPaths = await getProjectPaths(
@@ -393,4 +422,12 @@ export async function getEricProjects(): Promise<Project[]> {
 		.filter((project) => project.status !== 'unmaintained')
 
 	return projects
+}
+
+/**
+ * Get all Eric projects as POJOs (TableRows)
+ */
+export async function getEricProjectsAsTableRows(): Promise<TableRow[]> {
+	const projects = await getEricProjects()
+	return Promise.all(projects.map(async (project) => project.getTableRow()))
 }
