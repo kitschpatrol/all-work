@@ -35,29 +35,29 @@
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@kitschpatrol/shared-config": "^5.3.1",
+		"@kitschpatrol/shared-config": "^5.4.2",
 		"@sveltejs/adapter-node": "^5.2.12",
-		"@sveltejs/kit": "^2.20.2",
-		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"@sveltejs/kit": "^2.21.2",
+		"@sveltejs/vite-plugin-svelte": "^5.1.0",
 		"autoprefixer": "^10.4.21",
-		"electron": "^35.0.3",
+		"electron": "^35.5.1",
 		"electron-builder": "^25.1.8",
-		"execa": "^9.5.2",
+		"execa": "^9.6.0",
 		"flowbite": "^3.1.2",
-		"flowbite-svelte": "^0.48.4",
-		"flowbite-svelte-icons": "^2.1.0",
+		"flowbite-svelte": "^0.48.6",
+		"flowbite-svelte-icons": "^2.2.0",
 		"globby": "^14.1.0",
 		"read-pkg": "^9.0.1",
-		"svelte": "^5.25.3",
-		"svelte-check": "^4.1.5",
+		"svelte": "^5.33.15",
+		"svelte-check": "^4.2.1",
 		"tailwindcss": "^3.4.17",
-		"taze": "^19.0.2",
-		"typescript": "^5.8.2",
-		"vite": "^6.2.3",
-		"vitest": "^3.0.9",
+		"taze": "^19.1.0",
+		"typescript": "^5.8.3",
+		"vite": "^6.3.5",
+		"vitest": "^3.2.2",
 		"zod": "^3.25.56"
 	},
-	"packageManager": "pnpm@10.6.5",
+	"packageManager": "pnpm@10.11.1",
 	"engines": {
 		"node": ">=22.0.0",
 		"pnpm": ">=10.0.0"
@@ -67,7 +67,8 @@
 			"@sveltejs/kit",
 			"electron",
 			"esbuild",
-			"puppeteer"
+			"puppeteer",
+			"unrs-resolver"
 		]
 	}
 }
