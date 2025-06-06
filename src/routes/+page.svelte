@@ -78,6 +78,15 @@
 	}
 
 	let sortUpdateKey = $derived(`${sortKey}-${sortDirection}`)
+
+	function formatDate(dateValue: string | Date | undefined): string {
+		if (!dateValue) return ''
+
+		const date = new Date(dateValue)
+		if (isNaN(date.getTime())) return ''
+
+		return date.toLocaleDateString('en-CA') // en-CA gives YYYY-MM-DD format
+	}
 </script>
 
 {#key sortUpdateKey}
@@ -85,6 +94,9 @@
 		<TableHead>
 			<TableHeadCell on:click={() => sortBy('title')}>Project {sortIcon('title')}</TableHeadCell>
 			<TableHeadCell on:click={() => sortBy('type')}>Type {sortIcon('type')}</TableHeadCell>
+			<TableHeadCell on:click={() => sortBy('firstCommitDate')}
+				>First Commit {sortIcon('firstCommitDate')}</TableHeadCell
+			>
 			<TableHeadCell on:click={() => sortBy('lastCommitDate')}
 				>Last Commit {sortIcon('lastCommitDate')}</TableHeadCell
 			>
@@ -130,10 +142,17 @@
 					<!-- Source or Fork -->
 					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
 
+					<!-- First commit -->
+					<TableBodyCell tdClass="px-6 py-1">
+						{#if project.firstCommitDate !== undefined}
+							{formatDate(project.firstCommitDate)}
+						{/if}
+					</TableBodyCell>
+
 					<!-- Last commit -->
 					<TableBodyCell tdClass="px-6 py-1">
 						{#if project.lastCommitDate !== undefined}
-							{project.lastCommitDate}
+							{formatDate(project.lastCommitDate)}
 						{/if}
 					</TableBodyCell>
 

@@ -20,6 +20,7 @@ import { z } from 'zod'
 
 // Zod schema for getTableRow return type
 export const TableRowSchema = z.object({
+	firstCommitDate: z.date().optional(),
 	gitHubLink: z.string().optional(),
 	gitHubStarCount: z.number().optional(),
 	gitIsClean: z.boolean(),
@@ -31,7 +32,7 @@ export const TableRowSchema = z.object({
 	isPublic: z.boolean(),
 	isRemoteAhead: z.boolean().optional(),
 	issueCount: z.number().optional(),
-	lastCommitDate: z.string().optional(),
+	lastCommitDate: z.date().optional(),
 	majorUpdateCount: z.number(),
 	majorUpdateList: z.array(z.string()),
 	npmDownloadCount: z.number().optional(),
@@ -108,6 +109,22 @@ export class Project {
 		// this.gitInfo = hostedGitInfo.fromUrl(this.packageData.repository?.url ?? '')
 	}
 
+	public async getFirstCommitDate(): Promise<Date | undefined> {
+		try {
+			const { stdout: firstCommitDateString } = await execa(
+				'git',
+				['log', '--reverse', '--format=%cd', '-n', '1'],
+				{
+					cwd: this.repositoryPath,
+				},
+			)
+			return firstCommitDateString ? new Date(firstCommitDateString) : undefined
+		} catch (error) {
+			console.error('Error getting first commit date:', error)
+			return undefined
+		}
+	}
+
 	public async getGitHubInfo(): Promise<
 		| undefined
 		| {
@@ -161,16 +178,12 @@ export class Project {
 		}
 	}
 
-	public async getLastCommitDate(): Promise<string | undefined> {
+	public async getLastCommitDate(): Promise<Date | undefined> {
 		try {
-			const { stdout: lastCommitDate } = await execa(
-				'git',
-				['log', '-1', '--format=%cd', '--date=short'],
-				{
-					cwd: this.repositoryPath,
-				},
-			)
-			return lastCommitDate
+			const { stdout: lastCommitDateString } = await execa('git', ['log', '-1', '--format=%cd'], {
+				cwd: this.repositoryPath,
+			})
+			return lastCommitDateString ? new Date(lastCommitDateString) : undefined
 		} catch (error) {
 			console.error('Error getting last commit date:', error)
 			return undefined
@@ -261,8 +274,9 @@ export class Project {
 		return info.stargazers_count
 	}
 
-	public async getTableRow() {
+	public async getTableRow(): Promise<TableRow> {
 		const semverUpdateList: string[] = await this.getUpdateList('default')
+		const firstCommitDate = await this.getFirstCommitDate()
 		const lastCommitDate = await this.getLastCommitDate()
 		const majorUpdateList: string[] = await this.getUpdateList('major')
 		const gitIsClean = await this.getGitIsClean()
@@ -278,7 +292,8 @@ export class Project {
 
 		const isPublic = this.isOnMyGitHub && gitHubInfo !== undefined
 
-		return {
+		const tableRow = {
+			firstCommitDate,
 			gitHubLink: this.gitHubLink,
 			gitHubStarCount: starCount,
 			gitIsClean,
@@ -302,6 +317,8 @@ export class Project {
 			usesPnpm: this.usesPnpm,
 			usesSharedConfig: this.usesSharedConfig,
 		}
+
+		return TableRowSchema.parse(tableRow)
 	}
 
 	public async getUpdateList(

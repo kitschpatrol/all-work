@@ -54,7 +54,8 @@
 		"taze": "^19.0.2",
 		"typescript": "^5.8.2",
 		"vite": "^6.2.3",
-		"vitest": "^3.0.9"
+		"vitest": "^3.0.9",
+		"zod": "^3.25.56"
 	},
 	"packageManager": "pnpm@10.6.5",
 	"engines": {
@@ -68,8 +69,5 @@
 			"esbuild",
 			"puppeteer"
 		]
-	},
-	"dependencies": {
-		"zod": "^3.25.56"
 	}
 }
