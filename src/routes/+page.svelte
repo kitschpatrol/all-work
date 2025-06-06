@@ -339,7 +339,7 @@
 								href={`https://www.npmjs.com/package/${project.title}`}
 								title="Open in NPM"
 							>
-								<NpmSolid color="red" class="w-5 h-5" strokeWidth={0} />
+								<NpmSolid color="red" class="w-5 h-5" strokeWidth="0" />
 							</a>
 						{/if}
 					</TableBodyCell>
