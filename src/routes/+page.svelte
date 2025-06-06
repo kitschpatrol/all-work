@@ -90,40 +90,116 @@
 </script>
 
 {#key sortUpdateKey}
-	<Table striped={true}>
+	<Table>
 		<TableHead>
-			<TableHeadCell on:click={() => sortBy('title')}>Project {sortIcon('title')}</TableHeadCell>
-			<TableHeadCell on:click={() => sortBy('type')}>Type {sortIcon('type')}</TableHeadCell>
-			<TableHeadCell on:click={() => sortBy('firstCommitDate')}
-				>First Commit {sortIcon('firstCommitDate')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('lastCommitDate')}
-				>Last Commit {sortIcon('lastCommitDate')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('gitIsDirty')}
-				>Dirty {sortIcon('gitIsDirty')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('isRemoteAhead')}
-				>Behind {sortIcon('isRemoteAhead')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('semverUpdateCount')}
-				>Semver Updates {sortIcon('semverUpdateCount')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('majorUpdateCount')}
-				>Major Updates {sortIcon('majorUpdateCount')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('issueCount')}
-				>Issues {sortIcon('issueCount')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('gitHubStarCount')}
-				>Stars {sortIcon('gitHubStarCount')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('npmDownloadCount')}
-				>Downloads {sortIcon('npmDownloadCount')}</TableHeadCell
-			>
-			<TableHeadCell on:click={() => sortBy('isPublic')}
-				>Public {sortIcon('isPublic')}</TableHeadCell
-			>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('title')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Project {sortIcon('title')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('type')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Type {sortIcon('type')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('firstCommitDate')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					First Commit {sortIcon('firstCommitDate')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('lastCommitDate')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Last Commit {sortIcon('lastCommitDate')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('gitIsDirty')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Dirty {sortIcon('gitIsDirty')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('isRemoteAhead')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Behind {sortIcon('isRemoteAhead')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('semverUpdateCount')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Semver Updates {sortIcon('semverUpdateCount')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('majorUpdateCount')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Major Updates {sortIcon('majorUpdateCount')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('issueCount')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Issues {sortIcon('issueCount')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('gitHubStarCount')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Stars {sortIcon('gitHubStarCount')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('npmDownloadCount')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Downloads {sortIcon('npmDownloadCount')}
+				</button>
+			</TableHeadCell>
+			<TableHeadCell>
+				<button
+					type="button"
+					onclick={() => sortBy('isPublic')}
+					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+				>
+					Public {sortIcon('isPublic')}
+				</button>
+			</TableHeadCell>
 
 			<TableHeadCell></TableHeadCell>
 			<TableHeadCell></TableHeadCell>
@@ -131,82 +207,82 @@
 			<TableHeadCell></TableHeadCell>
 			<TableHeadCell></TableHeadCell>
 		</TableHead>
-		<TableBody tableBodyClass="divide-y">
-			{#each resolvedProjects as project (project.repositoryPath)}
-				<TableBodyRow>
+		<TableBody class="divide-y divide-gray-200">
+			{#each resolvedProjects as project, index (project.repositoryPath)}
+				<TableBodyRow class={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
 					<!-- Title -->
-					<TableBodyCell tdClass="px-6 py-1 font-bold">
+					<TableBodyCell class="px-6 py-1 font-bold">
 						{project.title}
 					</TableBodyCell>
 
 					<!-- Source or Fork -->
-					<TableBodyCell tdClass="px-6 py-1">{project.type}</TableBodyCell>
+					<TableBodyCell class="px-6 py-1">{project.type}</TableBodyCell>
 
 					<!-- First commit -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.firstCommitDate !== undefined}
 							{formatDate(project.firstCommitDate)}
 						{/if}
 					</TableBodyCell>
 
 					<!-- Last commit -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.lastCommitDate !== undefined}
 							{formatDate(project.lastCommitDate)}
 						{/if}
 					</TableBodyCell>
 
 					<!-- Git clean -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if !project.gitIsClean}
 							📝
 						{/if}
 					</TableBodyCell>
 
 					<!-- Remote ahead -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.isRemoteAhead === true}
 							📥
 						{/if}
 					</TableBodyCell>
 
 					<!-- Semver Updates -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.semverUpdateCount > 0}
 							{project.semverUpdateCount}
 						{/if}
 					</TableBodyCell>
 
 					<!-- Major Updates -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.majorUpdateCount > 0}
 							{project.majorUpdateCount}
 						{/if}
 					</TableBodyCell>
 
 					<!-- Open Issues -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.issueCount}
 							{project.issueCount}
 						{/if}
 					</TableBodyCell>
 
 					<!-- GitHub Stars -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.gitHubStarCount}
 							{project.gitHubStarCount}
 						{/if}
 					</TableBodyCell>
 
 					<!-- NPM downloads -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.npmDownloadCount}
 							{project.npmDownloadCount}
 						{/if}
 					</TableBodyCell>
 
 					<!-- Public -->
-					<TableBodyCell tdClass="px-6 py-1">
+					<TableBodyCell class="px-6 py-1">
 						{#if project.isPublic}
 							✅
 						{/if}
@@ -215,55 +291,55 @@
 					<!-- Bare links -->
 
 					<!-- Finder Link -->
-					<TableBodyCell tdClass="px-0">
+					<TableBodyCell class="px-0">
 						<a
 							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
 							href={`file://${project.repositoryPath}`}
 							title="Open in Finder"
 						>
-							<FolderSolid color="red" />
+							<FolderSolid color="red" class="w-5 h-5" />
 						</a>
 					</TableBodyCell>
 					<!-- Tower Link -->
-					<TableBodyCell tdClass="px-0">
+					<TableBodyCell class="px-0">
 						<a
 							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
 							href={`gittower://${project.repositoryPath}`}
 							title="Open in Tower"
 						>
-							<ArchiveSolid color="red" />
+							<ArchiveSolid color="red" class="w-5 h-5" />
 						</a>
 					</TableBodyCell>
 					<!-- VS Code Link  -->
-					<TableBodyCell tdClass="px-0">
+					<TableBodyCell class="px-0">
 						<a
 							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
 							href={`vscode://file/${project.repositoryPath}`}
 							title="Open in VS Code"
 						>
-							<FileCodeSolid color="red" />
+							<FileCodeSolid color="red" class="w-5 h-5" />
 						</a>
 					</TableBodyCell>
 					<!-- GitHub -->
-					<TableBodyCell tdClass="px-0">
+					<TableBodyCell class="px-0">
 						{#if project.gitHubLink}
 							<a
 								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
 								href={project.gitHubLink}
 								title="Open in GitHub"
 							>
-								<GithubSolid color="red" />
+								<GithubSolid color="red" class="w-5 h-5" />
 							</a>
 						{/if}
 					</TableBodyCell>
-					<TableBodyCell tdClass="px-0">
+					<TableBodyCell class="px-0">
 						{#if project.isOnNpm}
 							<a
 								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
 								href={`https://www.npmjs.com/package/${project.title}`}
 								title="Open in NPM"
 							>
-								<NpmSolid color="red" />
+								<NpmSolid color="red" class="w-5 h-5" strokeWidth={0} />
 							</a>
 						{/if}
 					</TableBodyCell>
