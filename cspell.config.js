@@ -2,5 +2,5 @@ import { cspellConfig } from '@kitschpatrol/cspell-config'
 
 export default cspellConfig({
 	ignorePaths: ['build'],
-	words: ['gittower', 'icns', 'nsis', 'syntaxhighlight'],
+	words: ['gittower', 'icns', 'nsis', 'syntaxhighlight', 'pixi', 'linkinator'],
 })

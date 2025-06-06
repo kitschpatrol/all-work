@@ -3,8 +3,9 @@ import { execa } from 'execa'
 import { globby } from 'globby'
 // Maybe later
 // import hostedGitInfo from 'hosted-git-info'
+import type { NormalizedPackageJson } from 'read-pkg'
 import path from 'node:path'
-import { type NormalizedPackageJson, readPackageSync } from 'read-pkg'
+import { readPackageSync } from 'read-pkg'
 import { CheckPackages } from 'taze'
 import { z } from 'zod'
 
@@ -18,7 +19,10 @@ import { z } from 'zod'
 // Maybe later
 // type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
 
-// Zod schema for getTableRow return type
+/**
+ * Zod schema for getTableRow return type
+ * @public
+ */
 export const TableRowSchema = z.object({
 	firstCommitDate: z.date().optional(),
 	gitHubLink: z.string().optional(),
@@ -45,6 +49,9 @@ export const TableRowSchema = z.object({
 	usesSharedConfig: z.boolean(),
 })
 
+/**
+ * @public
+ */
 export type TableRow = z.infer<typeof TableRowSchema>
 
 export class Project {
@@ -136,9 +143,9 @@ export class Project {
 		const author = 'kitschpatrol'
 		const repo = this.packageData.name.replace('@kitschpatrol/', '')
 		const result = await fetch(`https://api.github.com/repos/${author}/${repo}`)
+		// eslint-disable-next-line ts/no-unsafe-type-assertion
 		const json = (await result.json()) as {
 			open_issues_count: number
-
 			stargazers_count: number
 			status: string | undefined
 		}
@@ -194,6 +201,7 @@ export class Project {
 		const result = await fetch(
 			`https://api.npmjs.org/downloads/point/1970-01-01:3000-01-01/${this.packageData.name}`,
 		)
+		// eslint-disable-next-line ts/no-unsafe-type-assertion
 		const json = (await result.json()) as {
 			downloads: number
 			end: string
@@ -368,7 +376,7 @@ export class Project {
 /**
  * Get the paths of all projects in the projects directory
  */
-export async function getProjectPaths(
+async function getProjectPaths(
 	projectsDirectory: string,
 	extraProjectPaths: string[] = [],
 	excludedProjectPaths: string[] = [],
@@ -415,6 +423,7 @@ export async function getProjects(
 
 /**
  * Get all Eric projects as lazily resolved project classes
+ * @public
  */
 export async function getEricProjects(): Promise<Project[]> {
 	const projectPaths = await getProjectPaths(
@@ -443,6 +452,7 @@ export async function getEricProjects(): Promise<Project[]> {
 
 /**
  * Get all Eric projects as POJOs (TableRows)
+ * @public
  */
 export async function getEricProjectsAsTableRows(): Promise<TableRow[]> {
 	const projects = await getEricProjects()
