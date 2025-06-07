@@ -4,17 +4,17 @@ import type { PageServerLoad } from './$types'
 export const load: PageServerLoad = async () => {
 	const projects = await getEricProjects()
 
-	// Type ProjectTableRow = Awaited<ReturnType<typeof Project.prototype.getTableRow>>
+	// Type ProjectProjectMetadata = Awaited<ReturnType<typeof Project.prototype.getProjectMetadata>>
 
-	// Const resolvedProjects: ProjectTableRow[] = []
+	// Const resolvedProjects: ProjectProjectMetadata[] = []
 
 	// For (const project of projects) {
-	// 	const resolveProject = await project.getTableRow()
+	// 	const resolveProject = await project.getProjectMetadata()
 	// 	resolvedProjects.push(resolveProject)
 	// }
 
 	// Can't pass non-POJO class : (
 	return {
-		projects: projects.map(async (project) => project.getTableRow()),
+		projects: projects.map(async (project) => project.getProjectMetadata()),
 	}
 }

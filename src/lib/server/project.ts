@@ -20,16 +20,18 @@ import { z } from 'zod'
 // type HostedGitInfo = ReturnType<typeof hostedGitInfo.fromUrl>
 
 /**
- * Zod schema for getTableRow return type
+ * Zod schema for getProjectMetadata return type
  * @public
  */
-export const TableRowSchema = z.object({
+export const ProjectMetadataSchema = z.object({
+	description: z.string().optional(),
 	firstCommitDate: z.date().optional(),
 	gitHubLink: z.string().optional(),
 	gitHubStarCount: z.number().optional(),
 	gitIsClean: z.boolean(),
 	gitIsDirty: z.boolean(),
 	gitRemoteCount: z.number(),
+	homepage: z.string().optional(),
 	isAuthoredByMe: z.boolean(),
 	isOnMyGitHub: z.boolean(),
 	isOnNpm: z.boolean(),
@@ -37,6 +39,7 @@ export const TableRowSchema = z.object({
 	isRemoteAhead: z.boolean().optional(),
 	issueCount: z.number().optional(),
 	lastCommitDate: z.date().optional(),
+	license: z.string().optional(),
 	majorUpdateCount: z.number(),
 	majorUpdateList: z.array(z.string()),
 	npmDownloadCount: z.number().optional(),
@@ -44,16 +47,18 @@ export const TableRowSchema = z.object({
 	repositoryPath: z.string(),
 	semverUpdateCount: z.number(),
 	semverUpdateList: z.array(z.string()),
+	tags: z.array(z.string()).optional(),
 	title: z.string(),
 	type: z.enum(['fork', 'source', 'unmaintained']),
 	usesPnpm: z.boolean(),
 	usesSharedConfig: z.boolean(),
+	version: z.string().optional(),
 })
 
 /**
  * @public
  */
-export type TableRow = z.infer<typeof TableRowSchema>
+export type ProjectMetadata = z.infer<typeof ProjectMetadataSchema>
 
 export class Project {
 	public get gitHubLink(): string | undefined {
@@ -213,6 +218,60 @@ export class Project {
 		return json.downloads
 	}
 
+	public async getProjectMetadata(): Promise<ProjectMetadata> {
+		const semverUpdateList: string[] = await this.getUpdateList('default')
+		const firstCommitDate = await this.getFirstCommitDate()
+		const lastCommitDate = await this.getLastCommitDate()
+		const majorUpdateList: string[] = await this.getUpdateList('major')
+		const gitIsClean = await this.getGitIsClean()
+		const isRemoteAheadInitial = await this.isRemoteAhead()
+		const readmePath = await this.getReadmePath()
+
+		const gitHubInfo = await this.getGitHubInfo()
+		const issueCount =
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.open_issues_count : undefined
+		const starCount =
+			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.stargazers_count : undefined
+		const npmDownloadCount =
+			this.isOnMyGitHub && this.isOnNpm ? await this.getNpmDownloadCount() : undefined
+
+		const isPublic = this.isOnMyGitHub && gitHubInfo !== undefined
+
+		const projectMetadata = {
+			description: this.packageData.description,
+			firstCommitDate,
+			gitHubLink: this.gitHubLink,
+			gitHubStarCount: starCount,
+			gitIsClean,
+			gitIsDirty: !gitIsClean,
+			gitRemoteCount: await this.getGitRemoteCount(),
+			homepage: this.packageData.homepage,
+			isAuthoredByMe: this.isAuthoredByMe,
+			isOnMyGitHub: this.isOnMyGitHub,
+			isOnNpm: this.isOnNpm,
+			isPublic,
+			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
+			issueCount,
+			lastCommitDate,
+			license: this.packageData.license,
+			majorUpdateCount: majorUpdateList.length - semverUpdateList.length,
+			majorUpdateList,
+			npmDownloadCount,
+			readmePath,
+			repositoryPath: this.repositoryPath,
+			semverUpdateCount: semverUpdateList.length,
+			semverUpdateList,
+			tags: this.packageData.keywords,
+			title: this.title,
+			type: this.status,
+			usesPnpm: this.usesPnpm,
+			usesSharedConfig: this.usesSharedConfig,
+			version: this.packageData.version,
+		}
+
+		return ProjectMetadataSchema.parse(projectMetadata)
+	}
+
 	public async getReadmePath(): Promise<string | undefined> {
 		try {
 			// Look for readme files using case-insensitive search
@@ -297,55 +356,6 @@ export class Project {
 		}
 
 		return info.stargazers_count
-	}
-
-	public async getTableRow(): Promise<TableRow> {
-		const semverUpdateList: string[] = await this.getUpdateList('default')
-		const firstCommitDate = await this.getFirstCommitDate()
-		const lastCommitDate = await this.getLastCommitDate()
-		const majorUpdateList: string[] = await this.getUpdateList('major')
-		const gitIsClean = await this.getGitIsClean()
-		const isRemoteAheadInitial = await this.isRemoteAhead()
-		const readmePath = await this.getReadmePath()
-
-		const gitHubInfo = await this.getGitHubInfo()
-		const issueCount =
-			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.open_issues_count : undefined
-		const starCount =
-			gitHubInfo !== undefined && this.isOnMyGitHub ? gitHubInfo.stargazers_count : undefined
-		const npmDownloadCount =
-			this.isOnMyGitHub && this.isOnNpm ? await this.getNpmDownloadCount() : undefined
-
-		const isPublic = this.isOnMyGitHub && gitHubInfo !== undefined
-
-		const tableRow = {
-			firstCommitDate,
-			gitHubLink: this.gitHubLink,
-			gitHubStarCount: starCount,
-			gitIsClean,
-			gitIsDirty: !gitIsClean,
-			gitRemoteCount: await this.getGitRemoteCount(),
-			isAuthoredByMe: this.isAuthoredByMe,
-			isOnMyGitHub: this.isOnMyGitHub,
-			isOnNpm: this.isOnNpm,
-			isPublic,
-			isRemoteAhead: this.status === 'fork' ? isRemoteAheadInitial : undefined,
-			issueCount,
-			lastCommitDate,
-			majorUpdateCount: majorUpdateList.length - semverUpdateList.length,
-			majorUpdateList,
-			npmDownloadCount,
-			readmePath,
-			repositoryPath: this.repositoryPath,
-			semverUpdateCount: semverUpdateList.length,
-			semverUpdateList,
-			title: this.title,
-			type: this.status,
-			usesPnpm: this.usesPnpm,
-			usesSharedConfig: this.usesSharedConfig,
-		}
-
-		return TableRowSchema.parse(tableRow)
 	}
 
 	public async getUpdateList(
@@ -470,10 +480,10 @@ export async function getEricProjects(): Promise<Project[]> {
 }
 
 /**
- * Get all Eric projects as POJOs (TableRows)
+ * Get all Eric projects as POJOs (ProjectMetadatas)
  * @public
  */
-export async function getEricProjectsAsTableRows(): Promise<TableRow[]> {
+export async function getEricProjectsAsProjectMetadatas(): Promise<ProjectMetadata[]> {
 	const projects = await getEricProjects()
-	return Promise.all(projects.map(async (project) => project.getTableRow()))
+	return Promise.all(projects.map(async (project) => project.getProjectMetadata()))
 }
