@@ -403,13 +403,19 @@ export class Project {
 }
 
 /**
+ * Options for getProjectPaths function
+ */
+export type ProjectPathOptions = {
+	excludedProjectPaths?: string[]
+	extraProjectPaths?: string[]
+	projectsDirectory?: string
+}
+
+/**
  * Get the paths of all projects in the projects directory
  */
-async function getProjectPaths(
-	projectsDirectory: string,
-	extraProjectPaths: string[] = [],
-	excludedProjectPaths: string[] = [],
-): Promise<string[]> {
+async function getProjectPaths(options: ProjectPathOptions): Promise<string[]> {
+	const { excludedProjectPaths = [], extraProjectPaths = [], projectsDirectory = '.' } = options
 	const projectsDirectoryPackageJsonPaths = await globby(
 		path.join(projectsDirectory, '*/package.json'),
 		{
@@ -439,7 +445,10 @@ export async function getProjects(
 	projectsDirectory: string,
 	extraProjectPaths: string[] = [],
 ): Promise<Project[]> {
-	const allProjectPaths = await getProjectPaths(projectsDirectory, extraProjectPaths)
+	const allProjectPaths = await getProjectPaths({
+		extraProjectPaths,
+		projectsDirectory,
+	})
 
 	const projects: Project[] = []
 
@@ -454,23 +463,27 @@ export async function getProjects(
  * Get all Eric projects as lazily resolved project classes
  * @public
  */
-export async function getEricProjects(): Promise<Project[]> {
-	const projectPaths = await getProjectPaths(
-		'/Users/mika/Code/',
-		// Any extra repos not detected by getProjectPaths filters...
-		[
-			'/Users/mika/Notes',
-			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-tap',
-			'/Users/mika/.local/share/chezmoi',
-		],
+export async function getEricProjects(options?: ProjectPathOptions): Promise<Project[]> {
+	const defaultEricProjectPathOptions: ProjectPathOptions = {
 		// Exclusions
-		[
+		excludedProjectPaths: [
 			'/Users/mika/Code/eleventy-plugin-syntaxhighlight',
 			'/Users/mika/Code/parcel-optimizer-friendly-urls',
 			'/Users/mika/Code/eleventy-plugin-parcel-test',
 			'/Users/mika/Code/tp-test-astro',
 		],
-	)
+		// Any extra repos not detected by getProjectPaths filters...
+		extraProjectPaths: [
+			'/Users/mika/Notes',
+			'/opt/homebrew/Library/Taps/kitschpatrol/homebrew-tap',
+			'/Users/mika/.local/share/chezmoi',
+		],
+		projectsDirectory: '/Users/mika/Code/',
+	}
+
+	const resolvedProjectPathOptions = Object.assign(defaultEricProjectPathOptions, options)
+
+	const projectPaths = await getProjectPaths(resolvedProjectPathOptions)
 
 	const projects = projectPaths
 		.map((projectPath) => new Project(projectPath))
@@ -480,10 +493,13 @@ export async function getEricProjects(): Promise<Project[]> {
 }
 
 /**
- * Get all Eric projects as POJOs (ProjectMetadatas)
+ * Get all Eric projects as POJOs (ProjectMetadata objects)
+ * Optionally override default paths
  * @public
  */
-export async function getEricProjectsAsProjectMetadatas(): Promise<ProjectMetadata[]> {
-	const projects = await getEricProjects()
+export async function getEricProjectsAsProjectMetadata(
+	options?: ProjectPathOptions,
+): Promise<ProjectMetadata[]> {
+	const projects = await getEricProjects(options)
 	return Promise.all(projects.map(async (project) => project.getProjectMetadata()))
 }
