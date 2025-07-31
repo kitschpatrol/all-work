@@ -1,6 +1,6 @@
 {
 	"name": "allwork",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"private": true,
 	"description": "High-level view of your maintained repositories.",
 	"keywords": [
@@ -21,7 +21,7 @@
 	"type": "module",
 	"main": "./electron/main.js",
 	"scripts": {
-		"build": "vite build",
+		"build": "svelte-kit sync && vite build",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json --watch",
 		"clean": "git rm -f pnpm-lock.yaml ; git clean -fdX",
@@ -32,33 +32,36 @@
 		"lint": "kpi lint",
 		"move": "rm -rf /Applications/AllWork.app ; mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"preview": "vite preview",
+		"release1": "bumpp --commit 'Release: %s' && pnpm run build",
+		"release2": "electron-builder --publish onTag",
 		"test": "vitest"
 	},
 	"devDependencies": {
-		"@kitschpatrol/shared-config": "^5.4.2",
-		"@sveltejs/adapter-node": "^5.2.12",
-		"@sveltejs/kit": "^2.21.2",
-		"@sveltejs/vite-plugin-svelte": "^5.1.0",
-		"@tailwindcss/postcss": "^4.1.8",
+		"@kitschpatrol/shared-config": "^5.5.0",
+		"@sveltejs/adapter-node": "^5.2.13",
+		"@sveltejs/kit": "^2.26.1",
+		"@sveltejs/vite-plugin-svelte": "^5.1.1",
+		"@tailwindcss/postcss": "^4.1.11",
 		"autoprefixer": "^10.4.21",
-		"electron": "^35.5.1",
+		"bumpp": "^10.2.1",
+		"electron": "^36.7.3",
 		"electron-builder": "^26.0.12",
 		"execa": "^9.6.0",
 		"flowbite": "^3.1.2",
-		"flowbite-svelte": "^1.5.5",
-		"flowbite-svelte-icons": "^2.2.0",
+		"flowbite-svelte": "^1.10.22",
+		"flowbite-svelte-icons": "^2.2.1",
 		"globby": "^14.1.0",
 		"read-pkg": "^9.0.1",
-		"svelte": "^5.33.15",
-		"svelte-check": "^4.2.1",
-		"tailwindcss": "^4.1.8",
+		"svelte": "^5.37.1",
+		"svelte-check": "^4.3.0",
+		"tailwindcss": "^4.1.11",
 		"taze": "^19.1.0",
 		"typescript": "^5.8.3",
 		"vite": "^6.3.5",
-		"vitest": "^3.2.2",
-		"zod": "^3.25.56"
+		"vitest": "^3.2.4",
+		"zod": "^3.25.76"
 	},
-	"packageManager": "pnpm@10.11.1",
+	"packageManager": "pnpm@10.13.1",
 	"engines": {
 		"node": ">=22.0.0",
 		"pnpm": ">=10.0.0"
@@ -70,6 +73,7 @@
 			"electron",
 			"electron-winstaller",
 			"esbuild",
+			"oxc-resolver",
 			"puppeteer",
 			"unrs-resolver"
 		]
