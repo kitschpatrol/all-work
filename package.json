@@ -33,7 +33,7 @@
 		"move": "rm -rf /Applications/AllWork.app ; mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm run build",
-		"release2": "electron-builder --publish onTag",
+		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && electron-builder build --publish always",
 		"test": "vitest"
 	},
 	"devDependencies": {

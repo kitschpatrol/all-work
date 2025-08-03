@@ -26,8 +26,8 @@ nsis:
 linux:
   target: tar.gz
   icon: electron/resources/icons/png/1024x1024.png
-#
-# publish:
-#   provider: github
-#   releaseType: release
-#   vPrefixedTagName: false
+
+publish:
+  provider: github
+  releaseType: release
+  vPrefixedTagName: true
