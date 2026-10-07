@@ -1,4 +1,4 @@
-import { getEricProjects } from '$lib/server/project'
+import { getEricProjects } from '#lib/server/project.js'
 import type { PageServerLoad } from './$types'
 
 export const load: PageServerLoad = async () => {

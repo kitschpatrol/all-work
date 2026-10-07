@@ -1,4 +1,4 @@
-import { getEricProjects } from '$lib/server/project'
+import { getEricProjects } from '#lib/server/project.js'
 
 const projects = await getEricProjects()
 const myProjects = projects.filter((project) => project.isAuthoredByMe)

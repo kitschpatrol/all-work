@@ -40,22 +40,26 @@ function createWindow() {
 		// If the url is different from the app's url, open in default browser
 
 		if (
-			url.startsWith('file://') ||
-			url.startsWith('gittower://') ||
-			url.startsWith('vscode://') ||
-			url !== mainWindow.webContents.getURL()
+			!url.startsWith('file://') &&
+			!url.startsWith('gittower://') &&
+			!url.startsWith('vscode://') &&
+			url === mainWindow.webContents.getURL()
 		) {
-			event.preventDefault()
-
-			// All other protocols handled
-			shell.openExternal(url)
+			return
 		}
+
+		event.preventDefault()
+
+		// All other protocols handled
+		shell.openExternal(url)
 	})
 }
 
 /**
  * Checks if the server is available.
+ *
  * @param {number} port - The port number.
+ *
  * @returns {Promise<void>}
  */
 async function checkServerAvailability(port) {
@@ -118,10 +122,14 @@ app
 
 // Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {
-	if (process.platform !== 'darwin') app.quit()
+	if (process.platform !== 'darwin') {
+		app.quit()
+	}
 })
 
 // Open a window if none are open in macOS
 app.on('activate', () => {
-	if (BrowserWindow.getAllWindows().length === 0) createWindow()
+	if (BrowserWindow.getAllWindows().length === 0) {
+		createWindow()
+	}
 })

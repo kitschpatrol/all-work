@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
 	import {
 		Table,
 		TableBody,
@@ -15,6 +14,7 @@
 		GithubSolid,
 		NpmSolid,
 	} from 'flowbite-svelte-icons'
+	import { onMount } from 'svelte'
 
 	const { data } = $props()
 
@@ -79,13 +79,17 @@
 
 	let sortUpdateKey = $derived(`${sortKey}-${sortDirection}`)
 
-	function formatDate(dateValue: string | Date | undefined): string {
-		if (!dateValue) return ''
+	function formatDate(dateValue: Date | string | undefined): string {
+		if (!dateValue) {
+			return ''
+		}
 
 		const date = new Date(dateValue)
-		if (isNaN(date.getTime())) return ''
+		if (Number.isNaN(date.getTime())) {
+			return ''
+		}
 
-		return date.toLocaleDateString('en-CA') // en-CA gives YYYY-MM-DD format
+		return date.toLocaleDateString('en-CA') // Canadian English locale formats dates as YYYY-MM-DD
 	}
 </script>
 
@@ -94,118 +98,118 @@
 		<TableHead>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('title')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Project {sortIcon('title')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('type')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Type {sortIcon('type')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('firstCommitDate')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					First Commit {sortIcon('firstCommitDate')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('lastCommitDate')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Last Commit {sortIcon('lastCommitDate')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('gitIsDirty')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Dirty {sortIcon('gitIsDirty')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('isRemoteAhead')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Behind {sortIcon('isRemoteAhead')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('semverUpdateCount')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Semver Updates {sortIcon('semverUpdateCount')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('majorUpdateCount')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Major Updates {sortIcon('majorUpdateCount')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('issueCount')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Issues {sortIcon('issueCount')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('gitHubStarCount')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Stars {sortIcon('gitHubStarCount')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('npmDownloadCount')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Downloads {sortIcon('npmDownloadCount')}
 				</button>
 			</TableHeadCell>
 			<TableHeadCell>
 				<button
-					type="button"
+					class="hover:text-primary-600 w-full cursor-pointer border-none bg-transparent p-0 text-left"
 					onclick={() => sortBy('isPublic')}
-					class="cursor-pointer bg-transparent border-none p-0 text-left w-full hover:text-primary-600"
+					type="button"
 				>
 					Public {sortIcon('isPublic')}
 				</button>
 			</TableHeadCell>
 
-			<TableHeadCell></TableHeadCell>
-			<TableHeadCell></TableHeadCell>
-			<TableHeadCell></TableHeadCell>
-			<TableHeadCell></TableHeadCell>
-			<TableHeadCell></TableHeadCell>
+			<TableHeadCell />
+			<TableHeadCell />
+			<TableHeadCell />
+			<TableHeadCell />
+			<TableHeadCell />
 		</TableHead>
 		<TableBody class="divide-y divide-gray-200">
 			{#each resolvedProjects as project, index (project.repositoryPath)}
@@ -293,53 +297,53 @@
 					<!-- Finder Link -->
 					<TableBodyCell class="px-0">
 						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 							href={`file://${project.repositoryPath}`}
 							title="Open in Finder"
 						>
-							<FolderSolid color="red" class="w-5 h-5" />
+							<FolderSolid class="h-5 w-5" color="red" />
 						</a>
 					</TableBodyCell>
 					<!-- Tower Link -->
 					<TableBodyCell class="px-0">
 						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 							href={`gittower://${project.repositoryPath}`}
 							title="Open in Tower"
 						>
-							<ArchiveSolid color="red" class="w-5 h-5" />
+							<ArchiveSolid class="h-5 w-5" color="red" />
 						</a>
 					</TableBodyCell>
 					<!-- VS Code Link  -->
 					<TableBodyCell class="px-0">
 						<a
-							class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+							class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 							href={`vscode://file/${project.repositoryPath}`}
 							title="Open in VS Code"
 						>
-							<FileCodeSolid color="red" class="w-5 h-5" />
+							<FileCodeSolid class="h-5 w-5" color="red" />
 						</a>
 					</TableBodyCell>
 					<!-- GitHub -->
 					<TableBodyCell class="px-0">
 						{#if project.gitHubLink}
 							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 								href={project.gitHubLink}
 								title="Open in GitHub"
 							>
-								<GithubSolid color="red" class="w-5 h-5" />
+								<GithubSolid class="h-5 w-5" color="red" />
 							</a>
 						{/if}
 					</TableBodyCell>
 					<TableBodyCell class="px-0">
 						{#if project.isOnNpm}
 							<a
-								class="font-medium text-primary-600 hover:underline dark:text-primary-500"
+								class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 								href={`https://www.npmjs.com/package/${project.title}`}
 								title="Open in NPM"
 							>
-								<NpmSolid color="red" class="w-5 h-5" strokeWidth="0" />
+								<NpmSolid class="h-5 w-5 [&_path]:stroke-0" color="red" />
 							</a>
 						{/if}
 					</TableBodyCell>

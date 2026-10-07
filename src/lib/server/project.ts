@@ -21,6 +21,7 @@ import { z } from 'zod'
 
 /**
  * Zod schema for getProjectMetadata return type
+ *
  * @public
  */
 export const ProjectMetadataSchema = z.object({
@@ -61,6 +62,8 @@ export const ProjectMetadataSchema = z.object({
 export type ProjectMetadata = z.infer<typeof ProjectMetadataSchema>
 
 export class Project {
+	public readonly repositoryPath: string
+
 	public get gitHubLink(): string | undefined {
 		return this.packageData.repository?.url.replace('git+', '').replace('.git', '')
 	}
@@ -112,7 +115,8 @@ export class Project {
 	// private readonly gitInfo: HostedGitInfo
 	private readonly packageData: NormalizedPackageJson
 
-	constructor(public readonly repositoryPath: string) {
+	constructor(repositoryPath: string) {
+		this.repositoryPath = repositoryPath
 		this.packageData = readPackageSync({
 			cwd: repositoryPath,
 			normalize: true,
@@ -142,14 +146,13 @@ export class Project {
 		| undefined
 		| {
 				open_issues_count: number
-
 				stargazers_count: number
 		  }
 	> {
 		const author = 'kitschpatrol'
-		const repo = this.packageData.name.replace('@kitschpatrol/', '')
-		const result = await fetch(`https://api.github.com/repos/${author}/${repo}`)
-		// eslint-disable-next-line ts/no-unsafe-type-assertion
+		const repository = this.packageData.name.replace('@kitschpatrol/', '')
+		const result = await fetch(`https://api.github.com/repos/${author}/${repository}`)
+
 		const json = (await result.json()) as {
 			open_issues_count: number
 			stargazers_count: number
@@ -207,7 +210,7 @@ export class Project {
 		const result = await fetch(
 			`https://api.npmjs.org/downloads/point/1970-01-01:3000-01-01/${this.packageData.name}`,
 		)
-		// eslint-disable-next-line ts/no-unsafe-type-assertion
+
 		const json = (await result.json()) as {
 			downloads: number
 			end: string
@@ -338,6 +341,9 @@ export class Project {
 					{ cwd: this.repositoryPath },
 				)
 				const [ahead, behind] = stdout.split('\t').map(Number)
+				if (ahead === undefined || behind === undefined) {
+					throw new Error(`Unexpected "git rev-list --count" output: "${stdout}"`)
+				}
 
 				results[remote] = behind - ahead
 			} catch (error) {
@@ -351,11 +357,7 @@ export class Project {
 	public async getStarCount(): Promise<number> {
 		const info = await this.getGitHubInfo()
 
-		if (info === undefined) {
-			return 0
-		}
-
-		return info.stargazers_count
+		return info === undefined ? 0 : info.stargazers_count
 	}
 
 	public async getUpdateList(
@@ -368,7 +370,9 @@ export class Project {
 			const checked = await CheckPackages({
 				cwd: this.repositoryPath,
 				force: true,
+				githubActions: false,
 				mode,
+				nodeVersion: false,
 				recursive: true,
 			})
 
@@ -439,6 +443,7 @@ async function getProjectPaths(options: ProjectPathOptions): Promise<string[]> {
 
 /**
  * Get all projects in the projects directory
+ *
  * @public
  */
 export async function getProjects(
@@ -450,17 +455,17 @@ export async function getProjects(
 		projectsDirectory,
 	})
 
-	const projects: Project[] = []
-
-	for (const repositoryPath of allProjectPaths) {
-		projects.push(new Project(repositoryPath))
-	}
+	const projects: Project[] = Array.from(
+		allProjectPaths,
+		(repositoryPath) => new Project(repositoryPath),
+	)
 
 	return projects
 }
 
 /**
  * Get all Eric projects as lazily resolved project classes
+ *
  * @public
  */
 export async function getEricProjects(options?: ProjectPathOptions): Promise<Project[]> {
@@ -493,8 +498,9 @@ export async function getEricProjects(options?: ProjectPathOptions): Promise<Pro
 }
 
 /**
- * Get all Eric projects as POJOs (ProjectMetadata objects)
- * Optionally override default paths
+ * Get all Eric projects as POJOs (ProjectMetadata objects) Optionally override
+ * default paths
+ *
  * @public
  */
 export async function getEricProjectsAsProjectMetadata(
