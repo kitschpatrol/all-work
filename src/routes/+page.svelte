@@ -15,8 +15,9 @@
 		NpmSolid,
 	} from 'flowbite-svelte-icons'
 	import { onMount } from 'svelte'
+	import type { PageProps } from './$types'
 
-	const { data } = $props()
+	const { data }: PageProps = $props()
 
 	type ProjectType = Awaited<(typeof data.projects)[number]>
 	type SortKey = keyof ProjectType
@@ -54,18 +55,19 @@
 		resolvedProjects.sort(compareProjects)
 	}
 
+	async function resolveProject(projectPromise: Promise<ProjectType>) {
+		try {
+			const project = await projectPromise
+			resolvedProjects = [...resolvedProjects, project]
+			resolvedProjects.sort(compareProjects)
+		} catch (error) {
+			console.error('Error resolving project:', error)
+		}
+	}
+
 	onMount(() => {
 		for (const projectPromise of data.projects) {
-			projectPromise
-				.then((project) => {
-					resolvedProjects = [...resolvedProjects, project]
-					resolvedProjects.sort(compareProjects)
-				})
-
-				.catch((error: unknown) => {
-					// Handle errors if necessary
-					console.error('Error resolving project:', error)
-				})
+			void resolveProject(projectPromise)
 		}
 	})
 
@@ -80,7 +82,7 @@
 	let sortUpdateKey = $derived(`${sortKey}-${sortDirection}`)
 
 	function formatDate(dateValue: Date | string | undefined): string {
-		if (!dateValue) {
+		if (dateValue === undefined || dateValue === '') {
 			return ''
 		}
 

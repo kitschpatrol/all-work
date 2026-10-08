@@ -7,7 +7,8 @@ export default eslintConfig({
 			'depend/ban-dependencies': [
 				'error',
 				{
-					allowed: ['execa', 'globby'],
+					// Read-pkg normalizes author and repository metadata used by Project.
+					allowed: ['execa', 'globby', 'read-pkg'],
 				},
 			],
 		},
