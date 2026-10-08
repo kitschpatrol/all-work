@@ -15,8 +15,9 @@
 		NpmSolid,
 	} from 'flowbite-svelte-icons'
 	import { onMount } from 'svelte'
+	import type { PageProps } from './$types'
 
-	const { data } = $props()
+	const { data }: PageProps = $props()
 
 	type ProjectType = Awaited<(typeof data.projects)[number]>
 	type SortKey = keyof ProjectType
@@ -54,18 +55,19 @@
 		resolvedProjects.sort(compareProjects)
 	}
 
+	async function resolveProject(projectPromise: Promise<ProjectType>) {
+		try {
+			const project = await projectPromise
+			resolvedProjects = [...resolvedProjects, project]
+			resolvedProjects.sort(compareProjects)
+		} catch (error) {
+			console.error('Error resolving project:', error)
+		}
+	}
+
 	onMount(() => {
 		for (const projectPromise of data.projects) {
-			projectPromise
-				.then((project) => {
-					resolvedProjects = [...resolvedProjects, project]
-					resolvedProjects.sort(compareProjects)
-				})
-
-				.catch((error: unknown) => {
-					// Handle errors if necessary
-					console.error('Error resolving project:', error)
-				})
+			void resolveProject(projectPromise)
 		}
 	})
 
@@ -80,7 +82,7 @@
 	let sortUpdateKey = $derived(`${sortKey}-${sortDirection}`)
 
 	function formatDate(dateValue: Date | string | undefined): string {
-		if (!dateValue) {
+		if (dateValue === undefined || dateValue === '') {
 			return ''
 		}
 
@@ -327,6 +329,7 @@
 					<!-- GitHub -->
 					<TableBodyCell class="px-0">
 						{#if project.gitHubLink}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- External repository URL, resolve() only applies to internal routes -->
 							<a
 								class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 								href={project.gitHubLink}
@@ -334,6 +337,7 @@
 							>
 								<GithubSolid class="h-5 w-5" color="red" />
 							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}
 					</TableBodyCell>
 					<TableBodyCell class="px-0">

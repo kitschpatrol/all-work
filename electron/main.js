@@ -97,9 +97,9 @@ async function checkServerAvailability(port) {
 	})
 }
 
-app
-	.whenReady()
-	.then(async () => {
+async function startApp() {
+	try {
+		await app.whenReady()
 		if (app.isPackaged) {
 			utilityProcess.fork(path.join(app.getAppPath(), 'build', 'index.js'), {
 				// @ts-expect-error - string[] index
@@ -110,15 +110,15 @@ app
 			console.log('##### Run `npm run dev` to start the SvelteKit server separately')
 		}
 
-		await checkServerAvailability(Number.parseInt(sveltePort, 10))
+		await checkServerAvailability(Number(sveltePort))
 		createWindow()
-	})
-	// eslint-disable-next-line unicorn/prefer-top-level-await, ts/use-unknown-in-catch-callback-variable
-	.catch((error) => {
-		// eslint-disable-next-line ts/no-unsafe-argument, ts/no-unsafe-member-access
-		dialog.showErrorBox('Error', error.message)
+	} catch (error) {
+		dialog.showErrorBox('Error', error instanceof Error ? error.message : String(error))
 		app.quit()
-	})
+	}
+}
+
+void startApp()
 
 // Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {

@@ -135,7 +135,7 @@ export class Project {
 					cwd: this.repositoryPath,
 				},
 			)
-			return firstCommitDateString ? new Date(firstCommitDateString) : undefined
+			return firstCommitDateString === '' ? undefined : new Date(firstCommitDateString)
 		} catch (error) {
 			console.error('Error getting first commit date:', error)
 			return undefined
@@ -199,7 +199,7 @@ export class Project {
 			const { stdout: lastCommitDateString } = await execa('git', ['log', '-1', '--format=%cd'], {
 				cwd: this.repositoryPath,
 			})
-			return lastCommitDateString ? new Date(lastCommitDateString) : undefined
+			return lastCommitDateString === '' ? undefined : new Date(lastCommitDateString)
 		} catch (error) {
 			console.error('Error getting last commit date:', error)
 			return undefined
@@ -285,7 +285,7 @@ export class Project {
 			})
 
 			// Return the first match found, or undefined if none found
-			return readmeFiles.length > 0 ? readmeFiles[0] : undefined
+			return readmeFiles[0]
 		} catch {
 			return undefined
 		}
@@ -316,20 +316,9 @@ export class Project {
 				await execa('git', ['fetch', remote], { cwd: this.repositoryPath })
 
 				// Try to find the matching remote branch
-				let remoteBranch = ''
-				for (const branch of [currentBranch, 'main', 'master', 'dev']) {
-					const { exitCode } = await execa(
-						'git',
-						['ls-remote', '--exit-code', '--heads', remote, branch],
-						{ cwd: this.repositoryPath, reject: false },
-					)
-					if (exitCode === 0) {
-						remoteBranch = branch
-						break
-					}
-				}
+				const remoteBranch = await this.findRemoteBranch(remote, currentBranch)
 
-				if (!remoteBranch) {
+				if (remoteBranch === undefined) {
 					console.warn(`No matching branch found for remote "${remote}" in ${this.repositoryPath}`)
 					continue
 				}
@@ -403,6 +392,24 @@ export class Project {
 	public async isRemoteAhead(): Promise<boolean> {
 		const forkStatus = await this.getRemoteStatus()
 		return Object.values(forkStatus).some((value) => value > 0)
+	}
+
+	private async findRemoteBranch(
+		remote: string,
+		currentBranch: string,
+	): Promise<string | undefined> {
+		for (const branch of [currentBranch, 'main', 'master', 'dev']) {
+			const { exitCode } = await execa(
+				'git',
+				['ls-remote', '--exit-code', '--heads', remote, branch],
+				{ cwd: this.repositoryPath, reject: false },
+			)
+			if (exitCode === 0) {
+				return branch
+			}
+		}
+
+		return undefined
 	}
 }
 

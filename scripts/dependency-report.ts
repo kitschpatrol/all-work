@@ -25,7 +25,7 @@ for (const project of reallyMyProjects) {
 }
 
 // Sort the dependencies by frequency
-const sortedDependencyFrequency = [...dependencyFrequency].sort((a, b) => b[1] - a[1])
+const sortedDependencyFrequency = [...dependencyFrequency].toSorted((a, b) => b[1] - a[1])
 
 for (const [dependencyName, frequency] of sortedDependencyFrequency) {
 	console.log(`${dependencyName}: ${frequency}`)
