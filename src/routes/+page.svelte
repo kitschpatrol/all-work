@@ -329,6 +329,7 @@
 					<!-- GitHub -->
 					<TableBodyCell class="px-0">
 						{#if project.gitHubLink}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- External repository URL, resolve() only applies to internal routes -->
 							<a
 								class="text-primary-600 dark:text-primary-500 font-medium hover:underline"
 								href={project.gitHubLink}
@@ -336,6 +337,7 @@
 							>
 								<GithubSolid class="h-5 w-5" color="red" />
 							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/if}
 					</TableBodyCell>
 					<TableBodyCell class="px-0">
