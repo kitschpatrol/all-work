@@ -14,12 +14,13 @@
 		rowSelectionFeature,
 		rowSortingFeature,
 		sortFn_alphanumeric,
+		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
 	import { getGithubUrl } from '#lib/repository-links.js'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
-	import { SvelteMap } from 'svelte/reactivity'
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 	import type { PageProps } from './$types'
 
 	const { data }: PageProps = $props()
@@ -30,6 +31,9 @@
 	let starting = $state(false)
 	let errorMessage = $state('')
 	let command = $state('')
+	let commandHistory: string[] = $state([])
+	let historyIndex = $state(-1)
+	let commandDraft = $state('')
 	let concurrency = $state(6)
 	let autoClear = $state(false)
 	let search = $state('')
@@ -40,9 +44,11 @@
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
+	let columnMenu: HTMLDetailsElement
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
 	const autoClearPredecessors = new SvelteMap<string, string>()
+	const resizedColumns = new SvelteSet<string>()
 
 	const features = tableFeatures({
 		columnFilteringFeature,
@@ -55,7 +61,7 @@
 		rowSelectionFeature,
 		rowSortingFeature,
 		sortedRowModel: createSortedRowModel(),
-		sortFns: { alphanumeric: sortFn_alphanumeric },
+		sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
 	})
 
 	const columns = $derived<Array<ColumnDef<typeof features, Repository>>>([
@@ -65,12 +71,17 @@
 			enableSorting: false,
 			header: '',
 			id: 'select',
-			maxSize: 46,
-			minSize: 46,
-			size: 46,
+			maxSize: 32,
+			minSize: 32,
+			size: 32,
 		},
-		{ accessorKey: 'name', enableHiding: false, header: 'Repository', minSize: 240, size: 310 },
-		{ accessorKey: 'branch', header: 'Branch', size: 150 },
+		{
+			accessorKey: 'relativePath',
+			enableHiding: false,
+			header: 'Repository',
+		},
+		{ accessorKey: 'name', header: 'Name' },
+		{ accessorKey: 'branch', header: 'Branch' },
 		{
 			accessorKey: 'changedFiles',
 			filterFn(row: Row<typeof features, Repository>, _columnId: string, value: unknown) {
@@ -83,27 +94,22 @@
 					: value !== 'clean' || row.original.changedFiles === 0
 			},
 			header: 'Working tree',
-			size: 140,
 		},
 		{
 			accessorFn: (repository: Repository) => repository.ahead + repository.behind,
 			header: 'Sync',
 			id: 'sync',
-			size: 100,
 		},
-		{ accessorKey: 'lastCommitDate', header: 'Last commit', size: 140 },
-		{ accessorKey: 'version', header: 'Version', size: 100 },
-		{ accessorKey: 'packageManager', header: 'Package manager', size: 170 },
-		{ accessorKey: 'remote', header: 'Remote', size: 260 },
-		{ accessorKey: 'relativePath', header: 'Path', size: 240 },
+		{ accessorKey: 'lastCommitDate', header: 'Last commit' },
+		{ accessorKey: 'version', header: 'Version' },
+		{ accessorKey: 'packageManager', header: 'Package manager' },
+		{ accessorKey: 'remote', header: 'Remote' },
 		...runs.map((run): ColumnDef<typeof features, Repository> => ({
 			accessorFn: (repository: Repository) => run.results[repository.id]?.output ?? '',
 			enableGlobalFilter: false,
-			enableSorting: false,
 			header: run.command,
 			id: run.id,
-			minSize: 220,
-			size: 340,
+			sortFn: 'text',
 		})),
 	])
 	const repositories = $derived(
@@ -119,13 +125,13 @@
 		get data() {
 			return repositories
 		},
-		defaultColumn: { maxSize: 900, minSize: 80, sortFn: 'alphanumeric' },
+		defaultColumn: { maxSize: 4000, minSize: 24, size: 80, sortFn: 'alphanumeric' },
 		features,
 		getRowId: getRepositoryId,
 		globalFilterFn: 'includesString',
 		initialState: {
-			columnVisibility: { packageManager: false, relativePath: false, remote: false },
-			sorting: [{ desc: false, id: 'name' }],
+			columnVisibility: { packageManager: false, remote: false },
+			sorting: [{ desc: false, id: 'relativePath' }],
 		},
 		onRowSelectionChange(updater) {
 			rowSelection = typeof updater === 'function' ? updater(rowSelection) : updater
@@ -155,8 +161,108 @@
 		directory = localStorage.getItem('allwork.directory') ?? data.defaultDirectory
 		recursive = localStorage.getItem('allwork.recursive') !== 'false'
 		autoClear = localStorage.getItem('allwork.autoClear') === 'true'
+		try {
+			const history: unknown = JSON.parse(localStorage.getItem('allwork.commandHistory') ?? '[]')
+			if (Array.isArray(history) && history.every((entry: unknown) => typeof entry === 'string')) {
+				commandHistory = history.slice(-100)
+			}
+		} catch {
+			localStorage.removeItem('allwork.commandHistory')
+		}
+
+		void tick().then(() => fitColumns())
 		return closeStreams
 	})
+
+	function fitColumns(columnIds?: string[]) {
+		const source = tableScroll.querySelector('table')
+		const measurement = source?.cloneNode(true)
+		if (!(measurement instanceof HTMLTableElement)) {
+			return
+		}
+
+		measurement.classList.add('column-measurement')
+		measurement.removeAttribute('style')
+		measurement.setAttribute('aria-hidden', 'true')
+		for (const cell of measurement.querySelectorAll<HTMLElement>('th, td')) {
+			cell.style.removeProperty('width')
+		}
+
+		document.body.append(measurement)
+		try {
+			const sizes: Record<string, number> = {}
+			const visibleColumns = table.getVisibleLeafColumns()
+			const headers = measurement.tHead?.rows[0]?.cells ?? []
+			for (const [index, header] of [...headers].entries()) {
+				const column = visibleColumns[index]
+				if (
+					column !== undefined &&
+					column.getCanResize() &&
+					(columnIds === undefined || columnIds.includes(column.id))
+				) {
+					sizes[column.id] = Math.ceil(header.getBoundingClientRect().width)
+				}
+			}
+
+			table.setColumnSizing((previous) => ({ ...previous, ...sizes }))
+		} finally {
+			measurement.remove()
+		}
+	}
+
+	function recallCommand(event: KeyboardEvent) {
+		if (
+			event.isComposing ||
+			event.altKey ||
+			event.ctrlKey ||
+			event.metaKey ||
+			event.shiftKey ||
+			(event.key !== 'ArrowUp' && event.key !== 'ArrowDown') ||
+			commandHistory.length === 0
+		) {
+			return
+		}
+
+		event.preventDefault()
+		if (event.key === 'ArrowUp') {
+			if (historyIndex === -1) {
+				commandDraft = command
+				historyIndex = commandHistory.length - 1
+			} else {
+				historyIndex = Math.max(0, historyIndex - 1)
+			}
+
+			command = commandHistory[historyIndex] ?? ''
+		} else if (historyIndex !== -1) {
+			historyIndex++
+			if (historyIndex >= commandHistory.length) {
+				historyIndex = -1
+				command = commandDraft
+			} else {
+				command = commandHistory[historyIndex] ?? ''
+			}
+		}
+
+		const input = event.currentTarget
+		if (input instanceof HTMLInputElement) {
+			void tick().then(() => input.setSelectionRange(input.value.length, input.value.length))
+		}
+	}
+
+	function refreshOutputSorting(runId: string) {
+		const column = table.getColumn(runId)
+		if (workspace !== undefined && column !== undefined && column.getIsSorted() !== false) {
+			workspace.repositories = [...workspace.repositories]
+		}
+	}
+
+	function sortOutput(runId: string, multiple: boolean) {
+		if (workspace !== undefined) {
+			workspace.repositories = [...workspace.repositories]
+		}
+
+		table.getColumn(runId)?.toggleSorting(undefined, multiple)
+	}
 
 	function closeStreams() {
 		eventStream?.close()
@@ -212,6 +318,9 @@
 				selectedOnly = false
 				search = ''
 				status = 'all'
+				resizedColumns.clear()
+				table.resetColumnSizing()
+				table.resetSorting()
 				table.setGlobalFilter('')
 				table.resetColumnFilters()
 			}
@@ -220,6 +329,13 @@
 			directory = next.directory
 			localStorage.setItem('allwork.directory', directory)
 			localStorage.setItem('allwork.recursive', String(next.recursive))
+			await tick()
+			fitColumns(
+				table
+					.getAllLeafColumns()
+					.filter((column) => !resizedColumns.has(column.id))
+					.map((column) => column.id),
+			)
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		} finally {
@@ -268,8 +384,13 @@
 				run.finished = true
 			}
 
+			refreshOutputSorting(run.id)
+
 			if (run.finished) {
 				clearPreviousOutputs()
+				if (!resizedColumns.has(run.id)) {
+					void tick().then(() => fitColumns([run.id]))
+				}
 			}
 
 			if (runs.every((item) => item.finished)) {
@@ -304,6 +425,13 @@
 				workspaceId: workspace.id,
 			})
 			runs = [...runs, run]
+			if (commandHistory.at(-1) !== run.command) {
+				commandHistory = [...commandHistory, run.command].slice(-100)
+				localStorage.setItem('allwork.commandHistory', JSON.stringify(commandHistory))
+			}
+
+			historyIndex = -1
+			commandDraft = ''
 			if (previousRunId !== undefined) {
 				autoClearPredecessors.set(run.id, previousRunId)
 			}
@@ -311,6 +439,7 @@
 			clearPreviousOutputs()
 			watchRuns()
 			await tick()
+			fitColumns([run.id])
 			tableScroll.scrollLeft = tableScroll.scrollWidth
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
@@ -330,7 +459,9 @@
 	async function removeRun(runId: string) {
 		try {
 			await request(`/api/runs/${runId}`, {}, 'DELETE')
+			table.setSorting((previous) => previous.filter((entry) => entry.id !== runId))
 			runs = runs.filter((run) => run.id !== runId)
+			resizedColumns.delete(runId)
 			autoClearPredecessors.delete(runId)
 			if (inspected?.runId === runId) {
 				outputDialog.close()
@@ -398,7 +529,7 @@
 		return repository.id
 	}
 
-	async function openInApp(repository: Repository, app: 'finder' | 'tower') {
+	async function openInApp(repository: Repository, app: 'finder' | 'terminal' | 'tower') {
 		if (workspace === undefined) {
 			return
 		}
@@ -437,8 +568,16 @@
 	</svg>
 {/snippet}
 
+<svelte:window
+	onclick={(event: MouseEvent) => {
+		if (columnMenu.open && !event.composedPath().includes(columnMenu)) {
+			columnMenu.open = false
+		}
+	}}
+/>
+
 <svelte:head>
-	<title>AllWork — a command line for all your repositories</title>
+	<title>AllWork</title>
 	<meta
 		name="description"
 		content="Discover Git repositories, select a working set, and run shell commands in parallel."
@@ -484,7 +623,7 @@
 						type="button">Browse…</button
 					>{/if}
 				<button
-					class="button subtle"
+					class="button subtle workspace-load-button"
 					disabled={directory.trim() === '' || loading || activeRuns.length > 0}
 					type="submit"
 					>{loading ? 'Scanning…' : workspace === undefined ? 'Load' : 'Reload ↻'}</button
@@ -500,15 +639,21 @@
 			}}
 		>
 			<label class="field-label" for="shell-command">Command</label>
-			<span class="prompt-symbol" aria-hidden="true">$</span>
-			<input
-				id="shell-command"
-				aria-label="Shell command"
-				autocomplete="off"
-				placeholder="git status --short"
-				spellcheck="false"
-				bind:value={command}
-			/>
+			<div class="command-input">
+				<span class="prompt-symbol" aria-hidden="true">$</span>
+				<input
+					id="shell-command"
+					aria-label="Shell command"
+					autocomplete="off"
+					oninput={() => {
+						historyIndex = -1
+					}}
+					onkeydown={recallCommand}
+					placeholder="git status --short"
+					spellcheck="false"
+					bind:value={command}
+				/>
+			</div>
 			<label class="parallel-label"
 				><span>Jobs</span>
 				<input
@@ -520,19 +665,6 @@
 					bind:value={concurrency}
 				/></label
 			>
-			<label
-				class="auto-clear-option"
-				title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
-			>
-				<input
-					aria-label="Auto clear"
-					onchange={(event) =>
-						localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
-					type="checkbox"
-					bind:checked={autoClear}
-				/>
-				Auto clear
-			</label>
 			<button
 				class="button primary run-button"
 				disabled={targets.length === 0 || command.trim() === '' || starting || loading}
@@ -559,7 +691,13 @@
 			<div class="table-toolbar">
 				<div class="filters">
 					<div class="search-field">
-						<span aria-hidden="true">⌕</span><input
+						<svg aria-hidden="true" fill="none" height="12" viewBox="0 0 16 16" width="12"
+							><circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.5" /><path
+								d="m9.5 9.5 4 4"
+								stroke="currentColor"
+								stroke-width="1.5"
+							/></svg
+						><input
 							aria-label="Filter repositories"
 							oninput={() => table.setGlobalFilter(search)}
 							placeholder="Filter repositories…"
@@ -606,6 +744,19 @@
 						}}
 						type="button">Clear</button
 					>
+					<label
+						class="auto-clear-option"
+						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
+					>
+						<input
+							aria-label="Auto clear"
+							onchange={(event) =>
+								localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
+							type="checkbox"
+							bind:checked={autoClear}
+						/>
+						Auto clear
+					</label>
 				</div>
 				<div class="table-title-actions">
 					{#if activeRuns.length > 0}<span class="running-indicator"
@@ -621,7 +772,7 @@
 							}}
 							type="button">Clear finished runs</button
 						>{/if}
-					<details class="column-menu">
+					<details bind:this={columnMenu} class="column-menu">
 						<summary class="button subtle">Columns ▾</summary>
 						<div class="column-options">
 							{#each table
@@ -629,7 +780,13 @@
 								.filter((column) => column.getCanHide()) as column (column.id)}<label
 									><input
 										checked={column.getIsVisible()}
-										onchange={(event) => column.toggleVisibility(event.currentTarget.checked)}
+										onchange={async (event) => {
+											column.toggleVisibility(event.currentTarget.checked)
+											await tick()
+											if (!resizedColumns.has(column.id)) {
+												fitColumns([column.id])
+											}
+										}}
 										type="checkbox"
 									/>{String(column.columnDef.header)}</label
 								>{/each}
@@ -646,7 +803,7 @@
 									)}<th
 										style:width="{header.getSize()}px"
 										class:output-header={run !== undefined}
-										class:repository-cell={header.column.id === 'name'}
+										class:repository-cell={header.column.id === 'relativePath'}
 										class:selection-cell={header.column.id === 'select'}
 										aria-sort={header.column.getIsSorted() === 'asc'
 											? 'ascending'
@@ -665,13 +822,30 @@
 												type="checkbox"
 											/>
 										{:else if run !== undefined}<div class="run-header">
-												<div>
-													<span class="run-label"
-														>RUN {runs.indexOf(run) + 1}
-														<span>{runProgress(run)}{run.finished ? ' complete' : ' running'}</span
-														></span
-													><code title={run.command}>$ {run.command}</code>
-												</div>
+												<button
+													class="sort-button run-sort-button"
+													aria-label="Sort output for {run.command}"
+													onclick={(event) => sortOutput(run.id, event.shiftKey)}
+													type="button"
+												>
+													<span class="run-header-content">
+														<span class="run-label"
+															>RUN {runs.indexOf(run) + 1}
+															<span
+																>{runProgress(run)}{run.finished ? ' complete' : ' running'}</span
+															></span
+														><code title={run.command}>$ {run.command}</code>
+													</span>
+													<span
+														class="sort-indicator"
+														class:sorted={header.column.getIsSorted() !== false}
+														>{header.column.getIsSorted() === 'asc'
+															? '↑'
+															: header.column.getIsSorted() === 'desc'
+																? '↓'
+																: '↕'}</span
+													>
+												</button>
 												<div>
 													{#if !run.finished}<button
 															class="stop-button"
@@ -692,6 +866,7 @@
 												onclick={(event) => header.column.toggleSorting(undefined, event.shiftKey)}
 												type="button"
 												>{String(header.column.columnDef.header)}<span
+													class="sort-indicator"
 													class:sorted={header.column.getIsSorted() !== false}
 													>{header.column.getIsSorted() === 'asc'
 														? '↑'
@@ -703,9 +878,18 @@
 										{#if header.column.getCanResize()}<button
 												class="resize-handle"
 												aria-label="Resize column"
-												ondblclick={() => header.column.resetSize()}
-												onmousedown={header.getResizeHandler()}
-												ontouchstart={header.getResizeHandler()}
+												ondblclick={() => {
+													resizedColumns.delete(header.column.id)
+													fitColumns([header.column.id])
+												}}
+												onmousedown={(event) => {
+													resizedColumns.add(header.column.id)
+													header.getResizeHandler()(event)
+												}}
+												ontouchstart={(event) => {
+													resizedColumns.add(header.column.id)
+													header.getResizeHandler()(event)
+												}}
 												type="button"
 											></button>{/if}
 									</th>{/each}</tr
@@ -720,7 +904,7 @@
 									)}{@const result = run?.results[repository.id]}<td
 										style:width="{cell.column.getSize()}px"
 										class:output-cell={run !== undefined}
-										class:repository-cell={cell.column.id === 'name'}
+										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}
 									>
 										{#if cell.column.id === 'select'}<input
@@ -729,20 +913,33 @@
 												onchange={row.getToggleSelectedHandler()}
 												type="checkbox"
 											/>
-										{:else if cell.column.id === 'name'}{@const githubUrl = getGithubUrl(
+										{:else if cell.column.id === 'relativePath'}{@const githubUrl = getGithubUrl(
 												repository.remote,
 											)}
 											<div class="repository-heading">
-												<div
-													class="repository-name"
-													title={repository.description === ''
-														? repository.path
-														: repository.description}
-												>
-													<span class="repo-symbol" aria-hidden="true">▣</span><strong
-														>{repository.name}</strong
-													>
+												<div class="repository-name" title={repository.path}>
+													<svg
+														class="repo-symbol"
+														aria-hidden="true"
+														fill="none"
+														height="16"
+														viewBox="0 0 16 16"
+														width="16"
+														><path
+															d="M1.5 3h4l1.5 2h7v8h-13V3Z"
+															fill="#8ab9dd"
+															stroke="#507fa8"
+														/><path d="M1.5 6h13v7h-13V6Z" fill="#a5ceed" /><path
+															d="M2 6.5h12"
+															stroke="#d9edfc"
+														/></svg
+													><strong>{repository.relativePath}</strong>
 												</div>
+												{#if repository.error !== undefined}<span
+														class="metadata-error"
+														aria-label="Metadata incomplete"
+														title={repository.error}>!</span
+													>{/if}
 												<div class="repository-actions">
 													<button
 														class="repository-action"
@@ -825,15 +1022,42 @@
 															/></svg
 														>
 													</button>
+													<button
+														class="repository-action"
+														aria-label="Open {repository.name} in Terminal"
+														onclick={async () => openInApp(repository, 'terminal')}
+														title="Open in Terminal"
+														type="button"
+													>
+														<svg
+															aria-hidden="true"
+															fill="none"
+															height="16"
+															viewBox="0 0 16 16"
+															width="16"
+															><rect
+																height="11"
+																rx="1"
+																stroke="currentColor"
+																width="13"
+																x="1.5"
+																y="2.5"
+															/><path
+																d="m4 6 2 2-2 2m4 0h3"
+																stroke="currentColor"
+																stroke-linecap="round"
+																stroke-linejoin="round"
+															/></svg
+														>
+													</button>
 												</div>
 											</div>
-											<div class="repository-path" title={repository.path}>
-												{repository.relativePath}
-											</div>
-											{#if repository.error !== undefined}<span
-													class="metadata-error"
-													title={repository.error}>Metadata incomplete</span
-												>{/if}
+										{:else if cell.column.id === 'name'}<span
+												class="project-name"
+												title={repository.description === ''
+													? repository.name
+													: repository.description}>{repository.name}</span
+											>
 										{:else if cell.column.id === 'branch'}<span
 												class="branch"
 												title={repository.branch}
@@ -861,7 +1085,14 @@
 											>
 										{:else if run !== undefined}{#if result !== undefined}<button
 													class="output-preview"
-													onclick={() => inspect(run.id, repository.id)}
+													onclick={(event) => {
+														if (
+															event.detail === 0 ||
+															globalThis.getSelection()?.isCollapsed !== false
+														) {
+															inspect(run.id, repository.id)
+														}
+													}}
 													type="button"
 													><span
 														class="result-meta"
@@ -894,12 +1125,11 @@
 					>
 				</table>
 				{#if table.getRowModel().rows.length === 0}<div class="empty-state">
-						<div class="empty-icon" aria-hidden="true">{loading ? '↻' : '⌘'}</div>
 						<h3>
 							{loading
-								? 'Finding your repositories'
+								? 'Scanning repositories…'
 								: workspace === undefined
-									? 'All your repositories. One working surface.'
+									? 'No workspace loaded'
 									: workspace.repositories.length === 0
 										? 'No Git repositories found'
 										: 'No matching repositories'}
@@ -908,7 +1138,7 @@
 							{loading
 								? 'Reading local Git status and project metadata…'
 								: workspace === undefined
-									? 'Load a folder, select a few projects, and put a command to work.'
+									? 'Choose a workspace folder above.'
 									: workspace.repositories.length === 0
 										? 'Try a folder that contains Git repositories or worktrees.'
 										: 'Adjust your filters or turn off “Selected only” to see more projects.'}
@@ -922,7 +1152,6 @@
 					{dirtyCount} with changes <span class="caption-divider">·</span>
 					{runs.length} command {runs.length === 1 ? 'run' : 'runs'}</span
 				>
-				<span>Metascope <span class="caption-divider">·</span> Session history</span>
 			</footer>
 		</section>
 	</main>
@@ -936,17 +1165,17 @@
 	}}
 >
 	<div class="dialog-heading">
+		<button
+			class="remove-button dialog-close-button"
+			aria-label="Close output"
+			onclick={() => outputDialog.close()}
+			type="button">×</button
+		>
 		<div>
 			<span class="eyebrow">{inspectedRepository?.name}</span>
 			<h2><code>$ {inspectedRun?.command}</code></h2>
 			<p>{inspectedRepository?.path}</p>
 		</div>
-		<button
-			class="remove-button"
-			aria-label="Close output"
-			onclick={() => outputDialog.close()}
-			type="button">×</button
-		>
 	</div>
 	<div class="dialog-toolbar">
 		<span

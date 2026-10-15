@@ -53,7 +53,7 @@ const workspace: Workspace = {
 	warnings: [],
 }
 
-async function openRepository(repositoryId: string, app: 'Finder' | 'Tower') {
+async function openRepository(repositoryId: string, app: 'Finder' | 'Terminal' | 'Tower') {
 	const url = new URL(`http://127.0.0.1:5173/api/repositories/${app.toLowerCase()}`)
 	const request = new Request(url, {
 		body: JSON.stringify({ repositoryId, workspaceId: workspace.id }),
@@ -63,7 +63,7 @@ async function openRepository(repositoryId: string, app: 'Finder' | 'Tower') {
 	return openRepositoryInApp(request, url, app)
 }
 
-describe.skipIf(process.platform !== 'darwin').each(['Finder', 'Tower'] as const)(
+describe.skipIf(process.platform !== 'darwin').each(['Finder', 'Terminal', 'Tower'] as const)(
 	'opening a local repository in %s',
 	(app) => {
 		beforeEach(() => {

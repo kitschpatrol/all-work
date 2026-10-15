@@ -7,7 +7,7 @@ import { readRequest } from './request.js'
 export async function openRepository(
 	request: Request,
 	url: URL,
-	app: 'Finder' | 'Tower',
+	app: 'Finder' | 'Terminal' | 'Tower',
 ): Promise<Response> {
 	const body = await readRequest(request, url)
 	const workspace =
