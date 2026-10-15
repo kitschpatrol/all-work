@@ -270,7 +270,7 @@ export function getMetadataPlaceholder(repository: Repository, columnId: string)
 		state?.status === 'queued' ||
 		(state === undefined && column !== undefined && ['code', 'files'].includes(column.group))
 		? '…'
-		: state === undefined && column !== undefined && column.group === 'updates'
+		: state === undefined && column?.group === 'updates'
 			? 'Not scanned'
 			: '—'
 }

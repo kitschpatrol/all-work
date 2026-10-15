@@ -33,10 +33,12 @@
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import { commandPresets } from '#lib/command-presets.js'
+	import CommandAutocomplete from '#lib/CommandAutocomplete.svelte'
 	import FolderIcon from '#lib/FolderIcon.svelte'
 	import GithubIcon from '#lib/GithubIcon.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
+	import NumberField from '#lib/NumberField.svelte'
 	import OutputPreview from '#lib/OutputPreview.svelte'
 	import { getGithubUrl } from '#lib/repository-links.js'
 	import {
@@ -73,7 +75,7 @@
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
-	let commandInput: HTMLInputElement
+	let commandInput = $state<HTMLInputElement>()
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
 	let metadataStream: undefined | { close: () => void }
@@ -242,7 +244,11 @@
 				id: column.id,
 				maxSize: Math.min(
 					column.columnDef.maxSize ?? 4000,
-					repositoryColumnIds.has(column.id) ? maxWidth : maxRunWidth,
+					column.id === 'relativePath'
+						? maxWidth * 2
+						: repositoryColumnIds.has(column.id)
+							? maxWidth
+							: maxRunWidth,
 				),
 				values: rows.map((row) => getColumnSizingValue(row.original, column.id, runs)),
 			})),
@@ -317,13 +323,13 @@
 		}
 	}
 
-	async function choosePreset(value: string) {
+	async function choosePreset(value: string, caret = value.length) {
 		command = value
 		historyIndex = -1
 		commandDraft = ''
 		await tick()
-		commandInput.focus()
-		commandInput.setSelectionRange(commandInput.value.length, commandInput.value.length)
+		commandInput?.focus()
+		commandInput?.setSelectionRange(caret, caret)
 	}
 
 	function refreshOutputSorting(runId: string) {
@@ -562,6 +568,19 @@
 		}
 	}
 
+	async function setColumnsVisible(ids: string[], visible: boolean) {
+		table.setColumnVisibility((previous) => ({
+			...previous,
+			...Object.fromEntries(ids.map((id) => [id, visible])),
+		}))
+		await tick()
+		if (visible) {
+			fitColumns(ids.filter((id) => !resizedColumns.has(id)))
+		}
+
+		scheduleMetadata()
+	}
+
 	async function browseDirectory() {
 		try {
 			const chosen = await globalThis._allwork?.chooseDirectory()
@@ -667,15 +686,13 @@
 	}
 
 	async function insertVariable(name: string) {
-		const insertion = `"$${name}"`
-		const start = commandInput.selectionStart ?? command.length
-		const end = commandInput.selectionEnd ?? start
-		command = command.slice(0, start) + insertion + command.slice(end)
-		historyIndex = -1
-		commandDraft = ''
-		await tick()
-		commandInput.focus()
-		commandInput.setSelectionRange(start + insertion.length, start + insertion.length)
+		const insertion = `$${name}`
+		const start = commandInput?.selectionStart ?? command.length
+		const end = commandInput?.selectionEnd ?? start
+		await choosePreset(
+			command.slice(0, start) + insertion + command.slice(end),
+			start + insertion.length,
+		)
 	}
 
 	function columnTooltip(repository: Repository, columnId: string) {
@@ -861,6 +878,11 @@
 					spellcheck="false"
 					bind:value={command}
 				/>
+				<CommandAutocomplete
+					input={commandInput}
+					onComplete={choosePreset}
+					variables={columnVariables}
+				/>
 
 				<select
 					class="command-picker command-variables"
@@ -870,7 +892,7 @@
 						event.currentTarget.value = ''
 						await insertVariable(name)
 					}}
-					title="Insert a quoted column variable at the cursor"
+					title="Insert a column variable at the cursor"
 					value=""
 				>
 					<option disabled value="">Variables</option>
@@ -897,35 +919,24 @@
 					{/each}
 				</select>
 			</div>
-			<label class="parallel-label"
-				><span>Jobs</span>
-				<input
-					aria-label="Parallel jobs"
-					max="32"
-					min="1"
+			<div class="parallel-label">
+				<label for="parallel-jobs">Jobs</label>
+				<NumberField
+					id="parallel-jobs"
+					label="Parallel jobs"
+					max={32}
+					onChange={(value: number) => {
+						concurrency = value
+					}}
 					required
-					type="number"
-					bind:value={concurrency}
-				/></label
-			>
+					value={concurrency}
+				/>
+			</div>
 			<button
 				class="button primary run-button"
 				disabled={targets.length === 0 || command.trim() === '' || starting || loading}
 				type="submit">▶ {starting ? 'Starting…' : `Run in ${targets.length}`}</button
 			>
-			<label
-				class="auto-clear-option"
-				title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
-			>
-				<input
-					aria-label="Auto clear"
-					onchange={(event) =>
-						localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
-					type="checkbox"
-					bind:checked={autoClear}
-				/>
-				Auto clear
-			</label>
 		</form>
 	</header>
 	<main>
@@ -980,28 +991,31 @@
 					>
 				</div>
 				<div class="selection-tools">
-					<label>
-						Output lines
+					<label
+						class="auto-clear-option"
+						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
+					>
 						<input
-							aria-label="Output lines"
-							min="1"
-							onblur={(event) => {
-								event.currentTarget.value = String(outputLines)
-							}}
-							oninput={(event) => {
-								const value = event.currentTarget.valueAsNumber
-								if (!Number.isSafeInteger(value) || !(value >= 1)) {
-									return
-								}
-
+							aria-label="Auto clear"
+							onchange={(event) =>
+								localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
+							type="checkbox"
+							bind:checked={autoClear}
+						/>
+						Auto clear
+					</label>
+					<div class="output-lines-control">
+						<label for="output-lines">Output lines</label>
+						<NumberField
+							id="output-lines"
+							label="Output lines"
+							onChange={(value: number) => {
 								outputLines = value
 								localStorage.setItem('allwork.outputLines', String(value))
 							}}
-							step="1"
-							type="number"
 							value={outputLines}
 						/>
-					</label>
+					</div>
 				</div>
 				<div class="table-title-actions">
 					{#if activeRuns.length > 0}<span class="running-indicator"
@@ -1034,29 +1048,15 @@
 							})}
 						disabled={loading || selectedCount === 0}
 						onRefresh={refreshMetadata}
-						onVisibility={async (id: string, visible: boolean) => {
-							table.getColumn(id)?.toggleVisibility(visible)
-							await tick()
-							if (!resizedColumns.has(id)) {
-								fitColumns([id])
-							}
-
-							scheduleMetadata()
-						}}
-						onVisibilityAll={async (visible: boolean) => {
-							table.toggleAllColumnsVisible(visible)
-							await tick()
-							if (visible) {
-								fitColumns(
-									table
-										.getVisibleLeafColumns()
-										.filter((column) => !resizedColumns.has(column.id))
-										.map((column) => column.id),
-								)
-							}
-
-							scheduleMetadata()
-						}}
+						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
+						onVisibilityAll={async (visible: boolean) =>
+							setColumnsVisible(
+								table
+									.getAllLeafColumns()
+									.filter((column) => column.getCanHide())
+									.map((column) => column.id),
+								visible,
+							)}
 						onVisibilityDefaults={async () => {
 							table.resetColumnVisibility()
 							await tick()
@@ -1068,6 +1068,7 @@
 							)
 							scheduleMetadata()
 						}}
+						onVisibilityMany={setColumnsVisible}
 						{selectedCount}
 					/>
 				</div>
@@ -1122,15 +1123,11 @@
 															></span
 														><code title={previewColumn(run.id)}>$ {run.command}</code>
 													</span>
-													<span
-														class="sort-indicator"
-														class:sorted={header.column.getIsSorted() !== false}
-														>{header.column.getIsSorted() === 'asc'
-															? '↑'
-															: header.column.getIsSorted() === 'desc'
-																? '↓'
-																: '↕'}</span
-													>
+													{#if header.column.getIsSorted() !== false}<span
+															class="sort-indicator"
+															class:descending={header.column.getIsSorted() === 'desc'}
+															aria-hidden="true"
+														></span>{/if}
 												</button>
 												<div class="run-actions">
 													{#if !run.finished}<button
@@ -1155,15 +1152,13 @@
 													scheduleMetadata()
 												}}
 												type="button"
-												>{String(header.column.columnDef.header)}<span
-													class="sort-indicator"
-													class:sorted={header.column.getIsSorted() !== false}
-													>{header.column.getIsSorted() === 'asc'
-														? '↑'
-														: header.column.getIsSorted() === 'desc'
-															? '↓'
-															: '↕'}</span
-												></button
+												>{String(
+													header.column.columnDef.header,
+												)}{#if header.column.getIsSorted() !== false}<span
+														class="sort-indicator"
+														class:descending={header.column.getIsSorted() === 'desc'}
+														aria-hidden="true"
+													></span>{/if}</button
 											>{/if}
 										{#if header.column.getCanResize()}<button
 												class="resize-handle"

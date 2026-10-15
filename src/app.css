@@ -108,9 +108,19 @@ input:disabled {
 	opacity: 0.55;
 }
 
+.number-field input::-webkit-inner-spin-button {
+	margin: 0;
+	appearance: none;
+}
+
 code,
 pre,
 .branch,
+.number-field {
+	position: relative;
+	flex-shrink: 0;
+}
+
 .directory-form > input,
 .command-input input,
 .sync-value,
@@ -244,8 +254,8 @@ main {
 
 .directory-form > input,
 .command-input,
-.parallel-label input,
-.selection-tools input[type='number'] {
+.parallel-label .number-field,
+.selection-tools .number-field {
 	min-width: 0;
 	height: 23px;
 	border: 1px solid #929292;
@@ -284,6 +294,48 @@ main {
 	font-size: 11px;
 	background: transparent;
 	outline: none;
+}
+
+.command-completions {
+	user-select: none;
+	position: fixed;
+	z-index: 30;
+	overflow: auto;
+	max-height: 260px;
+	margin: 0;
+	padding: 3px 0;
+	border: 1px solid #888;
+	border-radius: 4px;
+	list-style: '';
+	background: #fff;
+	box-shadow: 0 4px 12px #0000004d;
+}
+
+.command-completions li {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 8px;
+	font-size: 11px;
+}
+
+.command-completions code {
+	overflow: hidden;
+	font-size: 10px;
+	color: #666;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.command-completions [aria-selected='true'] {
+	color: #fff;
+	background: linear-gradient(#6795d1, #3c71ba);
+}
+
+.command-completions :where([aria-selected='true']) code {
+	color: inherit;
 }
 
 .button,
@@ -364,9 +416,53 @@ select {
 	text-shadow: 0 1px #ffffffb3;
 }
 
-.parallel-label input {
+.parallel-label .number-field {
 	width: 37px;
-	padding: 1px 3px;
+}
+
+.number-field input {
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	padding: 1px 19px 1px 3px;
+	border: 0;
+	border-radius: inherit;
+	text-align: right;
+	appearance: textfield;
+	background: transparent;
+}
+
+:where(.number-field) input:focus-visible {
+	outline: none;
+}
+
+.number-stepper {
+	position: absolute;
+	inset-block: 0;
+	right: 0;
+	display: grid;
+	grid-template-rows: repeat(2, minmax(0, 1fr));
+	width: 16px;
+	border-left: 1px solid #b0b0b0;
+}
+
+.number-stepper button {
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	color: #555;
+	background: linear-gradient(#fafafa, #e1e1e1);
+}
+
+.number-stepper button:where(:last-child) {
+	border-top: 1px solid #b0b0b0;
+}
+
+.number-stepper button:where(:active:enabled) {
+	color: #244b75;
+	background: linear-gradient(#b7cce5, #dce9f8);
+	box-shadow: inset 0 1px 2px #0003;
 }
 
 .run-button {
@@ -449,7 +545,7 @@ h2 {
 
 .column-width-reference span {
 	grid-area: 1 / 1;
-	padding-inline: 26px 23px;
+	padding-inline: 44px 23px;
 	white-space: nowrap;
 }
 
@@ -469,14 +565,18 @@ h2 {
 	position: sticky;
 	z-index: 1;
 	top: 0;
-	display: block;
 	padding: 4px 8px;
+	border-top: 1px solid #e3e3e3;
 	border-bottom: 1px solid #c9c9c9;
 	font-size: 10px;
 	color: #626b78;
 	text-shadow: 0 1px #fff;
 	background: linear-gradient(#f7f7f7, #e4e4e4);
 	box-shadow: inset 0 1px #fff;
+}
+
+.column-group > label:where(:not(.column-category)) {
+	padding-left: 26px;
 }
 
 .column-search {
@@ -570,6 +670,7 @@ h2 {
 }
 
 .command-input:focus-within,
+.number-field:focus-within,
 .search-field:focus-within {
 	border-color: #658cba;
 	outline: 3px solid #79b5ed99;
@@ -593,17 +694,16 @@ select {
 	color: #444;
 }
 
-.selection-tools label {
+.output-lines-control {
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 4px;
 	align-items: center;
 }
 
-.selection-tools input[type='number'] {
+.selection-tools .number-field {
 	width: 40px;
 	height: 20px;
-	padding: 1px 3px;
 }
 
 .button:active:enabled {
@@ -740,14 +840,16 @@ th.repository-cell {
 }
 
 .sort-indicator {
+	transform: translateY(2px) rotate(225deg);
 	flex-shrink: 0;
-	font-size: 11px;
-	opacity: 0.4;
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid #486482;
+	border-bottom: 1.5px solid #486482;
 }
 
-.sort-button > .sorted {
-	color: #486482;
-	opacity: 1;
+.sort-indicator.descending {
+	transform: translateY(-1px) rotate(45deg);
 }
 
 th[aria-sort='ascending'],
@@ -1252,7 +1354,7 @@ tr.selected
 		background: #ffffff40;
 	}
 
-	.column-options label:hover {
+	.column-options label:not(.column-category):hover {
 		color: #fff;
 		background: linear-gradient(#6795d1, #3c71ba);
 	}
@@ -1275,7 +1377,7 @@ tr.selected
 @media (width <= 1100px) {
 	.directory-form > .field-label,
 	.recursive-option > span,
-	.parallel-label > span {
+	.parallel-label > label {
 		display: none;
 	}
 

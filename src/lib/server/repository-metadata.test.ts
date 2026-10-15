@@ -51,23 +51,29 @@ function fixture(): Workspace {
 	}
 }
 
-function begin(workspace: Workspace) {
-	const controller = startWorkspaceMetadata(
-		workspace,
-		vi.fn<(repository: Repository) => void>(),
-		async (repository) => {
-			repository.gitStatusAvailable = true
-			repository.branch = 'main'
-			await Promise.resolve()
-		},
-	)
+function begin(workspace: Workspace, notify = vi.fn<(repository: Repository) => void>()) {
+	const controller = startWorkspaceMetadata(workspace, notify, async (repository) => {
+		repository.gitStatusAvailable = true
+		repository.branch = 'main'
+		await Promise.resolve()
+	})
 	controllers.push(controller)
 	return controller
 }
 
 async function ready(workspace: Workspace) {
 	await vi.waitFor(() =>
-		expect(workspace.repositories[0]?.metadata?.groups.git?.status).toBe('ready'),
+		expect(
+			workspace.repositories.every(
+				(repository) =>
+					repository.metadata?.groups.git?.status === 'ready' &&
+					(['code', 'files'] as const).every((group) =>
+						['error', 'ready', 'unavailable'].includes(
+							repository.metadata?.groups[group]?.status ?? '',
+						),
+					),
+			),
+		).toBe(true),
 	)
 }
 
@@ -94,7 +100,7 @@ describe('progressive Metascope metadata', () => {
 		expect(metadataColumns.filter((column) => column.group === 'updates')).toHaveLength(5)
 	})
 
-	it('returns control before extraction and does not automatically run remote or expensive sources', async () => {
+	it('returns control before extraction and automatically scans Git, code, and files offline', async () => {
 		const deferred = Promise.withResolvers<MetadataContext>()
 		vi.mocked(extractMetadata).mockReturnValueOnce(deferred.promise)
 
@@ -106,11 +112,13 @@ describe('progressive Metascope metadata', () => {
 		deferred.resolve(context())
 		await ready(workspace)
 		const { calls } = vi.mocked(extractMetadata).mock
-		expect(calls).toHaveLength(2)
+		expect(calls).toHaveLength(4)
 		expect(calls[0]?.[0]?.sources).not.toContain('gitStats')
 		expect(calls[0]?.[0]?.sources).not.toContain('codeStats')
 		expect(calls[0]?.[0]?.sources).not.toContain('dependencyUpdates')
 		expect(calls[1]?.[0]?.sources).toEqual(['gitStats'])
+		expect(calls[2]?.[0]?.sources).toEqual(['codeStats'])
+		expect(calls[3]?.[0]?.sources).toEqual(['fileStats'])
 		expect(calls.every(([options]) => options?.offline === true)).toBe(true)
 	})
 
@@ -127,19 +135,22 @@ describe('progressive Metascope metadata', () => {
 		expect(values?.['Git Dirty Files']).toBe(0)
 	})
 
-	it('persists explicit scans, reuses them on reload, and preserves them after a failed refresh', async () => {
+	it('restores cached scans, automatically refreshes them on reload, and retains them after a failure', async () => {
+		let totalFiles = 42
+		vi.mocked(extractMetadata).mockImplementation(async (options) => {
+			await Promise.resolve()
+			return options?.sources?.includes('fileStats') === true
+				? context({
+						fileStats: {
+							data: { totalFileCount: totalFiles, totalSizeBytes: 1024 },
+							source: 'fixture',
+						},
+					})
+				: context()
+		})
 		const workspace = fixture()
-		const controller = begin(workspace)
+		begin(workspace)
 		await ready(workspace)
-		vi.mocked(extractMetadata).mockResolvedValueOnce(
-			context({
-				fileStats: { data: { totalFileCount: 42, totalSizeBytes: 1024 }, source: 'fixture' },
-			}),
-		)
-		controller.request(['fixture'], ['files'], true)
-		await vi.waitFor(() =>
-			expect(workspace.repositories[0]?.metadata?.groups.files?.status).toBe('ready'),
-		)
 		expect(workspace.repositories[0]?.metadata?.values['Total Files']).toBe(42)
 		// Let the atomic cache write finish before simulating another workspace.
 		await vi.waitFor(async () => {
@@ -150,17 +161,27 @@ describe('progressive Metascope metadata', () => {
 			)
 			expect(saved).toMatchObject({ values: { 'Total Files': 42 } })
 		})
+		totalFiles = 84
+		const restored: number[] = []
 		const reloaded = fixture()
-		const next = begin(reloaded)
+		const next = begin(
+			reloaded,
+			vi.fn((repository: Repository) => {
+				const count = repository.metadata?.values['Total Files']
+				if (typeof count === 'number' && repository.metadata?.groups.files?.cached === true) {
+					restored.push(count)
+				}
+			}),
+		)
 		await ready(reloaded)
-		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(42)
-		expect(reloaded.repositories[0]?.metadata?.groups.files?.cached).toBe(true)
+		expect(restored).toContain(42)
+		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(84)
 		vi.mocked(extractMetadata).mockRejectedValueOnce(new Error('Scan failed'))
 		next.request(['fixture'], ['files'], true)
 		await vi.waitFor(() =>
 			expect(reloaded.repositories[0]?.metadata?.groups.files?.status).toBe('error'),
 		)
-		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(42)
+		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(84)
 	})
 
 	it('loads real zero update counts only after an explicit dependency check', async () => {
@@ -260,13 +281,7 @@ describe('progressive Metascope metadata', () => {
 			path: `${original.path}-${index}`,
 		}))
 		const controller = begin(workspace)
-		await vi.waitFor(() =>
-			expect(
-				workspace.repositories.every(
-					(repository) => repository.metadata?.groups.git?.status === 'ready',
-				),
-			).toBe(true),
-		)
+		await ready(workspace)
 		const baseline = vi.mocked(extractMetadata).mock.calls.length
 		const deferred = Promise.withResolvers<MetadataContext>()
 		let active = 0

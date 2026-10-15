@@ -15,6 +15,7 @@
 		onVisibility,
 		onVisibilityAll,
 		onVisibilityDefaults,
+		onVisibilityMany,
 		selectedCount,
 	}: {
 		columns: MenuColumn[]
@@ -23,6 +24,7 @@
 		onVisibility: (id: string, visible: boolean) => Promise<void>
 		onVisibilityAll: (visible: boolean) => Promise<void>
 		onVisibilityDefaults: () => Promise<void>
+		onVisibilityMany: (ids: string[], visible: boolean) => Promise<void>
 		selectedCount: number
 	} = $props()
 	let columnMenu: HTMLDetailsElement
@@ -112,8 +114,24 @@
 		<div class="column-list">
 			{#each categories as category (category)}
 				{@const matching = matchingColumns.filter((column) => column.category === category)}
+				{@const children = columns.filter((column) => column.category === category)}
+				{@const allVisible = children.every((column) => column.visible)}
 				{#if matching.length > 0}<div class="column-group">
-						<strong class="column-category">{category}</strong>
+						<label class="column-category">
+							<input
+								aria-label="All {category} columns"
+								checked={allVisible}
+								disabled={search !== ''}
+								indeterminate={!allVisible && children.some((column) => column.visible)}
+								onchange={async (event) =>
+									onVisibilityMany(
+										children.map((column) => column.id),
+										event.currentTarget.checked,
+									)}
+								type="checkbox"
+							/>
+							<strong>{category}</strong>
+						</label>
 						{#each matching as column (column.id)}
 							<label title={column.note}
 								><input
