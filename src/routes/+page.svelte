@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { ColumnDef, Row, RowSelectionState } from '@tanstack/svelte-table'
-	import type { CommandRun, Repository, StreamEvent, Workspace } from '#lib/workspace.js'
+	import type {
+		CommandRun,
+		MetadataGroup,
+		Repository,
+		StreamEvent,
+		Workspace,
+	} from '#lib/workspace.js'
 	import {
 		columnFilteringFeature,
 		columnResizingFeature,
@@ -14,12 +20,31 @@
 		rowSelectionFeature,
 		rowSortingFeature,
 		sortFn_alphanumeric,
+		sortFn_basic,
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
-	import { getColumnVariables, repositoryColumns } from '#lib/column-variables.js'
+	import {
+		formatColumnCellValue,
+		getColumnPreviewTooltip,
+		getColumnTooltip,
+		getColumnVariables,
+		getMetadataPlaceholder,
+		repositoryColumns,
+	} from '#lib/column-variables.js'
 	import { commandPresets } from '#lib/command-presets.js'
+	import GithubIcon from '#lib/GithubIcon.svelte'
+	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
+	import MetadataControls from '#lib/MetadataControls.svelte'
 	import { getGithubUrl } from '#lib/repository-links.js'
+	import {
+		formatDate,
+		getColumnSizingValue,
+		runProgress,
+		vscodeUrl,
+	} from '#lib/table-formatting.js'
+	import { measureColumns } from '#lib/table-sizing.js'
+	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
@@ -47,11 +72,15 @@
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
 	let variablesDialog: HTMLDialogElement
-	let columnMenu: HTMLDetailsElement
 	let presetMenu: HTMLDetailsElement
 	let commandInput: HTMLInputElement
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
+	let metadataStream: undefined | { close: () => void }
+	let metadataTimer: ReturnType<typeof setTimeout> | undefined
+	let sizingTimer: ReturnType<typeof setTimeout> | undefined
+	const requestedMetadata = new SvelteSet<string>()
+	const repositoryColumnIds = new SvelteSet(repositoryColumns.map((column) => column.id))
 	const autoClearPredecessors = new SvelteMap<string, string>()
 	const resizedColumns = new SvelteSet<string>()
 
@@ -66,7 +95,7 @@
 		rowSelectionFeature,
 		rowSortingFeature,
 		sortedRowModel: createSortedRowModel(),
-		sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+		sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
 	})
 
 	const columns = $derived<Array<ColumnDef<typeof features, Repository>>>([
@@ -86,6 +115,8 @@
 			filterFn: column.id === 'changedFiles' ? filterWorkingTree : undefined,
 			header: column.header,
 			id: column.id,
+			sortFn: column.sort,
+			sortUndefined: 'last',
 		})),
 		...runs.map((run): ColumnDef<typeof features, Repository> => ({
 			accessorFn: (repository: Repository) => run.results[repository.id]?.output ?? '',
@@ -96,9 +127,6 @@
 		})),
 	])
 	const columnVariables = $derived(getColumnVariables(runs))
-	const variableNames = $derived(
-		Object.fromEntries(columnVariables.map(({ id, name }) => [id, `$${name}`])),
-	)
 	const repositories = $derived(
 		(workspace?.repositories ?? []).filter(
 			(repository) => !selectedOnly || rowSelection[repository.id],
@@ -117,11 +145,14 @@
 		getRowId: getRepositoryId,
 		globalFilterFn: 'includesString',
 		initialState: {
-			columnVisibility: { packageManager: false, remote: false },
+			columnVisibility: Object.fromEntries(
+				repositoryColumns.map((column) => [column.id, column.visible]),
+			),
 			sorting: [{ desc: false, id: 'relativePath' }],
 		},
 		onRowSelectionChange(updater) {
 			rowSelection = typeof updater === 'function' ? updater(rowSelection) : updater
+			scheduleMetadata()
 		},
 		state: {
 			get rowSelection() {
@@ -159,42 +190,42 @@
 		}
 
 		void tick().then(() => fitColumns())
-		return closeStreams
+		return disposeStreams
 	})
 
-	function fitColumns(columnIds?: string[]) {
-		const source = tableScroll.querySelector('table')
-		const measurement = source?.cloneNode(true)
-		if (!(measurement instanceof HTMLTableElement)) {
-			return
-		}
+	function disposeStreams() {
+		closeStreams()
+		metadataStream?.close()
+		clearTimeout(metadataTimer)
+		clearTimeout(sizingTimer)
+	}
 
-		measurement.classList.add('column-measurement')
-		measurement.removeAttribute('style')
-		measurement.setAttribute('aria-hidden', 'true')
-		for (const cell of measurement.querySelectorAll<HTMLElement>('th, td')) {
-			cell.style.removeProperty('width')
-		}
-
-		document.body.append(measurement)
-		try {
-			const sizes: Record<string, number> = {}
-			const visibleColumns = table.getVisibleLeafColumns()
-			const headers = measurement.tHead?.rows[0]?.cells ?? []
-			for (const [index, header] of [...headers].entries()) {
-				const column = visibleColumns[index]
-				if (
-					column !== undefined &&
-					column.getCanResize() &&
-					(columnIds === undefined || columnIds.includes(column.id))
-				) {
-					sizes[column.id] = Math.ceil(header.getBoundingClientRect().width)
-				}
+	function fitColumns(columnIds?: string[], { automatic = true, growOnly = false } = {}) {
+		const maxWidth = automatic ? Math.floor(tableScroll.clientWidth * 0.2) : Infinity
+		const selected = table
+			.getVisibleLeafColumns()
+			.filter(
+				(column) =>
+					column.getCanResize() && (columnIds === undefined || columnIds.includes(column.id)),
+			)
+		const { rows } = table.getRowModel()
+		const sizes = measureColumns(
+			tableScroll,
+			selected.map((column) => ({
+				header: String(column.columnDef.header),
+				id: column.id,
+				maxSize: Math.min(column.columnDef.maxSize ?? 4000, maxWidth),
+				values: rows.map((row) => getColumnSizingValue(row.original, column.id, runs)),
+			})),
+		)
+		if (growOnly) {
+			for (const column of selected) {
+				sizes[column.id] = Math.max(column.getSize(), sizes[column.id] ?? 0)
 			}
+		}
 
+		if (selected.some((column) => sizes[column.id] !== column.getSize())) {
 			table.setColumnSizing((previous) => ({ ...previous, ...sizes }))
-		} finally {
-			measurement.remove()
 		}
 	}
 
@@ -288,6 +319,7 @@
 		}
 
 		table.getColumn(runId)?.toggleSorting(undefined, multiple)
+		scheduleMetadata()
 	}
 
 	function closeStreams() {
@@ -351,7 +383,14 @@
 				table.resetColumnFilters()
 			}
 
+			metadataStream?.close()
+			clearTimeout(metadataTimer)
+			clearTimeout(sizingTimer)
+			metadataTimer = undefined
+			sizingTimer = undefined
+			requestedMetadata.clear()
 			workspace = next
+			watchMetadata(next.id)
 			directory = next.directory
 			localStorage.setItem('allwork.directory', directory)
 			localStorage.setItem('allwork.recursive', String(next.recursive))
@@ -366,6 +405,138 @@
 			errorMessage = error instanceof Error ? error.message : String(error)
 		} finally {
 			loading = false
+		}
+	}
+
+	function watchMetadata(workspaceId: string) {
+		metadataStream = watchWorkspaceMetadata(
+			workspaceId,
+			(rows, snapshot) => {
+				if (workspace?.id !== workspaceId) {
+					return
+				}
+
+				if (snapshot) {
+					workspace.repositories = rows
+				} else {
+					const replacements = new Map(rows.map((repository) => [repository.id, repository]))
+					for (const repository of workspace.repositories) {
+						const update = replacements.get(repository.id)
+						if (update !== undefined) {
+							Object.assign(repository, update)
+						}
+					}
+
+					if (
+						search !== '' ||
+						status !== 'all' ||
+						table.atoms.sorting.get().some((entry) => entry.id !== 'relativePath')
+					) {
+						refreshTableData()
+					}
+				}
+
+				scheduleMetadata()
+				sizingTimer ??= setTimeout(() => {
+					sizingTimer = undefined
+					void tick().then(() =>
+						fitColumns(
+							table
+								.getVisibleLeafColumns()
+								.filter(
+									(column) => !resizedColumns.has(column.id) && repositoryColumnIds.has(column.id),
+								)
+								.map((column) => column.id),
+							{ growOnly: true },
+						),
+					)
+				}, 1000)
+			},
+			() => {
+				errorMessage = 'Metadata stream disconnected. Reload the folder to reconnect.'
+			},
+		)
+	}
+
+	function refreshTableData() {
+		if (workspace !== undefined) {
+			workspace.repositories = [...workspace.repositories]
+		}
+	}
+
+	function scheduleMetadata() {
+		metadataTimer ??= setTimeout(() => {
+			metadataTimer = undefined
+			void loadVisibleMetadata()
+		}, 200)
+	}
+
+	async function loadVisibleMetadata() {
+		if (workspace === undefined) {
+			return
+		}
+
+		const workspaceId = workspace.id
+		const ids = getVisibleRepositoryIds(
+			tableScroll,
+			targets.map((row) => row.id),
+		)
+		const groups = [
+			...new Set(
+				table
+					.getVisibleLeafColumns()
+					.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)
+					.filter(
+						(group): group is MetadataGroup =>
+							group !== undefined && !['code', 'files', 'local', 'updates'].includes(group),
+					),
+			),
+		]
+		for (const group of groups) {
+			const pending = ids.filter((id) => !requestedMetadata.has(`${id}:${group}`))
+			if (pending.length === 0) {
+				continue
+			}
+
+			for (const id of pending) {
+				requestedMetadata.add(`${id}:${group}`)
+			}
+
+			try {
+				await request('/api/workspace/metadata', {
+					groups: [group],
+					repositoryIds: pending,
+					workspaceId,
+				})
+				if (workspace.id !== workspaceId) {
+					return
+				}
+			} catch (error) {
+				if (workspace.id !== workspaceId) {
+					return
+				}
+
+				if (!loading) {
+					errorMessage = error instanceof Error ? error.message : String(error)
+				}
+			}
+		}
+	}
+
+	async function refreshMetadata(groups: MetadataGroup[]) {
+		if (workspace === undefined || targets.length === 0) {
+			return
+		}
+
+		try {
+			await request('/api/workspace/metadata', {
+				force: true,
+				groups,
+				repositoryIds: targets.map((row) => row.id),
+				workspaceId: workspace.id,
+			})
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : String(error)
 		}
 	}
 
@@ -489,27 +660,11 @@
 	}
 
 	function columnTooltip(repository: Repository, columnId: string) {
-		const name = variableNames[columnId]
-		if (name === undefined) {
-			return ''
-		}
-
-		const column = repositoryColumns.find((item) => item.id === columnId)
-		const value =
-			column === undefined
-				? (runs.find((run) => run.id === columnId)?.results[repository.id]?.output ?? '')
-				: String(column.value(repository))
-		return `${name} = ${value === '' ? '""' : value}`
+		return getColumnTooltip(repository, columnId, runs)
 	}
 
 	function previewColumn(columnId: string) {
-		if (variableNames[columnId] === undefined) {
-			return ''
-		}
-
-		return previewRepository === undefined
-			? (variableNames[columnId] ?? '')
-			: `${columnTooltip(previewRepository, columnId)}\nRepository: ${previewRepository.relativePath}`
+		return getColumnPreviewTooltip(previewRepository, columnId, runs)
 	}
 
 	function filterWorkingTree(
@@ -567,6 +722,7 @@
 	function selectMatching() {
 		const ids = visibleRepositories.slice(0, Math.max(1, selectCount)).map((row) => row.id)
 		rowSelection = { ...rowSelection, ...Object.fromEntries(ids.map((id) => [id, true as const])) }
+		scheduleMetadata()
 	}
 
 	function toggleMatching(event: Event) {
@@ -578,6 +734,7 @@
 					...Object.fromEntries(visibleRepositories.map((row) => [row.id, true as const])),
 				}
 			: Object.fromEntries(Object.entries(rowSelection).filter(([id]) => !matchingIds.has(id)))
+		scheduleMetadata()
 	}
 
 	function inspect(runId: string, repositoryId: string) {
@@ -591,16 +748,6 @@
 		} catch {
 			errorMessage = 'Could not copy output to the clipboard.'
 		}
-	}
-
-	function formatDate(value: string) {
-		return value === ''
-			? 'No commits'
-			: new Date(value).toLocaleDateString(undefined, {
-					day: 'numeric',
-					month: 'short',
-					year: 'numeric',
-				})
 	}
 
 	function getRepositoryId(repository: Repository) {
@@ -621,37 +768,12 @@
 			errorMessage = error instanceof Error ? error.message : String(error)
 		}
 	}
-
-	function vscodeUrl(repositoryPath: string) {
-		const normalized = repositoryPath.replaceAll('\\', '/')
-		const absolute = normalized.startsWith('/') ? normalized : `/${normalized}`
-		const encoded = absolute
-			.split('/')
-			.map((segment) => encodeURIComponent(segment))
-			.join('/')
-		return `vscode://file${encoded}/`
-	}
-
-	function runProgress(run: CommandRun) {
-		const results = Object.values(run.results)
-		return `${results.filter((result) => result.status !== 'queued' && result.status !== 'running').length}/${results.length}`
-	}
 </script>
-
-{#snippet githubIcon()}
-	<svg aria-hidden="true" fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
-		<path
-			d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.73.39-1.22.71-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.23 1.16-3.01-.12-.29-.5-1.43.11-2.97 0 0 .94-.3 3.09 1.15a10.75 10.75 0 0 1 5.62 0c2.15-1.45 3.09-1.15 3.09-1.15.61 1.54.23 2.68.11 2.97.72.78 1.16 1.78 1.16 3.01 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.11c0 .3.2.65.77.54A11.25 11.25 0 0 0 12 .75Z"
-		/>
-	</svg>
-{/snippet}
 
 <svelte:window
 	onclick={(event: MouseEvent) => {
-		for (const menu of [columnMenu, presetMenu]) {
-			if (menu.open && !event.composedPath().includes(menu)) {
-				menu.open = false
-			}
+		if (presetMenu.open && !event.composedPath().includes(presetMenu)) {
+			presetMenu.open = false
 		}
 	}}
 />
@@ -808,23 +930,28 @@
 							/></svg
 						><input
 							aria-label="Filter repositories"
-							oninput={() => table.setGlobalFilter(search)}
+							oninput={() => {
+								refreshTableData()
+								table.setGlobalFilter(search)
+								scheduleMetadata()
+							}}
 							placeholder="Filter repositories…"
 							bind:value={search}
 						/>
 					</div>
 					<select
 						aria-label="Working tree filter"
-						onchange={() =>
-							table
-								.getColumn('changedFiles')
-								?.setFilterValue(status === 'all' ? undefined : status)}
+						onchange={() => {
+							table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
+							scheduleMetadata()
+						}}
 						bind:value={status}
 						><option value="all">All working trees</option><option value="dirty"
 							>With changes</option
 						><option value="clean">Clean</option></select
 					><label class="selected-filter"
-						><input type="checkbox" bind:checked={selectedOnly} /> Selected only</label
+						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
+						only</label
 					>
 				</div>
 				<div class="selection-tools">
@@ -884,29 +1011,38 @@
 							}}
 							type="button">Clear finished runs</button
 						>{/if}
-					<details bind:this={columnMenu} class="column-menu">
-						<summary class="button subtle">Columns ▾</summary>
-						<div class="column-options">
-							{#each table
-								.getAllLeafColumns()
-								.filter((column) => column.getCanHide()) as column (column.id)}<label
-									><input
-										checked={column.getIsVisible()}
-										onchange={async (event) => {
-											column.toggleVisibility(event.currentTarget.checked)
-											await tick()
-											if (!resizedColumns.has(column.id)) {
-												fitColumns([column.id])
-											}
-										}}
-										type="checkbox"
-									/>{String(column.columnDef.header)}</label
-								>{/each}
-						</div>
-					</details>
+					<MetadataControls
+						columns={table
+							.getAllLeafColumns()
+							.filter((column) => column.getCanHide())
+							.map((column) => {
+								const definition = repositoryColumns.find((entry) => entry.id === column.id)
+								return {
+									category: definition?.category ?? 'Runs',
+									header: String(column.columnDef.header),
+									id: column.id,
+									note: definition?.note,
+									onDemand:
+										definition !== undefined &&
+										['code', 'files', 'updates'].includes(definition.group),
+									visible: column.getIsVisible(),
+								}
+							})}
+						onRefresh={refreshMetadata}
+						onVisibility={async (id: string, visible: boolean) => {
+							table.getColumn(id)?.toggleVisibility(visible)
+							await tick()
+							if (!resizedColumns.has(id)) {
+								fitColumns([id])
+							}
+
+							scheduleMetadata()
+						}}
+						selectedCount={targets.length}
+					/>
 				</div>
 			</div>
-			<div bind:this={tableScroll} class="table-scroll">
+			<div bind:this={tableScroll} class="table-scroll" onscroll={scheduleMetadata}>
 				<table style:width="{table.getTotalSize()}px">
 					<thead
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
@@ -922,6 +1058,7 @@
 											: header.column.getIsSorted() === 'desc'
 												? 'descending'
 												: undefined}
+										data-column-id={header.column.id}
 										title={previewColumn(header.column.id)}
 									>
 										{#if header.column.id === 'select'}<input
@@ -976,7 +1113,11 @@
 										{:else}<button
 												class="sort-button"
 												disabled={!header.column.getCanSort()}
-												onclick={(event) => header.column.toggleSorting(undefined, event.shiftKey)}
+												onclick={(event) => {
+													refreshTableData()
+													header.column.toggleSorting(undefined, event.shiftKey)
+													scheduleMetadata()
+												}}
 												type="button"
 												>{String(header.column.columnDef.header)}<span
 													class="sort-indicator"
@@ -993,7 +1134,7 @@
 												aria-label="Resize column"
 												ondblclick={() => {
 													resizedColumns.delete(header.column.id)
-													fitColumns([header.column.id])
+													fitColumns([header.column.id], { automatic: false })
 												}}
 												onmousedown={(event) => {
 													resizedColumns.add(header.column.id)
@@ -1011,6 +1152,7 @@
 					<tbody
 						>{#each table.getRowModel().rows as row (row.id)}<tr
 								class:selected={row.getIsSelected()}
+								data-repository-id={row.id}
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
@@ -1108,7 +1250,7 @@
 															href={githubUrl}
 															rel="external noopener noreferrer"
 															target="_blank"
-															title="Open in GitHub">{@render githubIcon()}</a
+															title="Open in GitHub"><GithubIcon /></a
 														>
 													{:else}
 														<button
@@ -1116,7 +1258,7 @@
 															aria-label="No GitHub origin remote for {repository.name}"
 															disabled
 															title="No GitHub origin remote"
-															type="button">{@render githubIcon()}</button
+															type="button"><GithubIcon /></button
 														>
 													{/if}
 													<button
@@ -1141,9 +1283,9 @@
 													</button>
 													<button
 														class="repository-action"
-														aria-label="Open {repository.name} in Terminal"
+														aria-label="Open {repository.name} in default terminal"
 														onclick={async () => openInApp(repository, 'terminal')}
-														title="Open in Terminal"
+														title="Open in default terminal"
 														type="button"
 													>
 														<svg
@@ -1176,7 +1318,9 @@
 													: `${tooltip}\n${repository.description}`}>{repository.name}</span
 											>
 										{:else if cell.column.id === 'branch'}<span class="branch" title={tooltip}
-												>⑂ {repository.branch === '' ? 'Unknown' : repository.branch}</span
+												>⑂ {repository.branch === ''
+													? getMetadataPlaceholder(repository, 'branch')
+													: repository.branch}</span
 											>
 										{:else if cell.column.id === 'changedFiles'}<span
 												class="status-badge"
@@ -1185,11 +1329,11 @@
 													? repository.changedFiles > 0
 														? `${repository.changedFiles} changed`
 														: 'Clean'
-													: 'Unavailable'}</span
+													: getMetadataPlaceholder(repository, 'changedFiles')}</span
 											>
 										{:else if cell.column.id === 'sync'}<span
 												class="sync-value"
-												title={`${tooltip}\nCompared with the locally cached upstream; no fetch is performed`}
+												title={`${tooltip}\nTotals across locally cached remotes; no fetch is performed`}
 												>{repository.ahead > 0 || repository.behind > 0
 													? `↑${repository.ahead} ↓${repository.behind}`
 													: '—'}</span
@@ -1199,7 +1343,10 @@
 												title={repository.lastCommit === ''
 													? tooltip
 													: `${tooltip}\n${repository.lastCommit}`}
-												>{formatDate(repository.lastCommitDate)}</span
+												>{repository.lastCommitDate === '' &&
+												repository.metadata?.groups.git?.status !== 'ready'
+													? getMetadataPlaceholder(repository, 'lastCommitDate')
+													: formatDate(repository.lastCommitDate)}</span
 											>
 										{:else if run !== undefined}{#if result !== undefined}<button
 													class="output-preview"
@@ -1236,7 +1383,7 @@
 															: ''}</pre></button
 												>{:else}<span class="not-targeted">Not included in this run</span>{/if}
 										{:else}<span class="cell-text" title={tooltip}
-												>{String(cell.getValue<number | string>())}</span
+												>{formatColumnCellValue(repository, cell.column.id, runs)}</span
 											>{/if}
 									</td>{/each}</tr
 							>{/each}</tbody
@@ -1268,7 +1415,13 @@
 					>{visibleRepositories.length} of {workspace?.repositories.length ?? 0} repositories
 					<span class="caption-divider">·</span>
 					{dirtyCount} with changes <span class="caption-divider">·</span>
-					{runs.length} command {runs.length === 1 ? 'run' : 'runs'}</span
+					{runs.length} command {runs.length === 1 ? 'run' : 'runs'}
+					{#if workspace !== undefined}{@const pending = workspace.repositories.filter(
+							(repository) =>
+								Object.values(repository.metadata?.groups ?? {}).some(
+									(state) => state.status === 'queued' || state.status === 'loading',
+								),
+						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
 				>
 			</footer>
 		</section>

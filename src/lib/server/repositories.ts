@@ -1,10 +1,10 @@
 import type { Repository, Workspace } from '#lib/workspace.js'
-import { defineTemplate, getMetadata, helpers, templates } from 'metascope'
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { access, readdir, realpath, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { startWorkspaceMetadata } from './repository-metadata.js'
 
 const branchCounts = /\+(\d+) -(\d+)/v
 const changedEntry = /^[12u?] /v
@@ -27,10 +27,8 @@ const ignoredDirectories = new Set([
 	'venv',
 ])
 const workspaces = new Map<string, Workspace>()
-const projectTemplate = defineTemplate((context, templateData) => ({
-	...templates.project(context, templateData),
-	packageManager: helpers.firstOf(context.nodePackageJson)?.data.packageManager,
-}))
+const metadataControllers = new Map<string, ReturnType<typeof startWorkspaceMetadata>>()
+const workspaceListeners = new Map<string, Set<(repository: Repository) => void>>()
 
 async function git(directory: string, args: string[]): Promise<string> {
 	const environment = {
@@ -88,7 +86,32 @@ function readGitStatus(status: string, repository: Repository) {
 	}
 }
 
-async function metadata(directory: string, root: string): Promise<Repository> {
+async function supplementGitMetadata(repository: Repository) {
+	// Metascope 0.13 returns no gitStats for unborn repositories or linked
+	// worktrees. Only query status directly when that source has no data.
+	if (!repository.gitStatusAvailable) {
+		try {
+			readGitStatus(
+				await git(repository.path, ['status', '--porcelain=v2', '--branch', '-z']),
+				repository,
+			)
+			repository.gitStatusAvailable = true
+		} catch (error) {
+			repository.error ??= error instanceof Error ? error.message : String(error)
+		}
+	}
+
+	// Metascope exposes the commit date but not its subject, used by the tooltip.
+	const commit = await optionalGit(repository.path, ['log', '-1', '--format=%cI%n%s'])
+	const [date = '', ...subject] = commit.split('\n')
+	if (repository.lastCommitDate === '') {
+		repository.lastCommitDate = date
+	}
+
+	repository.lastCommit = subject.join('\n')
+}
+
+async function createRepository(directory: string, root: string): Promise<Repository> {
 	const repository: Repository = {
 		ahead: 0,
 		behind: 0,
@@ -99,53 +122,20 @@ async function metadata(directory: string, root: string): Promise<Repository> {
 		id: createHash('sha256').update(directory).digest('hex'),
 		lastCommit: '',
 		lastCommitDate: '',
+		metadata: { groups: {}, values: {} },
 		name: path.basename(directory),
 		packageManager: '',
 		path: directory,
 		relativePath: directory === root ? '.' : path.relative(root, directory),
 		remote: '',
+		repoName: path.basename(directory),
+		repoOwner: '',
 		version: '',
 	}
-	try {
-		const [status, commit, remote] = await Promise.all([
-			git(directory, ['status', '--porcelain=v2', '--branch', '-z']),
-			optionalGit(directory, ['log', '-1', '--format=%cI%n%s']),
-			optionalGit(directory, ['config', '--get', 'remote.origin.url']),
-		])
-		readGitStatus(status, repository)
-		repository.gitStatusAvailable = true
-
-		const [date = '', ...subject] = commit.split('\n')
-		repository.lastCommitDate = date
-		repository.lastCommit = subject.join('\n')
-		repository.remote = remote
-	} catch (error) {
-		repository.error = error instanceof Error ? error.message : String(error)
-	}
-
-	try {
-		const project = await getMetadata({
-			offline: true,
-			path: directory,
-			recursive: false,
-			sources: [
-				'codemetaJson',
-				'gitConfig',
-				'nodePackageJson',
-				'pythonPyprojectToml',
-				'rustCargoToml',
-				'goGoMod',
-			],
-			template: projectTemplate,
-			workspaces: false,
-		})
-		repository.name = project.title ?? repository.name
-		repository.version = project.version ?? ''
-		repository.description = project.description ?? ''
-		repository.packageManager = project.packageManager ?? ''
-	} catch (error) {
-		// A malformed manifest must not hide an otherwise usable Git repository.
-		repository.error ??= `Metascope: ${error instanceof Error ? error.message : String(error)}`
+	// Linked worktrees keep their effective config outside the repository directory.
+	const gitEntry = await stat(path.join(directory, '.git'))
+	if (gitEntry.isFile()) {
+		repository.remote = await optionalGit(directory, ['config', '--get', 'remote.origin.url'])
 	}
 
 	return repository
@@ -204,17 +194,30 @@ export async function scanWorkspace(input: string, recursive = true): Promise<Wo
 
 	let next = 0
 	await Promise.all(
-		Array.from({ length: Math.min(8, repositories.length) }, async () => {
+		Array.from({ length: Math.min(4, repositories.length) }, async () => {
 			while (next < repositories.length) {
 				const repositoryPath = repositories[next++]
 				if (repositoryPath !== undefined) {
-					workspace.repositories.push(await metadata(repositoryPath, directory))
+					workspace.repositories.push(await createRepository(repositoryPath, directory))
 				}
 			}
 		}),
 	)
 	workspace.repositories.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 	workspaces.set(workspace.id, workspace)
+	metadataControllers.set(
+		workspace.id,
+		startWorkspaceMetadata(
+			workspace,
+			(repository) => {
+				const listeners = workspaceListeners.get(workspace.id) ?? []
+				for (const listener of listeners) {
+					listener(repository)
+				}
+			},
+			supplementGitMetadata,
+		),
+	)
 	return workspace
 }
 
@@ -240,5 +243,35 @@ export async function verifyRepository(repository: Repository): Promise<void> {
 
 /** Release a previous scan once its replacement has loaded. */
 export function forgetWorkspace(id: string): void {
+	metadataControllers.get(id)?.dispose()
+	metadataControllers.delete(id)
+	workspaceListeners.delete(id)
 	workspaces.delete(id)
+}
+
+/** Queue source groups only for repositories discovered in this workspace. */
+export function requestWorkspaceMetadata(
+	id: string,
+	repositoryIds: string[],
+	groups: Parameters<ReturnType<typeof startWorkspaceMetadata>['request']>[1],
+	force = false,
+) {
+	metadataControllers.get(id)?.request(repositoryIds, groups, force, true)
+}
+
+/**
+ * Subscribe to row replacements, with a snapshot supplied by the event
+ * endpoint.
+ */
+export function subscribeWorkspace(id: string, listener: (repository: Repository) => void) {
+	let listeners = workspaceListeners.get(id)
+	if (listeners === undefined) {
+		listeners = new Set()
+		workspaceListeners.set(id, listeners)
+	}
+
+	listeners.add(listener)
+	return () => {
+		listeners.delete(listener)
+	}
 }

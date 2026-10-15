@@ -7,4 +7,8 @@ export const commandPresets = [
 	{ command: 'git remote -v', label: 'Show remote URLs' },
 	{ command: 'git fetch --all --prune', label: 'Fetch remote updates' },
 	{ command: 'git ls-files', label: 'List tracked files' },
+	{
+		command: 'gh secret list --repo $ALLWORK_COLUMN_REPO_OWNER/$ALLWORK_COLUMN_REPO_NAME',
+		label: 'List GitHub Secrets',
+	},
 ] as const

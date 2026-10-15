@@ -1,6 +1,11 @@
+/* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, Repository } from './workspace.js'
-import { getColumnEnvironment, getColumnVariables } from './column-variables.js'
+import {
+	getColumnEnvironment,
+	getColumnVariables,
+	getPendingCommandColumns,
+} from './column-variables.js'
 
 const repository: Repository = {
 	ahead: 2,
@@ -17,6 +22,8 @@ const repository: Repository = {
 	path: '/workspace/project with spaces',
 	relativePath: 'project with spaces',
 	remote: 'git@github.com:example/project.git',
+	repoName: 'project',
+	repoOwner: 'example',
 	version: '1.2.3',
 }
 
@@ -34,10 +41,41 @@ function outputRun(id: string, output: string): CommandRun {
 }
 
 describe('column variables', () => {
+	it('formats expanded metadata and keeps unknown values distinct from zero and false', () => {
+		const expanded = {
+			...repository,
+			metadata: { groups: {}, values: { Public: false, Stars: 0, Tags: ['one', 'two'] } },
+		}
+		const environment = getColumnEnvironment(expanded)
+		expect(environment.ALLWORK_COLUMN_PUBLIC).toBe('false')
+		expect(environment.ALLWORK_COLUMN_STARS).toBe('0')
+		expect(environment.ALLWORK_COLUMN_TAGS).toBe('one, two')
+		expect(environment.ALLWORK_COLUMN_TOTAL_UPDATES).toBe('')
+		const variables = getColumnVariables()
+		expect(new Set(variables.map((variable) => variable.name)).size).toBe(variables.length)
+	})
+
+	it('blocks only referenced values that are still waiting for metadata', () => {
+		expect(getPendingCommandColumns('printf "$ALLWORK_COLUMN_STARS"', [repository])).toEqual([
+			'Stars',
+		])
+		expect(getPendingCommandColumns(`printf "\${ALLWORK_COLUMN_PUBLIC}"`, [repository])).toEqual([
+			'Public',
+		])
+		expect(getPendingCommandColumns('pwd', [repository])).toEqual([])
+		expect(
+			getPendingCommandColumns('printf "$ALLWORK_COLUMN_STARS"', [
+				{ ...repository, metadata: { groups: {}, values: { Stars: 0 } } },
+			]),
+		).toEqual([])
+	})
+
 	it('exposes each data column with a shell-safe name and its raw value', () => {
-		expect(getColumnEnvironment(repository)).toEqual(
+		expect(getColumnEnvironment(repository)).toMatchObject(
 			Object.fromEntries([
 				['ALLWORK_COLUMN_REPOSITORY', 'project with spaces'],
+				['ALLWORK_COLUMN_REPO_NAME', 'project'],
+				['ALLWORK_COLUMN_REPO_OWNER', 'example'],
 				['ALLWORK_COLUMN_NAME', '@example/project'],
 				['ALLWORK_COLUMN_DESCRIPTION', 'Example project description'],
 				['ALLWORK_COLUMN_BRANCH', 'feature/example'],

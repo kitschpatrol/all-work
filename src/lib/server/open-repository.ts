@@ -3,6 +3,27 @@ import { execFile } from 'node:child_process'
 import { getWorkspace, verifyRepository } from './repositories.js'
 import { readRequest } from './request.js'
 
+// Resolve the preferred UNIX executable handler without opening the executable.
+const defaultTerminalScript = `
+ObjC.import('AppKit')
+const application = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL(
+	$.NSURL.fileURLWithPath('/bin/zsh')
+)
+ObjC.unwrap(application.path)
+`
+
+async function execute(command: string, args: string[]): Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		execFile(command, args, { timeout: 15_000 }, (cause, stdout) => {
+			if (cause instanceof Error) {
+				reject(cause)
+			} else {
+				resolve(stdout.trim())
+			}
+		})
+	})
+}
+
 /** Open a scanned repository folder in a supported native macOS application. */
 export async function openRepository(
 	request: Request,
@@ -23,20 +44,15 @@ export async function openRepository(
 
 	try {
 		await verifyRepository(repository)
-		await new Promise<void>((resolve, reject) => {
-			execFile(
-				'/usr/bin/open',
-				['-a', app, '--', repository.path],
-				{ timeout: 15_000 },
-				(cause) => {
-					if (cause instanceof Error) {
-						reject(cause)
-					} else {
-						resolve()
-					}
-				},
-			)
-		})
+		const targetApp =
+			app === 'Terminal'
+				? await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', defaultTerminalScript])
+				: app
+		if (targetApp === '') {
+			throw new Error('No default terminal application is configured in macOS.')
+		}
+
+		await execute('/usr/bin/open', ['-a', targetApp, '--', repository.path])
 		return Response.json({ opened: true })
 	} catch (error_) {
 		error(

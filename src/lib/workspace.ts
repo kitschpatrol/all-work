@@ -1,3 +1,13 @@
+export type MetadataGroup =
+	'ci' | 'code' | 'files' | 'git' | 'github' | 'local' | 'registry' | 'updates'
+export type MetadataValue = boolean | number | string | string[]
+export type MetadataState = {
+	cached?: boolean
+	error?: string
+	status: 'error' | 'loading' | 'queued' | 'ready' | 'unavailable'
+	updatedAt?: string
+}
+
 export type Repository = {
 	ahead: number
 	behind: number
@@ -9,11 +19,17 @@ export type Repository = {
 	id: string
 	lastCommit: string
 	lastCommitDate: string
+	metadata?: {
+		groups: Partial<Record<MetadataGroup, MetadataState>>
+		values: Record<string, MetadataValue>
+	}
 	name: string
 	packageManager: string
 	path: string
 	relativePath: string
 	remote: string
+	repoName: string
+	repoOwner: string
 	version: string
 }
 

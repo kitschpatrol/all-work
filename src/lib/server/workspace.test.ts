@@ -62,6 +62,7 @@ async function waitForRun(run: CommandRun) {
 beforeAll(async () => {
 	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-test-'))
 	vi.stubEnv('SHELL', fixtureShell)
+	vi.stubEnv('ALLWORK_CACHE_DIRECTORY', path.join(temporaryDirectory, '.metadata-cache'))
 	if (hasZsh) {
 		const shellDirectory = path.join(temporaryDirectory, '.shell-config')
 		const binDirectory = path.join(shellDirectory, 'bin')
@@ -90,17 +91,33 @@ beforeAll(async () => {
 	}
 
 	const first = await createRepository('project with spaces')
+	await git(first, ['remote', 'add', 'origin', 'git@github.com:fixture-owner/git-project.git'])
 	await writeFile(
 		path.join(first, 'package.json'),
 		JSON.stringify({
 			description: 'Metascope fixture',
 			name: 'example-project',
 			packageManager: 'pnpm@12.11.2',
+			repository: 'https://github.com/manifest-owner/manifest-project.git',
 			version: '1.2.3',
 		}),
 	)
 	await writeFile(path.join(first, 'readme.txt'), 'dirty fixture\n')
-	await createRepository('group/plain-git')
+	const nested = await createRepository('group/plain-git')
+	await git(nested, ['remote', 'add', 'origin', 'https://gitlab.com/team/subgroup/plain-git.git'])
+	await git(nested, ['remote', 'add', 'backup', 'https://gitlab.com/team/backup.git'])
+	await git(nested, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
+	await git(nested, ['update-ref', 'refs/remotes/backup/main', 'HEAD'])
+	await git(nested, [
+		'-c',
+		'user.name=AllWork Test',
+		'-c',
+		'user.email=test@example.com',
+		'commit',
+		'--allow-empty',
+		'-m',
+		'Ahead of cached remotes',
+	])
 	await createRepository('empty-repository', false)
 	await createRepository('node_modules/ignored-repository')
 	await git(first, [
@@ -112,6 +129,25 @@ beforeAll(async () => {
 	])
 	await symlink(first, path.join(temporaryDirectory, 'symlinked-repository'))
 	workspace = await scanWorkspace(temporaryDirectory)
+	await vi.waitFor(
+		() => {
+			if (
+				workspace.repositories.some(
+					(repository) => repository.metadata?.groups.git?.status !== 'ready',
+				)
+			) {
+				throw new Error(
+					JSON.stringify(
+						workspace.repositories.map((repository) => ({
+							groups: repository.metadata?.groups,
+							path: repository.relativePath,
+						})),
+					),
+				)
+			}
+		},
+		{ timeout: 15_000 },
+	)
 	repositories = workspace.repositories
 		.filter((repository) => repository.name !== 'empty-repository')
 		.slice(0, 2)
@@ -122,6 +158,7 @@ afterAll(async () => {
 		deleteRun(id)
 	}
 
+	forgetWorkspace(workspace.id)
 	await rm(temporaryDirectory, { force: true, recursive: true })
 	vi.unstubAllEnvs()
 })
@@ -155,7 +192,7 @@ describe('repository discovery and Metascope metadata', () => {
 		forgetWorkspace(shallow.id)
 	})
 
-	it('gets manifest metadata from Metascope and live working-tree status from Git', () => {
+	it('gets project metadata and live Git statistics through the Metascope template', () => {
 		const project = workspace.repositories.find(
 			(repository) => repository.relativePath === 'project with spaces',
 		)
@@ -166,16 +203,41 @@ describe('repository discovery and Metascope metadata', () => {
 			lastCommit: 'Initial fixture',
 			name: 'example-project',
 			packageManager: 'pnpm@12.11.2',
+			repoName: 'git-project',
+			repoOwner: 'fixture-owner',
 			version: '1.2.3',
 		})
 		const worktree = workspace.repositories.find(
 			(repository) => repository.relativePath === 'linked-worktree',
 		)
-		expect(worktree).toMatchObject({ branch: 'worktree-test', changedFiles: 0 })
+		expect(worktree).toMatchObject({
+			branch: 'worktree-test',
+			changedFiles: 0,
+			remote: 'git@github.com:fixture-owner/git-project.git',
+			repoName: 'git-project',
+			repoOwner: 'fixture-owner',
+		})
 		const empty = workspace.repositories.find(
 			(repository) => repository.relativePath === 'empty-repository',
 		)
 		expect(empty).toMatchObject({ branch: 'main', changedFiles: 0, lastCommitDate: '' })
+		expect(empty).toMatchObject({ repoName: 'empty-repository', repoOwner: '' })
+		expect(
+			workspace.repositories.find((repository) => repository.relativePath === 'group/plain-git'),
+		).toMatchObject({ repoName: 'plain-git', repoOwner: 'team/subgroup' })
+	})
+
+	it('uses Metascope totals across cached remotes, including without a configured upstream', () => {
+		const repository = workspace.repositories.find(
+			(candidate) => candidate.relativePath === 'group/plain-git',
+		)
+		expect(repository).toMatchObject({
+			ahead: 2,
+			behind: 0,
+			branch: 'main',
+			changedFiles: 0,
+			gitStatusAvailable: true,
+		})
 	})
 	it('keeps repository identifiers stable when metadata is refreshed', async () => {
 		const refreshed = await scanWorkspace(temporaryDirectory)
@@ -223,9 +285,11 @@ describe('parallel command runs', () => {
 				const result = run.results[repository.id]
 				expect(result?.status).toBe('success')
 				const environment: unknown = JSON.parse(result?.output ?? '{}')
-				expect(environment).toEqual(
+				expect(environment).toMatchObject(
 					Object.fromEntries([
 						['ALLWORK_COLUMN_REPOSITORY', repository.relativePath],
+						['ALLWORK_COLUMN_REPO_NAME', repository.repoName],
+						['ALLWORK_COLUMN_REPO_OWNER', repository.repoOwner],
 						['ALLWORK_COLUMN_NAME', repository.name],
 						['ALLWORK_COLUMN_DESCRIPTION', repository.description],
 						['ALLWORK_COLUMN_BRANCH', repository.branch],

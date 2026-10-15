@@ -460,6 +460,32 @@ h2 {
 	white-space: nowrap;
 }
 
+.column-category {
+	user-select: none;
+	display: block;
+	padding: 7px 8px 3px;
+	font-size: 10px;
+	color: #626b78;
+}
+
+.column-search {
+	position: sticky;
+	z-index: 1;
+	top: 0;
+	width: calc(100% - 16px);
+	margin: 4px 8px;
+}
+
+.metadata-options button {
+	display: block;
+	width: 100%;
+	padding: 6px 10px;
+	border: 0;
+	text-align: left;
+	white-space: nowrap;
+	background: transparent;
+}
+
 .table-toolbar {
 	display: flex;
 	flex-shrink: 0;

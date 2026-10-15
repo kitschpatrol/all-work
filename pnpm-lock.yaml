@@ -169,6 +169,9 @@ importers:
       execa:
         specifier: ^10.1.1
         version: 10.1.1
+      git-url-parse:
+        specifier: ^16.1.0
+        version: 16.1.0
       metascope:
         specifier: ^0.13.0
         version: 0.13.0(electron@44.7.0(supports-color@10.2.2))(supports-color@10.2.2)

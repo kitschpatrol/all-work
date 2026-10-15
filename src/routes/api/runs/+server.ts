@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit'
+import { getPendingCommandColumns } from '#lib/column-variables.js'
 import { getRun, startRun } from '#lib/server/commands.js'
 import { getWorkspace } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
@@ -56,6 +57,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
 		return run
 	})
+	const pendingColumns = getPendingCommandColumns(body.command, repositories)
+	if (pendingColumns.length > 0) {
+		error(
+			409,
+			`Metadata is not loaded for: ${pendingColumns.join(', ')}. Load it for the selected rows from the Metadata menu before running.`,
+		)
+	}
+
 	return Response.json(startRun(body.command.trim(), repositories, concurrency, sourceRuns), {
 		status: 201,
 	})
