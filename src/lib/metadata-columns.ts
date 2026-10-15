@@ -1,6 +1,36 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import type { MetadataGroup, MetadataValue, Repository } from './workspace.js'
 
+const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+
+function formatUpdatedAt(value: string) {
+	const seconds = (Date.parse(value) - Date.now()) / 1000
+	if (!Number.isFinite(seconds)) {
+		return 'at an unknown time'
+	}
+
+	if (Math.abs(seconds) < 10) {
+		return 'just now'
+	}
+
+	const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+		['year', 31_536_000],
+		['month', 2_592_000],
+		['week', 604_800],
+		['day', 86_400],
+		['hour', 3600],
+		['minute', 60],
+		['second', 1],
+	]
+	for (const [unit, duration] of units) {
+		if (Math.abs(seconds) >= duration) {
+			return relativeTime.format(Math.trunc(seconds / duration), unit)
+		}
+	}
+
+	return 'just now'
+}
+
 type MetadataColumn = {
 	category: string
 	field: string
@@ -219,7 +249,7 @@ export function metadataHint(repository: Repository, group: MetadataGroup): stri
 		metadataGroups[group],
 		state.status,
 		state.cached === true ? 'cached' : '',
-		state.updatedAt === undefined ? '' : `Updated ${new Date(state.updatedAt).toLocaleString()}`,
+		state.updatedAt === undefined ? '' : `Updated ${formatUpdatedAt(state.updatedAt)}`,
 		state.error ?? '',
 	]
 		.filter(Boolean)

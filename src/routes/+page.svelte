@@ -33,9 +33,11 @@
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import { commandPresets } from '#lib/command-presets.js'
+	import FolderIcon from '#lib/FolderIcon.svelte'
 	import GithubIcon from '#lib/GithubIcon.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
+	import OutputPreview from '#lib/OutputPreview.svelte'
 	import { getGithubUrl } from '#lib/repository-links.js'
 	import {
 		formatDate,
@@ -66,13 +68,11 @@
 	let search = $state('')
 	let status = $state('all')
 	let selectedOnly = $state(false)
-	let selectCount = $state(10)
+	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
-	let variablesDialog: HTMLDialogElement
-	let presetMenu: HTMLDetailsElement
 	let commandInput: HTMLInputElement
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
@@ -97,6 +97,17 @@
 		sortedRowModel: createSortedRowModel(),
 		sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
 	})
+	const defaultColumnIds = new Set([
+		'branch',
+		'changedFiles',
+		'description',
+		'lastCommitDate',
+		'name',
+		'relativePath',
+		'repoName',
+		'repoOwner',
+		'version',
+	])
 
 	const columns = $derived<Array<ColumnDef<typeof features, Repository>>>([
 		{
@@ -115,6 +126,7 @@
 			filterFn: column.id === 'changedFiles' ? filterWorkingTree : undefined,
 			header: column.header,
 			id: column.id,
+			minSize: column.id === 'relativePath' ? 160 : 24,
 			sortFn: column.sort,
 			sortUndefined: 'last',
 		})),
@@ -123,6 +135,8 @@
 			enableGlobalFilter: false,
 			header: run.command,
 			id: run.id,
+			minSize: 240,
+			size: 240,
 			sortFn: 'text',
 		})),
 	])
@@ -146,7 +160,7 @@
 		globalFilterFn: 'includesString',
 		initialState: {
 			columnVisibility: Object.fromEntries(
-				repositoryColumns.map((column) => [column.id, column.visible]),
+				repositoryColumns.map((column) => [column.id, defaultColumnIds.has(column.id)]),
 			),
 			sorting: [{ desc: false, id: 'relativePath' }],
 		},
@@ -180,6 +194,11 @@
 		directory = localStorage.getItem('allwork.directory') ?? data.defaultDirectory
 		recursive = localStorage.getItem('allwork.recursive') !== 'false'
 		autoClear = localStorage.getItem('allwork.autoClear') === 'true'
+		const savedOutputLines = Number(localStorage.getItem('allwork.outputLines') ?? 3)
+		if (Number.isSafeInteger(savedOutputLines) && savedOutputLines >= 1) {
+			outputLines = savedOutputLines
+		}
+
 		try {
 			const history: unknown = JSON.parse(localStorage.getItem('allwork.commandHistory') ?? '[]')
 			if (Array.isArray(history) && history.every((entry: unknown) => typeof entry === 'string')) {
@@ -201,7 +220,14 @@
 	}
 
 	function fitColumns(columnIds?: string[], { automatic = true, growOnly = false } = {}) {
-		const maxWidth = automatic ? Math.floor(tableScroll.clientWidth * 0.2) : Infinity
+		const followEnd =
+			runs.length > 0 &&
+			tableScroll.scrollLeft > 0 &&
+			tableScroll.scrollLeft + tableScroll.clientWidth >= tableScroll.scrollWidth - 2
+		const maxWidth = automatic
+			? Math.min(180, Math.floor(tableScroll.clientWidth * 0.12))
+			: Infinity
+		const maxRunWidth = automatic ? Math.floor(tableScroll.clientWidth * 0.2) : Infinity
 		const selected = table
 			.getVisibleLeafColumns()
 			.filter(
@@ -214,18 +240,41 @@
 			selected.map((column) => ({
 				header: String(column.columnDef.header),
 				id: column.id,
-				maxSize: Math.min(column.columnDef.maxSize ?? 4000, maxWidth),
+				maxSize: Math.min(
+					column.columnDef.maxSize ?? 4000,
+					repositoryColumnIds.has(column.id) ? maxWidth : maxRunWidth,
+				),
 				values: rows.map((row) => getColumnSizingValue(row.original, column.id, runs)),
 			})),
 		)
-		if (growOnly) {
-			for (const column of selected) {
-				sizes[column.id] = Math.max(column.getSize(), sizes[column.id] ?? 0)
-			}
+		for (const column of selected) {
+			sizes[column.id] = Math.max(
+				column.columnDef.minSize ?? 24,
+				sizes[column.id] ?? column.getSize(),
+				growOnly ? column.getSize() : 0,
+			)
 		}
 
-		if (selected.some((column) => sizes[column.id] !== column.getSize())) {
-			table.setColumnSizing((previous) => ({ ...previous, ...sizes }))
+		if (selected.every((column) => sizes[column.id] === column.getSize())) {
+			return
+		}
+
+		table.setColumnSizing((previous) => ({ ...previous, ...sizes }))
+		if (followEnd) {
+			void tick().then(() => {
+				tableScroll.scrollLeft = tableScroll.scrollWidth
+			})
+		}
+	}
+
+	async function sizeRunColumn(runId: string, reveal = false) {
+		const followEnd =
+			reveal || tableScroll.scrollLeft + tableScroll.clientWidth >= tableScroll.scrollWidth - 2
+		await tick()
+		fitColumns([runId])
+		await tick()
+		if (followEnd) {
+			tableScroll.scrollLeft = tableScroll.scrollWidth
 		}
 	}
 
@@ -272,38 +321,9 @@
 		command = value
 		historyIndex = -1
 		commandDraft = ''
-		presetMenu.open = false
 		await tick()
 		commandInput.focus()
 		commandInput.setSelectionRange(commandInput.value.length, commandInput.value.length)
-	}
-
-	function navigatePresets(event: KeyboardEvent) {
-		if (event.key === 'Escape' && presetMenu.open) {
-			event.preventDefault()
-			presetMenu.open = false
-			presetMenu.querySelector('summary')?.focus()
-			return
-		}
-
-		if (!['ArrowDown', 'ArrowUp', 'End', 'Home'].includes(event.key)) {
-			return
-		}
-
-		event.preventDefault()
-		presetMenu.open = true
-		const options = [...presetMenu.querySelectorAll<HTMLButtonElement>('.preset-option')]
-		const current = event.target instanceof HTMLButtonElement ? options.indexOf(event.target) : -1
-		let index = 0
-		if (event.key === 'End' || (current === -1 && event.key === 'ArrowUp')) {
-			index = options.length - 1
-		} else if (event.key === 'ArrowDown') {
-			index = (current + 1) % options.length
-		} else if (event.key === 'ArrowUp') {
-			index = (current - 1 + options.length) % options.length
-		}
-
-		options[index]?.focus()
 	}
 
 	function refreshOutputSorting(runId: string) {
@@ -524,7 +544,7 @@
 	}
 
 	async function refreshMetadata(groups: MetadataGroup[]) {
-		if (workspace === undefined || targets.length === 0) {
+		if (workspace === undefined || selectedCount === 0) {
 			return
 		}
 
@@ -532,7 +552,9 @@
 			await request('/api/workspace/metadata', {
 				force: true,
 				groups,
-				repositoryIds: targets.map((row) => row.id),
+				repositoryIds: workspace.repositories
+					.filter((repository) => rowSelection[repository.id])
+					.map((repository) => repository.id),
 				workspaceId: workspace.id,
 			})
 		} catch (error) {
@@ -586,7 +608,7 @@
 			if (run.finished) {
 				clearPreviousOutputs()
 				if (!resizedColumns.has(run.id)) {
-					void tick().then(() => fitColumns([run.id]))
+					void sizeRunColumn(run.id)
 				}
 			}
 
@@ -636,9 +658,7 @@
 
 			clearPreviousOutputs()
 			watchRuns()
-			await tick()
-			fitColumns([run.id])
-			tableScroll.scrollLeft = tableScroll.scrollWidth
+			await sizeRunColumn(run.id, true)
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		} finally {
@@ -653,14 +673,13 @@
 		command = command.slice(0, start) + insertion + command.slice(end)
 		historyIndex = -1
 		commandDraft = ''
-		variablesDialog.close()
 		await tick()
 		commandInput.focus()
 		commandInput.setSelectionRange(start + insertion.length, start + insertion.length)
 	}
 
 	function columnTooltip(repository: Repository, columnId: string) {
-		return getColumnTooltip(repository, columnId, runs)
+		return getColumnTooltip(repository, columnId)
 	}
 
 	function previewColumn(columnId: string) {
@@ -719,12 +738,6 @@
 		}
 	}
 
-	function selectMatching() {
-		const ids = visibleRepositories.slice(0, Math.max(1, selectCount)).map((row) => row.id)
-		rowSelection = { ...rowSelection, ...Object.fromEntries(ids.map((id) => [id, true as const])) }
-		scheduleMetadata()
-	}
-
 	function toggleMatching(event: Event) {
 		const { checked } = event.currentTarget as HTMLInputElement
 		const matchingIds = new Set(visibleRepositories.map((row) => row.id))
@@ -769,14 +782,6 @@
 		}
 	}
 </script>
-
-<svelte:window
-	onclick={(event: MouseEvent) => {
-		if (presetMenu.open && !event.composedPath().includes(presetMenu)) {
-			presetMenu.open = false
-		}
-	}}
-/>
 
 <svelte:head>
 	<title>AllWork</title>
@@ -856,34 +861,41 @@
 					spellcheck="false"
 					bind:value={command}
 				/>
-				<details bind:this={presetMenu} class="command-presets">
-					<summary
-						aria-label="Command presets"
-						onkeydown={navigatePresets}
-						title="Choose a preset command"
-					>
-						<svg aria-hidden="true" fill="none" height="10" viewBox="0 0 12 12" width="10"
-							><path
-								d="m3 4.5 3 3 3-3"
-								stroke="currentColor"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1.5"
-							/></svg
+
+				<select
+					class="command-picker command-variables"
+					aria-label="Column variables"
+					onchange={async (event) => {
+						const name = event.currentTarget.value
+						event.currentTarget.value = ''
+						await insertVariable(name)
+					}}
+					title="Insert a quoted column variable at the cursor"
+					value=""
+				>
+					<option disabled value="">Variables</option>
+					{#each columnVariables as variable (variable.id)}
+						<option title={previewColumn(variable.id)} value={variable.name}
+							>{variable.label}</option
 						>
-					</summary>
-					<div class="preset-options" aria-label="Preset commands" role="group">
-						{#each commandPresets as preset (preset.label)}
-							<button
-								class="preset-option"
-								onclick={async () => choosePreset(preset.command)}
-								onkeydown={navigatePresets}
-								title={preset.command}
-								type="button">{preset.label}</button
-							>
-						{/each}
-					</div>
-				</details>
+					{/each}
+				</select>
+				<select
+					class="command-picker command-presets"
+					aria-label="Command presets"
+					onchange={async (event) => {
+						const { value } = event.currentTarget
+						event.currentTarget.value = ''
+						await choosePreset(value)
+					}}
+					title="Choose a preset command"
+					value=""
+				>
+					<option disabled value="">Presets</option>
+					{#each commandPresets as preset (preset.label)}
+						<option title={preset.command} value={preset.command}>{preset.label}</option>
+					{/each}
+				</select>
 			</div>
 			<label class="parallel-label"
 				><span>Jobs</span>
@@ -901,6 +913,19 @@
 				disabled={targets.length === 0 || command.trim() === '' || starting || loading}
 				type="submit">▶ {starting ? 'Starting…' : `Run in ${targets.length}`}</button
 			>
+			<label
+				class="auto-clear-option"
+				title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
+			>
+				<input
+					aria-label="Auto clear"
+					onchange={(event) =>
+						localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
+					type="checkbox"
+					bind:checked={autoClear}
+				/>
+				Auto clear
+			</label>
 		</form>
 	</header>
 	<main>
@@ -955,49 +980,30 @@
 					>
 				</div>
 				<div class="selection-tools">
-					<span
-						>{targets.length} selected{selectedCount > targets.length
-							? ` · ${selectedCount - targets.length} hidden`
-							: ''}</span
-					><label
-						>First <input
-							aria-label="Number of repositories to select"
-							max={Math.max(1, visibleRepositories.length)}
-							min="1"
-							type="number"
-							bind:value={selectCount}
-						/></label
-					><button
-						class="text-button"
-						disabled={visibleRepositories.length === 0}
-						onclick={selectMatching}
-						type="button">Select</button
-					><button
-						class="text-button muted"
-						disabled={selectedCount === 0}
-						onclick={() => {
-							rowSelection = {}
-						}}
-						type="button">Clear</button
-					>
-					<label
-						class="auto-clear-option"
-						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
-					>
+					<label>
+						Output lines
 						<input
-							aria-label="Auto clear"
-							onchange={(event) =>
-								localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
-							type="checkbox"
-							bind:checked={autoClear}
+							aria-label="Output lines"
+							min="1"
+							onblur={(event) => {
+								event.currentTarget.value = String(outputLines)
+							}}
+							oninput={(event) => {
+								const value = event.currentTarget.valueAsNumber
+								if (!Number.isSafeInteger(value) || !(value >= 1)) {
+									return
+								}
+
+								outputLines = value
+								localStorage.setItem('allwork.outputLines', String(value))
+							}}
+							step="1"
+							type="number"
+							value={outputLines}
 						/>
-						Auto clear
 					</label>
 				</div>
 				<div class="table-title-actions">
-					<button class="button subtle" onclick={() => variablesDialog.showModal()} type="button"
-						>Variables…</button
-					>
 					{#if activeRuns.length > 0}<span class="running-indicator"
 							><span class="connection-dot"></span>{activeRuns.length} running</span
 						>{/if}{#if runs.some((run) => run.finished)}<button
@@ -1022,12 +1028,11 @@
 									header: String(column.columnDef.header),
 									id: column.id,
 									note: definition?.note,
-									onDemand:
-										definition !== undefined &&
-										['code', 'files', 'updates'].includes(definition.group),
+									onDemand: definition?.group === 'updates',
 									visible: column.getIsVisible(),
 								}
 							})}
+						disabled={loading || selectedCount === 0}
 						onRefresh={refreshMetadata}
 						onVisibility={async (id: string, visible: boolean) => {
 							table.getColumn(id)?.toggleVisibility(visible)
@@ -1038,12 +1043,43 @@
 
 							scheduleMetadata()
 						}}
-						selectedCount={targets.length}
+						onVisibilityAll={async (visible: boolean) => {
+							table.toggleAllColumnsVisible(visible)
+							await tick()
+							if (visible) {
+								fitColumns(
+									table
+										.getVisibleLeafColumns()
+										.filter((column) => !resizedColumns.has(column.id))
+										.map((column) => column.id),
+								)
+							}
+
+							scheduleMetadata()
+						}}
+						onVisibilityDefaults={async () => {
+							table.resetColumnVisibility()
+							await tick()
+							fitColumns(
+								table
+									.getVisibleLeafColumns()
+									.filter((column) => !resizedColumns.has(column.id))
+									.map((column) => column.id),
+							)
+							scheduleMetadata()
+						}}
+						{selectedCount}
 					/>
 				</div>
 			</div>
 			<div bind:this={tableScroll} class="table-scroll" onscroll={scheduleMetadata}>
-				<table style:width="{table.getTotalSize()}px">
+				<table style:width="max(100%, {table.getTotalSize()}px)">
+					<colgroup>
+						{#each table.getVisibleLeafColumns() as column (column.id)}
+							<col style:width="{column.getSize()}px" />
+						{/each}
+						<col />
+					</colgroup>
 					<thead
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
 								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
@@ -1096,7 +1132,7 @@
 																: '↕'}</span
 													>
 												</button>
-												<div>
+												<div class="run-actions">
 													{#if !run.finished}<button
 															class="stop-button"
 															aria-label="Stop command"
@@ -1146,7 +1182,7 @@
 												}}
 												type="button"
 											></button>{/if}
-									</th>{/each}</tr
+									</th>{/each}<th class="table-filler" aria-hidden="true"></th></tr
 							>{/each}</thead
 					>
 					<tbody
@@ -1177,22 +1213,7 @@
 											)}
 											<div class="repository-heading">
 												<div class="repository-name" title={`${tooltip}\n${repository.path}`}>
-													<svg
-														class="repo-symbol"
-														aria-hidden="true"
-														fill="none"
-														height="16"
-														viewBox="0 0 16 16"
-														width="16"
-														><path
-															d="M1.5 3h4l1.5 2h7v8h-13V3Z"
-															fill="#8ab9dd"
-															stroke="#507fa8"
-														/><path d="M1.5 6h13v7h-13V6Z" fill="#a5ceed" /><path
-															d="M2 6.5h12"
-															stroke="#d9edfc"
-														/></svg
-													><strong>{repository.relativePath}</strong>
+													<FolderIcon /><strong>{repository.relativePath}</strong>
 												</div>
 												{#if repository.error !== undefined}<span
 														class="metadata-error"
@@ -1348,44 +1369,16 @@
 													? getMetadataPlaceholder(repository, 'lastCommitDate')
 													: formatDate(repository.lastCommitDate)}</span
 											>
-										{:else if run !== undefined}{#if result !== undefined}<button
-													class="output-preview"
-													onclick={(event) => {
-														if (
-															event.detail === 0 ||
-															globalThis.getSelection()?.isCollapsed !== false
-														) {
-															inspect(run.id, repository.id)
-														}
-													}}
-													type="button"
-													><span
-														class="result-meta"
-														class:failed={result.status === 'failed'}
-														class:success={result.status === 'success'}
-														><span class="status-dot"></span>{result.status}{result.exitCode ===
-														undefined
-															? ''
-															: ` · exit ${result.exitCode}`}<span class="result-duration"
-															>{result.duration === undefined
-																? ''
-																: `${(result.duration / 1000).toFixed(1)}s`} ↗</span
-														></span
-													>
-													<pre>{result.output === ''
-															? result.status === 'queued'
-																? 'Waiting for a slot…'
-																: result.status === 'running'
-																	? 'Running…'
-																	: 'No output'
-															: result.output}{result.truncated
-															? '\n[Output limit reached]'
-															: ''}</pre></button
-												>{:else}<span class="not-targeted">Not included in this run</span>{/if}
+										{:else if run !== undefined}{#if result !== undefined}<OutputPreview
+													label="View output for {repository.name}"
+													lineLimit={outputLines}
+													onInspect={() => inspect(run.id, repository.id)}
+													{result}
+												/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
 										{:else}<span class="cell-text" title={tooltip}
 												>{formatColumnCellValue(repository, cell.column.id, runs)}</span
 											>{/if}
-									</td>{/each}</tr
+									</td>{/each}<td class="table-filler" aria-hidden="true"></td></tr
 							>{/each}</tbody
 					>
 				</table>
@@ -1411,6 +1404,11 @@
 					</div>{/if}
 			</div>
 			<footer class="table-footer">
+				<span class="selection-count" aria-live="polite"
+					>{selectedCount} selected{selectedCount > targets.length
+						? ` · ${selectedCount - targets.length} hidden`
+						: ''}</span
+				>
 				<span
 					>{visibleRepositories.length} of {workspace?.repositories.length ?? 0} repositories
 					<span class="caption-divider">·</span>
@@ -1462,39 +1460,4 @@
 			: (inspectedResult?.output ?? 'No output yet.')}{inspectedResult?.truncated === true
 			? '\n\n[Output truncated at 128,000 characters. The command continues to run.]'
 			: ''}</pre>
-</dialog>
-
-<dialog
-	bind:this={variablesDialog}
-	class="output-dialog variables-dialog"
-	aria-labelledby="variables-title"
->
-	<div class="dialog-heading">
-		<button
-			class="remove-button dialog-close-button"
-			aria-label="Close variables"
-			onclick={() => variablesDialog.close()}
-			type="button">×</button
-		>
-		<div>
-			<h2 id="variables-title">Column variables</h2>
-			<p>Insert a quoted variable. Each repository supplies its own value when you run.</p>
-		</div>
-	</div>
-	<div class="variable-options">
-		{#each columnVariables as variable (variable.id)}
-			<button
-				class="variable-option"
-				onclick={async () => insertVariable(variable.name)}
-				title={previewColumn(variable.id)}
-				type="button"
-			>
-				<span>{variable.label}</span><code>${variable.name}</code>
-			</button>
-		{/each}
-	</div>
-	<p class="variable-note">
-		Includes hidden columns. Working tree is a changed-file count; Sync is ahead + behind. Last
-		commit is an ISO date. Run values use the output available when you click Run.
-	</p>
 </dialog>

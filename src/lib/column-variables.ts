@@ -204,25 +204,16 @@ export function getPendingCommandColumns(
 }
 
 /** Show the exact row value, availability, and field meaning in a hover. */
-export function getColumnTooltip(
-	repository: Repository,
-	columnId: string,
-	runs: readonly CommandRun[] = [],
-): string {
-	const variable = findVariable(columnId, runs)
-	if (variable === undefined) {
+export function getColumnTooltip(repository: Repository, columnId: string): string {
+	const column = columnsById.get(columnId)
+	if (column === undefined) {
 		return ''
 	}
 
-	const column = columnsById.get(columnId)
-	const value =
-		column === undefined
-			? (runs.find((run) => run.id === columnId)?.results[repository.id]?.output ?? '')
-			: String(column.value(repository) ?? '')
 	return [
-		`$${variable.name} = ${value === '' ? '""' : value}`,
-		column === undefined ? '' : metadataHint(repository, column.group),
-		column?.note ?? '',
+		String(column.value(repository) ?? ''),
+		metadataHint(repository, column.group),
+		column.note ?? '',
 	]
 		.filter(Boolean)
 		.join('\n')
@@ -239,9 +230,20 @@ export function getColumnPreviewTooltip(
 		return ''
 	}
 
-	return repository === undefined
-		? `$${variable.name}`
-		: `${getColumnTooltip(repository, columnId, runs)}\nRepository: ${repository.relativePath}`
+	if (repository === undefined) {
+		return `$${variable.name}`
+	}
+
+	const column = columnsById.get(columnId)
+	const value = String(getColumnValue(repository, columnId, runs) ?? '')
+	return [
+		`$${variable.name} = ${value === '' ? '""' : value}`,
+		column === undefined ? '' : metadataHint(repository, column.group),
+		column?.note ?? '',
+		`Repository: ${repository.relativePath}`,
+	]
+		.filter(Boolean)
+		.join('\n')
 }
 
 /** Format a current row value for its table cell. */
@@ -264,11 +266,11 @@ export function formatColumnCellValue(
 export function getMetadataPlaceholder(repository: Repository, columnId: string) {
 	const column = columnsById.get(columnId)
 	const state = column === undefined ? undefined : repository.metadata?.groups[column.group]
-	return state?.status === 'loading' || state?.status === 'queued'
+	return state?.status === 'loading' ||
+		state?.status === 'queued' ||
+		(state === undefined && column !== undefined && ['code', 'files'].includes(column.group))
 		? '…'
-		: state === undefined &&
-			  column !== undefined &&
-			  ['code', 'files', 'updates'].includes(column.group)
+		: state === undefined && column !== undefined && column.group === 'updates'
 			? 'Not scanned'
 			: '—'
 }

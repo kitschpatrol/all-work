@@ -6,6 +6,18 @@ export const commandPresets = [
 	{ command: 'git log -10 --oneline', label: 'Show recent commits' },
 	{ command: 'git remote -v', label: 'Show remote URLs' },
 	{ command: 'git fetch --all --prune', label: 'Fetch remote updates' },
+	{
+		command: 'git push origin "$ALLWORK_COLUMN_BRANCH" --force-with-lease',
+		label: 'Force push branch (with lease)',
+	},
+	{
+		command: 'git add --all && git commit --amend --no-edit',
+		label: 'Amend commit (keep message)',
+	},
+	{
+		command: 'git add --all && git commit --amend -m "New commit message"',
+		label: 'Amend commit (new message)',
+	},
 	{ command: 'git ls-files', label: 'List tracked files' },
 	{
 		command: 'gh secret list --repo $ALLWORK_COLUMN_REPO_OWNER/$ALLWORK_COLUMN_REPO_NAME',

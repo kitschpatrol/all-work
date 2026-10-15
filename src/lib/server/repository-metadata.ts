@@ -492,7 +492,17 @@ export function startWorkspaceMetadata(
 				}
 
 				repository.metadata.groups[group] = { ...state, status: 'queued' }
-				queue.push({ group, priority: prioritize ? 1 : group === 'local' ? 2 : 3, repository })
+				queue.push({
+					group,
+					priority: prioritize
+						? 1
+						: group === 'local'
+							? 2
+							: ['code', 'files'].includes(group)
+								? 4
+								: 3,
+					repository,
+				})
 				notify(repository)
 			}
 		}
@@ -508,7 +518,7 @@ export function startWorkspaceMetadata(
 			}
 
 			notify(repository)
-			request([repository.id], ['local'])
+			request([repository.id], ['local', 'git', 'code', 'files'], true)
 		}),
 	)
 	return {
