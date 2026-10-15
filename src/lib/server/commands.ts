@@ -1,13 +1,14 @@
 import type { CommandRun, Repository, RunEvent } from '#lib/workspace.js'
-import type { ChildProcess } from 'node:child_process'
-import { spawn } from 'node:child_process'
+// eslint-disable-next-line depend/ban-dependencies -- Execa provides streaming, AbortSignal cancellation, and process tree termination.
+import { execa } from 'execa'
 import { randomUUID } from 'node:crypto'
 import { stripVTControlCharacters } from 'node:util'
 import { verifyRepository } from './repositories.js'
+import { userShellCommand } from './user-shell.js'
 
 type Job = {
 	cancelled: boolean
-	children: Set<ChildProcess>
+	controller: AbortController
 	listeners: Set<(event: RunEvent) => void>
 	run: CommandRun
 }
@@ -25,31 +26,6 @@ function emit(job: Job, event: RunEvent) {
 	}
 }
 
-function terminate(child: ChildProcess) {
-	try {
-		if (process.platform !== 'win32' && child.pid !== undefined) {
-			process.kill(-child.pid, 'SIGTERM')
-		} else {
-			child.kill('SIGTERM')
-		}
-	} catch {
-		// The command may have exited between the request and the signal.
-	}
-
-	const timer = setTimeout(() => {
-		try {
-			if (process.platform !== 'win32' && child.pid !== undefined) {
-				process.kill(-child.pid, 'SIGKILL')
-			} else {
-				child.kill('SIGKILL')
-			}
-		} catch {
-			// The process group has already exited.
-		}
-	}, 2000)
-	timer.unref()
-}
-
 async function execute(job: Job, repository: Repository): Promise<void> {
 	const result = job.run.results[repository.id]
 	if (result === undefined || job.cancelled) {
@@ -57,6 +33,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 	}
 
 	const started = Date.now()
+	let timer: ReturnType<typeof setTimeout> | undefined
 	result.status = 'running'
 	emit(job, { result, type: 'result' })
 	try {
@@ -65,69 +42,51 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 			return
 		}
 
-		await new Promise<void>((resolve) => {
-			const shell =
-				process.platform === 'win32'
-					? (process.env.ComSpec ?? 'cmd.exe')
-					: (process.env.SHELL ?? '/bin/sh')
-			const args =
-				process.platform === 'win32'
-					? ['/d', '/s', '/c', job.run.command]
-					: ['-lc', job.run.command]
-			const environment: Record<string, string | undefined> = {
-				...process.env,
-				// eslint-disable-next-line ts/naming-convention -- Git expects this exact environment variable name.
-				GIT_TERMINAL_PROMPT: '0',
-				// eslint-disable-next-line ts/naming-convention -- Command line tools recognize this exact environment variable name.
-				NO_COLOR: '1',
-				// eslint-disable-next-line ts/naming-convention -- Shell environment variables use their native uppercase names.
-				TERM: 'dumb',
-			}
-			delete environment.FORCE_COLOR
-			const child = spawn(shell, args, {
-				cwd: repository.path,
-				detached: process.platform !== 'win32',
-				env: environment,
-				stdio: ['ignore', 'pipe', 'pipe'],
-			})
-			job.children.add(child)
-			let timer: ReturnType<typeof setTimeout> | undefined
-			function flush() {
-				clearTimeout(timer)
-				timer = undefined
-				if (result !== undefined) {
-					emit(job, { result, type: 'result' })
-				}
-			}
-
-			function append(chunk: string) {
-				if (result === undefined || result.truncated) {
-					return
-				}
-
-				const output = stripVTControlCharacters(result.output + chunk)
-				result.truncated = output.length > outputLimit
-				result.output = output.slice(0, outputLimit)
-				timer ??= setTimeout(flush, 80)
-			}
-
-			child.stdout.setEncoding('utf8').on('data', append)
-			child.stderr.setEncoding('utf8').on('data', append)
-			child.on('error', (error) => {
-				append(error.message)
-			})
-			child.on('close', (code) => {
-				job.children.delete(child)
-				result.exitCode = code ?? undefined
-				result.duration = Date.now() - started
-				result.status = job.cancelled ? 'cancelled' : code === 0 ? 'success' : 'failed'
-				flush()
-				resolve()
-			})
+		const environment: Record<string, string | undefined> = {
+			...process.env,
+			// eslint-disable-next-line ts/naming-convention -- Git expects this exact environment variable name.
+			GIT_TERMINAL_PROMPT: '0',
+			// eslint-disable-next-line ts/naming-convention -- Command line tools recognize this exact environment variable name.
+			NO_COLOR: '1',
+		}
+		delete environment.FORCE_COLOR
+		const { args, file } = userShellCommand(job.run.command, repository.path)
+		const child = execa(file, args, {
+			all: true,
+			buffer: false,
+			cancelSignal: job.controller.signal,
+			cwd: repository.path,
+			env: environment,
+			forceKillAfterDelay: 2000,
+			killDescendants: true,
+			reject: false,
+			stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
 		})
+		const output = process.platform === 'win32' ? child.all : child.stdio[3]
+		output.setEncoding('utf8').on('data', (chunk: string) => {
+			if (result.truncated) {
+				return
+			}
+
+			const text = stripVTControlCharacters(result.output + chunk)
+			result.truncated = text.length > outputLimit
+			result.output = text.slice(0, outputLimit)
+			timer ??= setTimeout(() => {
+				timer = undefined
+				emit(job, { result, type: 'result' })
+			}, 80)
+		})
+		const completion = await child
+		result.exitCode = completion.exitCode
+		result.status = isCancelled(job) ? 'cancelled' : completion.failed ? 'failed' : 'success'
+		if (completion.exitCode === undefined && !isCancelled(job)) {
+			result.output ||= completion.shortMessage ?? 'The shell could not start.'
+		}
 	} catch (error) {
 		result.status = isCancelled(job) ? 'cancelled' : 'failed'
 		result.output = error instanceof Error ? error.message : String(error)
+	} finally {
+		clearTimeout(timer)
 		result.duration = Date.now() - started
 		emit(job, { result, type: 'result' })
 	}
@@ -160,7 +119,12 @@ export function startRun(
 			]),
 		),
 	}
-	const job: Job = { cancelled: false, children: new Set(), listeners: new Set(), run }
+	const job: Job = {
+		cancelled: false,
+		controller: new AbortController(),
+		listeners: new Set(),
+		run,
+	}
 	jobs.set(run.id, job)
 	let next = 0
 	void Promise.all(
@@ -220,9 +184,7 @@ export function stopRun(id: string): void {
 		emit(job, { result, type: 'result' })
 	}
 
-	for (const child of job.children) {
-		terminate(child)
-	}
+	job.controller.abort()
 }
 
 /** Release a run's history after stopping any remaining commands. */

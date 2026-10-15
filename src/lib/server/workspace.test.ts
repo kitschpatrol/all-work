@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -24,6 +25,10 @@ let temporaryDirectory: string
 let workspace: Workspace
 let repositories: Repository[]
 const runIds: string[] = []
+const hasZsh = existsSync('/bin/zsh')
+const fixtureShell = hasZsh ? '/bin/zsh' : '/bin/sh'
+const syntaxErrorPattern = /syntax error|parse error/iv
+const descendantPidPattern = /stubborn=(\d+)/v
 
 async function git(directory: string, args: string[]) {
 	return execute('git', ['-C', directory, ...args])
@@ -56,6 +61,34 @@ async function waitForRun(run: CommandRun) {
 
 beforeAll(async () => {
 	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-test-'))
+	vi.stubEnv('SHELL', fixtureShell)
+	if (hasZsh) {
+		const shellDirectory = path.join(temporaryDirectory, '.shell-config')
+		const binDirectory = path.join(shellDirectory, 'bin')
+		await mkdir(binDirectory, { recursive: true })
+		vi.stubEnv('ZDOTDIR', shellDirectory)
+		await writeFile(
+			path.join(shellDirectory, '.zprofile'),
+			'export ALLWORK_SHELL_PROFILE="login configuration loaded"\n',
+		)
+		await writeFile(
+			path.join(shellDirectory, '.zshrc'),
+			[
+				'export PATH="$ZDOTDIR/bin:$PATH"',
+				String.raw`alias allwork_fixture_alias='printf "alias works\n"'`,
+				String.raw`allwork_fixture_function() { printf "function works\n"; }`,
+				String.raw`printf "startup stdout\n"`,
+				String.raw`printf "startup stderr\n" >&2`,
+				'cd "$ZDOTDIR"',
+			].join('\n'),
+		)
+		await writeFile(
+			path.join(binDirectory, 'allwork-fixture-tool'),
+			'#!/bin/sh\nprintf "path works\\n"\n',
+			{ mode: 0o755 },
+		)
+	}
+
 	const first = await createRepository('project with spaces')
 	await writeFile(
 		path.join(first, 'package.json'),
@@ -90,6 +123,7 @@ afterAll(async () => {
 	}
 
 	await rm(temporaryDirectory, { force: true, recursive: true })
+	vi.unstubAllEnvs()
 })
 
 describe('repository discovery and Metascope metadata', () => {
@@ -169,6 +203,44 @@ describe('repository discovery and Metascope metadata', () => {
 })
 
 describe('parallel command runs', () => {
+	it.skipIf(!hasZsh)(
+		'loads login and interactive configuration, aliases, functions, and PATH without startup chatter',
+		async () => {
+			const run = startRun(
+				String.raw`allwork_fixture_alias; allwork_fixture_function; allwork-fixture-tool; printf '%s\n' "$ALLWORK_SHELL_PROFILE"; pwd`,
+				repositories,
+				2,
+			)
+			runIds.push(run.id)
+			await waitForRun(run)
+			for (const repository of repositories) {
+				expect(run.results[repository.id]).toMatchObject({
+					exitCode: 0,
+					output: `alias works\nfunction works\npath works\nlogin configuration loaded\n${repository.path}\n`,
+					status: 'success',
+				})
+			}
+		},
+	)
+
+	it.skipIf(!hasZsh || os.userInfo().shell !== '/bin/zsh')(
+		'uses the account login shell when a desktop launch does not inherit SHELL',
+		async () => {
+			vi.stubEnv('SHELL', undefined)
+			try {
+				const run = startRun('allwork_fixture_alias', repositories.slice(0, 1), 1)
+				runIds.push(run.id)
+				await waitForRun(run)
+				expect(Object.values(run.results)[0]).toMatchObject({
+					output: 'alias works\n',
+					status: 'success',
+				})
+			} finally {
+				vi.stubEnv('SHELL', fixtureShell)
+			}
+		},
+	)
+
 	it('runs with each repository as cwd and keeps stdout, stderr, and exit status per row', async () => {
 		const run = startRun(
 			String.raw`pwd; printf "standard output\n"; printf "standard error\n" >&2; exit 7`,
@@ -186,6 +258,53 @@ describe('parallel command runs', () => {
 		}
 
 		expect(getRun(run.id)).toBe(run)
+	})
+
+	it('preserves shell operators, quoting, and Unicode output', async () => {
+		const run = startRun(
+			String.raw`printf '%s\n' 'café $HOME "quotes"' | cat && printf '%s\n' '日本語' >&2`,
+			repositories.slice(0, 1),
+			1,
+		)
+		runIds.push(run.id)
+		await waitForRun(run)
+		expect(Object.values(run.results)[0]).toMatchObject({
+			output: 'café $HOME "quotes"\n日本語\n',
+			status: 'success',
+		})
+	})
+
+	it('reports command syntax errors in the output', async () => {
+		const run = startRun('if then', repositories.slice(0, 1), 1)
+		runIds.push(run.id)
+		await waitForRun(run)
+		const result = Object.values(run.results)[0]
+		expect(result?.status).toBe('failed')
+		expect(result?.output).toMatch(syntaxErrorPattern)
+	})
+
+	it('keeps internal runner arguments out of the command positional parameters', async () => {
+		const run = startRun(String.raw`printf '%s\n' "$#:$1:$2"`, repositories.slice(0, 1), 1)
+		runIds.push(run.id)
+		await waitForRun(run)
+		expect(Object.values(run.results)[0]).toMatchObject({
+			output: '0::\n',
+			status: 'success',
+		})
+	})
+
+	it('reports an unavailable user shell and finishes the run', async () => {
+		vi.stubEnv('SHELL', path.join(temporaryDirectory, 'missing-shell'))
+		try {
+			const run = startRun('pwd', repositories.slice(0, 1), 1)
+			runIds.push(run.id)
+			await waitForRun(run)
+			const result = Object.values(run.results)[0]
+			expect(result?.status).toBe('failed')
+			expect(result?.output).toContain('ENOENT')
+		} finally {
+			vi.stubEnv('SHELL', fixtureShell)
+		}
 	})
 
 	it('streams before completion and obeys the concurrency limit', async () => {
@@ -225,6 +344,23 @@ describe('parallel command runs', () => {
 		expect(
 			Object.values(run.results).filter((result) => result.output.includes('started')),
 		).toHaveLength(1)
+	})
+
+	it('forcefully stops descendant processes that ignore termination signals', async () => {
+		const run = startRun(
+			`'${process.execPath}' -e 'process.on("SIGTERM", () => {}); process.on("SIGHUP", () => {}); console.log("stubborn=" + process.pid); setInterval(() => {}, 1000)' & wait`,
+			repositories.slice(0, 1),
+			1,
+		)
+		runIds.push(run.id)
+		await vi.waitFor(() =>
+			expect(Object.values(run.results)[0]?.output).toMatch(descendantPidPattern),
+		)
+		const pid = Number(Object.values(run.results)[0]?.output.match(descendantPidPattern)?.[1])
+		stopRun(run.id)
+		await waitForRun(run)
+		expect(Object.values(run.results)[0]?.status).toBe('cancelled')
+		await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 3000 })
 	})
 
 	it('bounds captured output while allowing the command to finish', async () => {

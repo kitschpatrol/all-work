@@ -42,6 +42,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
+		"execa": "^10.1.1",
 		"metascope": "^0.13.0"
 	},
 	"devDependencies": {
