@@ -17,6 +17,7 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
+	import { commandPresets } from '#lib/command-presets.js'
 	import { getGithubUrl } from '#lib/repository-links.js'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
@@ -45,6 +46,8 @@
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
 	let columnMenu: HTMLDetailsElement
+	let presetMenu: HTMLDetailsElement
+	let commandInput: HTMLInputElement
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
 	const autoClearPredecessors = new SvelteMap<string, string>()
@@ -247,6 +250,44 @@
 		if (input instanceof HTMLInputElement) {
 			void tick().then(() => input.setSelectionRange(input.value.length, input.value.length))
 		}
+	}
+
+	async function choosePreset(value: string) {
+		command = value
+		historyIndex = -1
+		commandDraft = ''
+		presetMenu.open = false
+		await tick()
+		commandInput.focus()
+		commandInput.setSelectionRange(commandInput.value.length, commandInput.value.length)
+	}
+
+	function navigatePresets(event: KeyboardEvent) {
+		if (event.key === 'Escape' && presetMenu.open) {
+			event.preventDefault()
+			presetMenu.open = false
+			presetMenu.querySelector('summary')?.focus()
+			return
+		}
+
+		if (!['ArrowDown', 'ArrowUp', 'End', 'Home'].includes(event.key)) {
+			return
+		}
+
+		event.preventDefault()
+		presetMenu.open = true
+		const options = [...presetMenu.querySelectorAll<HTMLButtonElement>('.preset-option')]
+		const current = event.target instanceof HTMLButtonElement ? options.indexOf(event.target) : -1
+		let index = 0
+		if (event.key === 'End' || (current === -1 && event.key === 'ArrowUp')) {
+			index = options.length - 1
+		} else if (event.key === 'ArrowDown') {
+			index = (current + 1) % options.length
+		} else if (event.key === 'ArrowUp') {
+			index = (current - 1 + options.length) % options.length
+		}
+
+		options[index]?.focus()
 	}
 
 	function refreshOutputSorting(runId: string) {
@@ -570,8 +611,10 @@
 
 <svelte:window
 	onclick={(event: MouseEvent) => {
-		if (columnMenu.open && !event.composedPath().includes(columnMenu)) {
-			columnMenu.open = false
+		for (const menu of [columnMenu, presetMenu]) {
+			if (menu.open && !event.composedPath().includes(menu)) {
+				menu.open = false
+			}
 		}
 	}}
 />
@@ -614,7 +657,7 @@
 						type="checkbox"
 						bind:checked={recursive}
 					/>
-					Recursive
+					<span>Recursive</span>
 				</label>
 				{#if typeof window !== 'undefined' && globalThis._allwork !== undefined}<button
 						class="button subtle"
@@ -642,6 +685,7 @@
 			<div class="command-input">
 				<span class="prompt-symbol" aria-hidden="true">$</span>
 				<input
+					bind:this={commandInput}
 					id="shell-command"
 					aria-label="Shell command"
 					autocomplete="off"
@@ -653,6 +697,34 @@
 					spellcheck="false"
 					bind:value={command}
 				/>
+				<details bind:this={presetMenu} class="command-presets">
+					<summary
+						aria-label="Command presets"
+						onkeydown={navigatePresets}
+						title="Choose a preset command"
+					>
+						<svg aria-hidden="true" fill="none" height="10" viewBox="0 0 12 12" width="10"
+							><path
+								d="m3 4.5 3 3 3-3"
+								stroke="currentColor"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="1.5"
+							/></svg
+						>
+					</summary>
+					<div class="preset-options" aria-label="Preset commands" role="group">
+						{#each commandPresets as preset (preset.label)}
+							<button
+								class="preset-option"
+								onclick={async () => choosePreset(preset.command)}
+								onkeydown={navigatePresets}
+								title={preset.command}
+								type="button">{preset.label}</button
+							>
+						{/each}
+					</div>
+				</details>
 			</div>
 			<label class="parallel-label"
 				><span>Jobs</span>

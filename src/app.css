@@ -139,7 +139,7 @@ h1 {
 	inset-inline: 0;
 	top: 0;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
 	gap: 16px;
 	align-items: center;
 	min-width: 760px;
@@ -152,17 +152,18 @@ h1 {
 		0 1px #ffffff80;
 }
 
-.app-toolbar::after {
+.workspace-tools::after {
 	content: '';
 	position: absolute;
-	top: 5px;
-	bottom: 5px;
-	left: 50%;
+	top: -7px;
+	right: -9px;
+	bottom: -7px;
 	border-left: 1px solid #aaa;
 	box-shadow: 1px 0 #ffffffb3;
 }
 
 .workspace-tools {
+	position: relative;
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 10px;
@@ -255,12 +256,13 @@ main {
 }
 
 .command-input {
+	position: relative;
 	display: flex;
 	flex: 1;
 	flex-wrap: nowrap;
 	gap: 5px;
 	align-items: center;
-	padding: 0 5px;
+	padding: 0 0 0 5px;
 }
 
 .command-input input {
@@ -272,6 +274,63 @@ main {
 	font-size: 11px;
 	background: transparent;
 	outline: none;
+}
+
+.command-presets {
+	flex-shrink: 0;
+	align-self: stretch;
+	width: 22px;
+}
+
+.command-presets summary {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	border-left: 1px solid #b3b3b3;
+	border-radius: 0 1px 1px 0;
+	color: #4b5663;
+	list-style: '';
+	background: linear-gradient(#f9f9f9, #e4e4e4);
+}
+
+.command-presets:where([open]) summary {
+	background: linear-gradient(#e4edf9, #b9cce6);
+}
+
+.preset-options {
+	position: absolute;
+	z-index: 25;
+	top: calc(100% + 3px);
+	right: -1px;
+	overflow: auto;
+	min-width: 210px;
+	max-width: min(340px, calc(100vw - 16px));
+	max-height: min(400px, calc(100dvh - 60px));
+	padding: 3px 0;
+	border: 1px solid #888;
+	border-radius: 4px;
+	background: #fffffff5;
+	box-shadow: 0 4px 12px #0000004d;
+}
+
+.preset-option {
+	display: block;
+	width: 100%;
+	padding: 4px 10px;
+	border: 0;
+	font-size: 11px;
+	color: #222;
+	text-align: left;
+	white-space: nowrap;
+	background: transparent;
+}
+
+.preset-option:focus-visible {
+	color: #fff;
+	background: linear-gradient(#6795d1, #3c71ba);
+	outline-offset: -3px;
 }
 
 .button,
@@ -1084,6 +1143,11 @@ tr.selected
 }
 
 @media (hover: hover) {
+	.preset-option:hover {
+		color: #fff;
+		background: linear-gradient(#6795d1, #3c71ba);
+	}
+
 	tr:not(.selected):hover td {
 		background: #eef3f9;
 	}
@@ -1117,6 +1181,8 @@ tr.selected
 }
 
 @media (width <= 1100px) {
+	.directory-form > .field-label,
+	.recursive-option > span,
 	.parallel-label > span {
 		display: none;
 	}
