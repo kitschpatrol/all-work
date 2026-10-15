@@ -1,4 +1,5 @@
 import type { CommandRun, Repository, RunEvent } from '#lib/workspace.js'
+import { getColumnEnvironment } from '#lib/column-variables.js'
 // eslint-disable-next-line depend/ban-dependencies -- Execa provides streaming, AbortSignal cancellation, and process tree termination.
 import { execa } from 'execa'
 import { randomUUID } from 'node:crypto'
@@ -9,6 +10,7 @@ import { userShellCommand } from './user-shell.js'
 type Job = {
 	cancelled: boolean
 	controller: AbortController
+	environments: Map<string, Record<string, string>>
 	listeners: Set<(event: RunEvent) => void>
 	run: CommandRun
 }
@@ -43,7 +45,10 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 		}
 
 		const environment: Record<string, string | undefined> = {
-			...process.env,
+			...Object.fromEntries(
+				Object.entries(process.env).filter(([name]) => !name.startsWith('ALLWORK_COLUMN_')),
+			),
+			...job.environments.get(repository.id),
 			// eslint-disable-next-line ts/naming-convention -- Git expects this exact environment variable name.
 			GIT_TERMINAL_PROMPT: '0',
 			// eslint-disable-next-line ts/naming-convention -- Command line tools recognize this exact environment variable name.
@@ -57,6 +62,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 			cancelSignal: job.controller.signal,
 			cwd: repository.path,
 			env: environment,
+			extendEnv: false,
 			forceKillAfterDelay: 2000,
 			killDescendants: true,
 			reject: false,
@@ -87,6 +93,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 		result.output = error instanceof Error ? error.message : String(error)
 	} finally {
 		clearTimeout(timer)
+		job.environments.delete(repository.id)
 		result.duration = Date.now() - started
 		emit(job, { result, type: 'result' })
 	}
@@ -100,6 +107,7 @@ export function startRun(
 	command: string,
 	repositories: Repository[],
 	concurrency: number,
+	sourceRuns: readonly CommandRun[] = [],
 ): CommandRun {
 	const run: CommandRun = {
 		command,
@@ -122,6 +130,12 @@ export function startRun(
 	const job: Job = {
 		cancelled: false,
 		controller: new AbortController(),
+		environments: new Map(
+			repositories.map((repository) => [
+				repository.id,
+				getColumnEnvironment(repository, sourceRuns),
+			]),
+		),
 		listeners: new Set(),
 		run,
 	}
@@ -137,6 +151,7 @@ export function startRun(
 			}
 		}),
 	).then(() => {
+		job.environments.clear()
 		run.finished = true
 		emit(job, { type: 'finished' })
 	})

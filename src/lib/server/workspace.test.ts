@@ -203,6 +203,68 @@ describe('repository discovery and Metascope metadata', () => {
 })
 
 describe('parallel command runs', () => {
+	it('exports separate row values to commands and child processes as literal data', async () => {
+		const selected = repositories.map((repository, index) => ({
+			...repository,
+			branch: `branch-${index}`,
+			name: `${index}: project "quotes" $(printf injected); literal\nsecond line`,
+		}))
+		const inherited = process.env.ALLWORK_COLUMN_STALE
+		vi.stubEnv('ALLWORK_COLUMN_STALE', 'must not leak')
+		try {
+			const run = startRun(
+				`'${process.execPath}' -e 'process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("ALLWORK_COLUMN_")))))'`,
+				selected,
+				2,
+			)
+			runIds.push(run.id)
+			await waitForRun(run)
+			for (const repository of selected) {
+				const result = run.results[repository.id]
+				expect(result?.status).toBe('success')
+				const environment: unknown = JSON.parse(result?.output ?? '{}')
+				expect(environment).toEqual(
+					Object.fromEntries([
+						['ALLWORK_COLUMN_REPOSITORY', repository.relativePath],
+						['ALLWORK_COLUMN_NAME', repository.name],
+						['ALLWORK_COLUMN_DESCRIPTION', repository.description],
+						['ALLWORK_COLUMN_BRANCH', repository.branch],
+						['ALLWORK_COLUMN_WORKING_TREE', String(repository.changedFiles)],
+						['ALLWORK_COLUMN_SYNC', String(repository.ahead + repository.behind)],
+						['ALLWORK_COLUMN_LAST_COMMIT', repository.lastCommitDate],
+						['ALLWORK_COLUMN_VERSION', repository.version],
+						['ALLWORK_COLUMN_PACKAGE_MANAGER', repository.packageManager],
+						['ALLWORK_COLUMN_REMOTE', repository.remote],
+					]),
+				)
+			}
+		} finally {
+			vi.stubEnv('ALLWORK_COLUMN_STALE', inherited)
+		}
+	})
+
+	it('snapshots output variables before queueing and preserves them after the source run is deleted', async () => {
+		const source = startRun(String.raw`printf '%s\n' "$ALLWORK_COLUMN_REPOSITORY"`, repositories, 2)
+		runIds.push(source.id)
+		await waitForRun(source)
+		const run = startRun('printf \'%s\' "$ALLWORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, [
+			source,
+		])
+		runIds.push(run.id)
+		for (const result of Object.values(source.results)) {
+			result.output = 'changed after submission'
+		}
+
+		deleteRun(source.id)
+		await waitForRun(run)
+		for (const repository of repositories) {
+			expect(run.results[repository.id]).toMatchObject({
+				output: `${repository.relativePath}\n`,
+				status: 'success',
+			})
+		}
+	})
+
 	it.skipIf(!hasZsh)(
 		'loads login and interactive configuration, aliases, functions, and PATH without startup chatter',
 		async () => {

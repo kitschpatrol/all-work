@@ -17,6 +17,7 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
+	import { getColumnVariables, repositoryColumns } from '#lib/column-variables.js'
 	import { commandPresets } from '#lib/command-presets.js'
 	import { getGithubUrl } from '#lib/repository-links.js'
 	import { onMount, tick } from 'svelte'
@@ -45,6 +46,7 @@
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: HTMLDialogElement
+	let variablesDialog: HTMLDialogElement
 	let columnMenu: HTMLDetailsElement
 	let presetMenu: HTMLDetailsElement
 	let commandInput: HTMLInputElement
@@ -78,35 +80,13 @@
 			minSize: 32,
 			size: 32,
 		},
-		{
-			accessorKey: 'relativePath',
-			enableHiding: false,
-			header: 'Repository',
-		},
-		{ accessorKey: 'name', header: 'Name' },
-		{ accessorKey: 'branch', header: 'Branch' },
-		{
-			accessorKey: 'changedFiles',
-			filterFn(row: Row<typeof features, Repository>, _columnId: string, value: unknown) {
-				if (!row.original.gitStatusAvailable) {
-					return false
-				}
-
-				return value === 'dirty'
-					? row.original.changedFiles > 0
-					: value !== 'clean' || row.original.changedFiles === 0
-			},
-			header: 'Working tree',
-		},
-		{
-			accessorFn: (repository: Repository) => repository.ahead + repository.behind,
-			header: 'Sync',
-			id: 'sync',
-		},
-		{ accessorKey: 'lastCommitDate', header: 'Last commit' },
-		{ accessorKey: 'version', header: 'Version' },
-		{ accessorKey: 'packageManager', header: 'Package manager' },
-		{ accessorKey: 'remote', header: 'Remote' },
+		...repositoryColumns.map((column): ColumnDef<typeof features, Repository> => ({
+			accessorFn: column.value,
+			enableHiding: column.id !== 'relativePath',
+			filterFn: column.id === 'changedFiles' ? filterWorkingTree : undefined,
+			header: column.header,
+			id: column.id,
+		})),
 		...runs.map((run): ColumnDef<typeof features, Repository> => ({
 			accessorFn: (repository: Repository) => run.results[repository.id]?.output ?? '',
 			enableGlobalFilter: false,
@@ -115,6 +95,10 @@
 			sortFn: 'text',
 		})),
 	])
+	const columnVariables = $derived(getColumnVariables(runs))
+	const variableNames = $derived(
+		Object.fromEntries(columnVariables.map(({ id, name }) => [id, `$${name}`])),
+	)
 	const repositories = $derived(
 		(workspace?.repositories ?? []).filter(
 			(repository) => !selectedOnly || rowSelection[repository.id],
@@ -147,6 +131,7 @@
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
 	const targets = $derived(visibleRepositories.filter((row) => rowSelection[row.id]))
+	const previewRepository = $derived(targets[0]?.original ?? visibleRepositories[0]?.original)
 	const selectedCount = $derived(Object.values(rowSelection).filter(Boolean).length)
 	const activeRuns = $derived(runs.filter((run) => !run.finished))
 	const dirtyCount = $derived(
@@ -463,6 +448,7 @@
 				command,
 				concurrency,
 				repositoryIds: targets.map((row) => row.id),
+				sourceRunIds: runs.map((run) => run.id),
 				workspaceId: workspace.id,
 			})
 			runs = [...runs, run]
@@ -487,6 +473,57 @@
 		} finally {
 			starting = false
 		}
+	}
+
+	async function insertVariable(name: string) {
+		const insertion = `"$${name}"`
+		const start = commandInput.selectionStart ?? command.length
+		const end = commandInput.selectionEnd ?? start
+		command = command.slice(0, start) + insertion + command.slice(end)
+		historyIndex = -1
+		commandDraft = ''
+		variablesDialog.close()
+		await tick()
+		commandInput.focus()
+		commandInput.setSelectionRange(start + insertion.length, start + insertion.length)
+	}
+
+	function columnTooltip(repository: Repository, columnId: string) {
+		const name = variableNames[columnId]
+		if (name === undefined) {
+			return ''
+		}
+
+		const column = repositoryColumns.find((item) => item.id === columnId)
+		const value =
+			column === undefined
+				? (runs.find((run) => run.id === columnId)?.results[repository.id]?.output ?? '')
+				: String(column.value(repository))
+		return `${name} = ${value === '' ? '""' : value}`
+	}
+
+	function previewColumn(columnId: string) {
+		if (variableNames[columnId] === undefined) {
+			return ''
+		}
+
+		return previewRepository === undefined
+			? (variableNames[columnId] ?? '')
+			: `${columnTooltip(previewRepository, columnId)}\nRepository: ${previewRepository.relativePath}`
+	}
+
+	function filterWorkingTree(
+		row: Row<typeof features, Repository>,
+		_columnId: string,
+		value: unknown,
+	) {
+		if (!row.original.gitStatusAvailable) {
+			return false
+		}
+
+		return value === 'dirty'
+			? row.original.changedFiles > 0
+			: value !== 'clean' || row.original.changedFiles === 0
 	}
 
 	async function stop(runId: string) {
@@ -831,6 +868,9 @@
 					</label>
 				</div>
 				<div class="table-title-actions">
+					<button class="button subtle" onclick={() => variablesDialog.showModal()} type="button"
+						>Variables…</button
+					>
 					{#if activeRuns.length > 0}<span class="running-indicator"
 							><span class="connection-dot"></span>{activeRuns.length} running</span
 						>{/if}{#if runs.some((run) => run.finished)}<button
@@ -882,6 +922,7 @@
 											: header.column.getIsSorted() === 'desc'
 												? 'descending'
 												: undefined}
+										title={previewColumn(header.column.id)}
 									>
 										{#if header.column.id === 'select'}<input
 												aria-label="Select all matching repositories"
@@ -906,7 +947,7 @@
 															<span
 																>{runProgress(run)}{run.finished ? ' complete' : ' running'}</span
 															></span
-														><code title={run.command}>$ {run.command}</code>
+														><code title={previewColumn(run.id)}>$ {run.command}</code>
 													</span>
 													<span
 														class="sort-indicator"
@@ -973,11 +1014,15 @@
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
-									)}{@const result = run?.results[repository.id]}<td
+									)}{@const result = run?.results[repository.id]}{@const tooltip = columnTooltip(
+										repository,
+										cell.column.id,
+									)}<td
 										style:width="{cell.column.getSize()}px"
 										class:output-cell={run !== undefined}
 										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}
+										title={tooltip}
 									>
 										{#if cell.column.id === 'select'}<input
 												aria-label="Select {repository.name}"
@@ -989,7 +1034,7 @@
 												repository.remote,
 											)}
 											<div class="repository-heading">
-												<div class="repository-name" title={repository.path}>
+												<div class="repository-name" title={`${tooltip}\n${repository.path}`}>
 													<svg
 														class="repo-symbol"
 														aria-hidden="true"
@@ -1127,12 +1172,10 @@
 										{:else if cell.column.id === 'name'}<span
 												class="project-name"
 												title={repository.description === ''
-													? repository.name
-													: repository.description}>{repository.name}</span
+													? tooltip
+													: `${tooltip}\n${repository.description}`}>{repository.name}</span
 											>
-										{:else if cell.column.id === 'branch'}<span
-												class="branch"
-												title={repository.branch}
+										{:else if cell.column.id === 'branch'}<span class="branch" title={tooltip}
 												>⑂ {repository.branch === '' ? 'Unknown' : repository.branch}</span
 											>
 										{:else if cell.column.id === 'changedFiles'}<span
@@ -1146,14 +1189,17 @@
 											>
 										{:else if cell.column.id === 'sync'}<span
 												class="sync-value"
-												title="Compared with the locally cached upstream; no fetch is performed"
+												title={`${tooltip}\nCompared with the locally cached upstream; no fetch is performed`}
 												>{repository.ahead > 0 || repository.behind > 0
 													? `↑${repository.ahead} ↓${repository.behind}`
 													: '—'}</span
 											>
 										{:else if cell.column.id === 'lastCommitDate'}<span
 												class="date-value"
-												title={repository.lastCommit}>{formatDate(repository.lastCommitDate)}</span
+												title={repository.lastCommit === ''
+													? tooltip
+													: `${tooltip}\n${repository.lastCommit}`}
+												>{formatDate(repository.lastCommitDate)}</span
 											>
 										{:else if run !== undefined}{#if result !== undefined}<button
 													class="output-preview"
@@ -1189,7 +1235,7 @@
 															? '\n[Output limit reached]'
 															: ''}</pre></button
 												>{:else}<span class="not-targeted">Not included in this run</span>{/if}
-										{:else}<span class="cell-text" title={String(cell.getValue<number | string>())}
+										{:else}<span class="cell-text" title={tooltip}
 												>{String(cell.getValue<number | string>())}</span
 											>{/if}
 									</td>{/each}</tr
@@ -1263,4 +1309,39 @@
 			: (inspectedResult?.output ?? 'No output yet.')}{inspectedResult?.truncated === true
 			? '\n\n[Output truncated at 128,000 characters. The command continues to run.]'
 			: ''}</pre>
+</dialog>
+
+<dialog
+	bind:this={variablesDialog}
+	class="output-dialog variables-dialog"
+	aria-labelledby="variables-title"
+>
+	<div class="dialog-heading">
+		<button
+			class="remove-button dialog-close-button"
+			aria-label="Close variables"
+			onclick={() => variablesDialog.close()}
+			type="button">×</button
+		>
+		<div>
+			<h2 id="variables-title">Column variables</h2>
+			<p>Insert a quoted variable. Each repository supplies its own value when you run.</p>
+		</div>
+	</div>
+	<div class="variable-options">
+		{#each columnVariables as variable (variable.id)}
+			<button
+				class="variable-option"
+				onclick={async () => insertVariable(variable.name)}
+				title={previewColumn(variable.id)}
+				type="button"
+			>
+				<span>{variable.label}</span><code>${variable.name}</code>
+			</button>
+		{/each}
+	</div>
+	<p class="variable-note">
+		Includes hidden columns. Working tree is a changed-file count; Sync is ahead + behind. Last
+		commit is an ISO date. Run values use the output available when you click Run.
+	</p>
 </dialog>

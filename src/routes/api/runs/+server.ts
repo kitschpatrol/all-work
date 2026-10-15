@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit'
-import { startRun } from '#lib/server/commands.js'
+import { getRun, startRun } from '#lib/server/commands.js'
 import { getWorkspace } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
 import type { RequestHandler } from './$types'
@@ -43,5 +43,20 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		error(400, 'Parallel jobs must be between 1 and 32.')
 	}
 
-	return Response.json(startRun(body.command.trim(), repositories, concurrency), { status: 201 })
+	const sourceRunIds = body.sourceRunIds ?? []
+	if (!Array.isArray(sourceRunIds)) {
+		error(400, 'Invalid output columns.')
+	}
+
+	const sourceRuns = sourceRunIds.map((id: unknown) => {
+		const run = typeof id === 'string' ? getRun(id) : undefined
+		if (run === undefined) {
+			error(400, 'A previous output column is no longer available. Clear it and try again.')
+		}
+
+		return run
+	})
+	return Response.json(startRun(body.command.trim(), repositories, concurrency, sourceRuns), {
+		status: 201,
+	})
 }

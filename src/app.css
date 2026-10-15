@@ -1118,6 +1118,55 @@ tr.selected
 	white-space: pre-wrap;
 }
 
+.variables-dialog {
+	width: min(640px, 90vw);
+}
+
+.variable-options {
+	overflow: auto;
+	max-height: 50vh;
+	padding: 4px 0;
+}
+
+.variable-option {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 16px;
+	width: 100%;
+	padding: 6px 12px;
+	border: 0;
+	border-radius: 0;
+	text-align: left;
+	background: transparent;
+}
+
+.variable-option > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.variable-option:focus-visible {
+	background: #e7effb;
+	outline-offset: -2px;
+}
+
+.variable-note {
+	margin: 0;
+	padding: 8px 12px;
+	border-top: 1px solid #ddd;
+	font-size: 10px;
+	line-height: 1.5;
+	color: #555;
+	background: #f0f0f0;
+}
+
+@media (hover: hover) {
+	.variable-option:hover {
+		background: #e7effb;
+	}
+}
+
 .table-scroll::-webkit-scrollbar,
 .full-output::-webkit-scrollbar {
 	width: 13px;
