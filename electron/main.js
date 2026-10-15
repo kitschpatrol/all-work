@@ -1,9 +1,10 @@
 /* eslint-disable ts/no-floating-promises */
 /* eslint-disable ts/naming-convention */
 
-import { app, BrowserWindow, dialog, shell, utilityProcess } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, utilityProcess } from 'electron'
 import net from 'node:net'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // Vite default dev & production ports
 const sveltePort = app.isPackaged ? '4173' : '5173'
@@ -13,12 +14,13 @@ function createWindow() {
 	const mainWindow = new BrowserWindow({
 		height: 1024,
 		minHeight: 640,
-		minWidth: 400,
+		minWidth: 800,
 		title: 'AllWork',
 		webPreferences: {
-			webSecurity: false, // Disable web security to allow loading local resources
+			contextIsolation: true,
+			preload: fileURLToPath(new URL('preload.cjs', import.meta.url)),
 		},
-		width: 768,
+		width: 1440,
 	})
 
 	console.log('window created')
@@ -100,10 +102,21 @@ async function checkServerAvailability(port) {
 async function startApp() {
 	try {
 		await app.whenReady()
+		ipcMain.handle('allwork:choose-directory', async (event) => {
+			if (
+				event.senderFrame?.url === undefined ||
+				new URL(event.senderFrame.url).origin !== `http://${SVELTE_HOST}:${sveltePort}`
+			) {
+				throw new Error('Directory picker is only available inside AllWork.')
+			}
+
+			const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+			return result.canceled ? undefined : result.filePaths[0]
+		})
 		if (app.isPackaged) {
-			utilityProcess.fork(path.join(app.getAppPath(), 'build', 'index.js'), {
+			utilityProcess.fork(path.join(app.getAppPath(), 'electron', 'server.js'), {
 				// @ts-expect-error - string[] index
-				env: { ...process.env, PORT: sveltePort },
+				env: { ...process.env, HOST: SVELTE_HOST, PORT: sveltePort },
 			})
 		} else {
 			console.warn('##### Running Electron in development mode')

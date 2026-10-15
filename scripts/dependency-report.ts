@@ -1,14 +1,20 @@
-import { getEricProjects } from '#lib/server/project.js'
+import { scanWorkspace } from '#lib/server/repositories.js'
+import { getMetadata, helpers } from 'metascope'
 
-const projects = await getEricProjects()
-
-const reallyMyProjects = projects.filter((project) => project.isAuthoredByMe)
+const workspace = await scanWorkspace(process.argv[2] ?? '.')
 
 const dependencyFrequency = new Map<string, number>()
 
-for (const project of reallyMyProjects) {
-	const dependencyNames = Object.keys(project.package.dependencies ?? {})
-	const devDependencyNames = Object.keys(project.package.devDependencies ?? {})
+for (const project of workspace.repositories) {
+	const metadata = await getMetadata({
+		offline: true,
+		path: project.path,
+		sources: ['nodePackageJson'],
+		workspaces: false,
+	})
+	const pkg = helpers.firstOf(metadata.nodePackageJson)?.data
+	const dependencyNames = Object.keys(pkg?.dependencies ?? {})
+	const devDependencyNames = Object.keys(pkg?.devDependencies ?? {})
 
 	const allDependencyNames = [...dependencyNames, ...devDependencyNames].filter(
 		(dependencyName) =>

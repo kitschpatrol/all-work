@@ -2,7 +2,7 @@
 	"name": "allwork",
 	"version": "0.0.6",
 	"private": true,
-	"description": "High-level view of your maintained repositories.",
+	"description": "A parallel command line for all your Git repositories.",
 	"keywords": [
 		"github"
 	],
@@ -28,7 +28,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json --watch",
 		"clean-deep": "shx rm -f pnpm-lock.yaml && git clean -fdX -e !.claude/",
-		"dev": "vite dev --host",
+		"dev": "vite dev --host 127.0.0.1",
 		"electron": "electron .",
 		"electron:build": "svelte-kit sync && vite build && electron-builder",
 		"fix": "ksc fix",
@@ -38,7 +38,11 @@
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm build",
 		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && electron-builder build --publish always",
+		"start": "node electron/server.js",
 		"test": "vitest run"
+	},
+	"dependencies": {
+		"metascope": "^0.13.0"
 	},
 	"devDependencies": {
 		"@kitschpatrol/shared-config": "^8.13.1",
@@ -46,26 +50,20 @@
 		"@sveltejs/kit": "^3.0.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/postcss": "^4.3.3",
+		"@tanstack/svelte-table": "^9.3.1",
+		"@types/node": "^26.6.5",
 		"autoprefixer": "^10.6.1",
 		"bumpp": "^12.3.0",
 		"electron": "^44.7.0",
 		"electron-builder": "^26.15.3",
-		"execa": "^10.1.0",
-		"flowbite": "^3.1.2",
-		"flowbite-svelte": "^1.33.1",
-		"flowbite-svelte-icons": "^3.1.0",
-		"globby": "^16.2.4",
-		"read-pkg": "^10.1.0",
 		"shx": "^0.4.0",
 		"skills": "^1.7.2",
 		"svelte": "^5.57.2",
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
-		"taze": "^21.3.0",
 		"typescript": "~6.0.3",
 		"vite": "^8.3.4",
-		"vitest": "^5.0.3",
-		"zod": "^4.6.5"
+		"vitest": "^5.0.3"
 	},
 	"packageManager": "pnpm@12.11.2",
 	"engines": {

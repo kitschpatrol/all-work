@@ -1,0 +1,47 @@
+import { error } from '@sveltejs/kit'
+import { startRun } from '#lib/server/commands.js'
+import { getWorkspace } from '#lib/server/repositories.js'
+import { readRequest } from '#lib/server/request.js'
+import type { RequestHandler } from './$types'
+
+export const POST: RequestHandler = async ({ request, url }) => {
+	const body = await readRequest(request, url)
+	const workspace =
+		typeof body.workspaceId === 'string' ? getWorkspace(body.workspaceId) : undefined
+	if (workspace === undefined) {
+		error(404, 'Reload the folder to start a new workspace.')
+	}
+
+	if (
+		typeof body.command !== 'string' ||
+		body.command.trim() === '' ||
+		body.command.length > 16_000
+	) {
+		error(400, 'Enter a command (up to 16,000 characters).')
+	}
+
+	if (
+		!Array.isArray(body.repositoryIds) ||
+		body.repositoryIds.some((id: unknown) => typeof id !== 'string')
+	) {
+		error(400, 'Select repositories to run in.')
+	}
+
+	const ids = new Set(body.repositoryIds)
+	const repositories = workspace.repositories.filter((repository) => ids.has(repository.id))
+	if (repositories.length === 0 || repositories.length !== ids.size) {
+		error(400, 'Choose repositories from the loaded folder.')
+	}
+
+	const { concurrency } = body
+	if (
+		typeof concurrency !== 'number' ||
+		!Number.isInteger(concurrency) ||
+		concurrency < 1 ||
+		concurrency > 32
+	) {
+		error(400, 'Parallel jobs must be between 1 and 32.')
+	}
+
+	return Response.json(startRun(body.command.trim(), repositories, concurrency), { status: 201 })
+}
