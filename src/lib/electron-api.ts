@@ -9,6 +9,7 @@ export type MenuCommand =
 	| 'command.preset'
 	| 'command.run'
 	| 'command.stopAll'
+	| 'edit.selectAll'
 	| 'metadata.checkDependencies'
 	| 'metadata.refresh'
 	| 'preferences.open'

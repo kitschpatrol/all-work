@@ -52,6 +52,7 @@
 	import NumberField from '#lib/NumberField.svelte'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositoryLink } from '#lib/repository-links.js'
+	import { createRowSelection } from '#lib/row-selection.js'
 	import { getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
@@ -198,10 +199,6 @@
 			),
 			sorting: [{ desc: false, id: 'relativePath' }],
 		},
-		onRowSelectionChange(updater) {
-			rowSelection = typeof updater === 'function' ? updater(rowSelection) : updater
-			scheduleMetadata()
-		},
 		state: {
 			get columnOrder() {
 				return resolvedColumnOrder
@@ -212,6 +209,15 @@
 		},
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
+	const selection = createRowSelection({
+		ids: () => visibleRepositories.map((row) => row.id),
+		onChange(next) {
+			rowSelection = next
+			scheduleMetadata()
+		},
+		scroller: () => tableScroll,
+		selection: () => rowSelection,
+	})
 	const targets = $derived(visibleRepositories.filter((row) => rowSelection[row.id]))
 	const previewRepository = $derived(targets[0]?.original ?? visibleRepositories[0]?.original)
 	const selectedCount = $derived(
@@ -851,27 +857,6 @@
 		}
 	}
 
-	function selectRows(rows: typeof visibleRepositories) {
-		rowSelection = {
-			...rowSelection,
-			...Object.fromEntries(rows.map((row) => [row.id, true as const])),
-		}
-		scheduleMetadata()
-	}
-
-	function selectMatching(selected: boolean) {
-		if (selected) {
-			selectRows(visibleRepositories)
-			return
-		}
-
-		const matchingIds = new Set(visibleRepositories.map((row) => row.id))
-		rowSelection = Object.fromEntries(
-			Object.entries(rowSelection).filter(([id]) => !matchingIds.has(id)),
-		)
-		scheduleMetadata()
-	}
-
 	function applyWorkingTreeFilter() {
 		table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
 		scheduleMetadata()
@@ -1000,6 +985,7 @@
 				void stop(run.id)
 			}
 		},
+		'edit.selectAll': selection.selectAll,
 		'metadata.checkDependencies'() {
 			void refreshMetadata(['updates'])
 		},
@@ -1009,23 +995,21 @@
 		'preferences.open'() {
 			void appWindows.open({ kind: 'preferences' })
 		},
-		'repositories.deselectAll'() {
-			rowSelection = {}
-			scheduleMetadata()
-		},
+		'repositories.deselectAll': selection.clear,
 		'repositories.open'(payload) {
 			if (isOpenTarget(payload)) {
 				void openSelected(payload)
 			}
 		},
 		'repositories.selectAll'() {
-			selectMatching(true)
+			selection.setAll(true)
 		},
 		'repositories.selectChanged'() {
-			selectRows(
-				visibleRepositories.filter(
-					(row) => row.original.gitStatusAvailable && row.original.changedFiles > 0,
-				),
+			selection.set(
+				visibleRepositories
+					.filter((row) => row.original.gitStatusAvailable && row.original.changedFiles > 0)
+					.map((row) => row.id),
+				true,
 			)
 		},
 		'runs.clearFinished': clearFinishedRuns,
@@ -1070,6 +1054,8 @@
 		},
 	}
 </script>
+
+<svelte:window onkeydown={data.isElectron ? undefined : selection.shortcut} />
 
 <svelte:head>
 	<title>AllWork</title>
@@ -1343,8 +1329,8 @@
 													disabled={visibleRepositories.length === 0}
 													indeterminate={targets.length > 0 &&
 														targets.length < visibleRepositories.length}
-													onchange={(event) => {
-														selectMatching(event.currentTarget.checked)
+													onchange={() => {
+														selection.setAll(targets.length < visibleRepositories.length)
 													}}
 													type="checkbox"
 												/></label
@@ -1434,11 +1420,12 @@
 										data-column-id={cell.column.id}
 										title={tooltip}
 									>
-										{#if cell.column.id === 'select'}<label class="selection-hit-area"
+										{#if cell.column.id === 'select'}<label
+												class="selection-hit-area"
+												{@attach selection.checkbox(row.id)}
 												><input
 													aria-label="Select {repository.name}"
 													checked={row.getIsSelected()}
-													onchange={row.getToggleSelectedHandler()}
 													type="checkbox"
 												/></label
 											>

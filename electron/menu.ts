@@ -1,5 +1,5 @@
 import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
-import { app, Menu, shell } from 'electron'
+import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
 import { commandPresets } from '../src/lib/command-presets.js'
 
@@ -24,7 +24,11 @@ type Send = (command: MenuCommand, payload?: string) => void
 
 const separator: MenuItemConstructorOptions = { type: 'separator' }
 
-function buildTemplate(state: MenuState, send: Send): MenuItemConstructorOptions[] {
+function buildTemplate(
+	state: MenuState,
+	send: Send,
+	selectAll: () => void,
+): MenuItemConstructorOptions[] {
 	const isMac = process.platform === 'darwin'
 
 	function item(
@@ -91,7 +95,7 @@ function buildTemplate(state: MenuState, send: Send): MenuItemConstructorOptions
 			{ role: 'copy' },
 			{ role: 'paste' },
 			{ role: 'delete' },
-			{ role: 'selectAll' },
+			{ accelerator: 'CmdOrCtrl+A', click: selectAll, label: 'Select All' },
 			separator,
 			item('Filter Repositories…', 'view.focusFilter', { accelerator: 'CmdOrCtrl+F' }),
 		],
@@ -126,7 +130,6 @@ function buildTemplate(state: MenuState, send: Send): MenuItemConstructorOptions
 		label: 'Repositories',
 		submenu: [
 			item('Select All Matching', 'repositories.selectAll', {
-				accelerator: 'Shift+CmdOrCtrl+A',
 				enabled: state.visibleCount > 0,
 			}),
 			item('Select Repositories with Changes', 'repositories.selectChanged', {
@@ -246,5 +249,15 @@ export function syncMenu(state: MenuState, getWindow: () => BrowserWindow | unde
 		getWindow()?.webContents.send('allwork:menu-command', command, payload)
 	}
 
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildTemplate(state, send)))
+	// The main window decides between its text fields and its rows; other windows select text
+	const selectAll = () => {
+		const focused = webContents.getFocusedWebContents()
+		if (focused === null || focused === getWindow()?.webContents) {
+			send('edit.selectAll')
+		} else {
+			focused.selectAll()
+		}
+	}
+
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildTemplate(state, send, selectAll)))
 }

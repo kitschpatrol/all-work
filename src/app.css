@@ -861,7 +861,9 @@ th.last-output-cell {
 	background: #f4f5f7;
 }
 
+/* Shift-clicking checkboxes extends the row selection, never a text selection */
 .selection-cell {
+	user-select: none;
 	position: sticky;
 	z-index: 2;
 	left: 0;
