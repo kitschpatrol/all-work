@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, Repository } from './workspace.js'
 import {
+	formatColumnCellValue,
 	getColumnDisplay,
 	getColumnEnvironment,
 	getColumnVariables,
@@ -67,6 +68,20 @@ describe('column variables', () => {
 		expect(
 			Object.fromEntries(Object.keys(expected).map((id) => [id, getColumnDisplay(id)])),
 		).toEqual(expected)
+	})
+
+	it('title-cases Metascope status keywords in cells but keeps them raw for commands', () => {
+		const status = (value: string) => ({
+			...repository,
+			metadata: { groups: {}, values: { Author: 'lowercase author', Status: value } },
+		})
+		expect(
+			['author', 'maintainer', 'observer', 'unknown'].map((value) =>
+				formatColumnCellValue(status(value), 'metadata:Status'),
+			),
+		).toEqual(['Author', 'Maintainer', 'Observer', 'Unknown'])
+		expect(formatColumnCellValue(status('author'), 'metadata:Author')).toBe('lowercase author')
+		expect(getColumnEnvironment(status('author')).ALLWORK_COLUMN_STATUS).toBe('author')
 	})
 
 	it('formats expanded metadata and keeps unknown values distinct from zero and false', () => {

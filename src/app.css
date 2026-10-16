@@ -842,7 +842,7 @@ td.output-cell {
 }
 
 th.last-output-cell {
-	z-index: 4;
+	z-index: 5;
 }
 
 .table-filler {
@@ -880,7 +880,43 @@ th.last-output-cell {
 
 th.selection-cell,
 th.repository-cell {
+	z-index: 5;
+}
+
+/* Clicking anywhere in a selection cell toggles its checkbox */
+.selection-hit-area {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	justify-content: center;
+}
+
+/* A dragged column floats over its neighbors but passes beneath the pinned columns */
+.column-dragged {
+	box-shadow:
+		-1px 0 #c5ccd6,
+		1px 0 #c5ccd6;
+}
+
+td.column-dragged {
+	position: relative;
+	z-index: 1;
+}
+
+th.column-dragged {
 	z-index: 4;
+	background: linear-gradient(#f3f3f3, #e3e3e3);
+}
+
+/* Hover states and tooltips would flicker beneath the pointer while a column moves */
+.column-dragging {
+	user-select: none;
+}
+
+.column-dragging table {
+	pointer-events: none;
 }
 
 .sort-button {
@@ -1310,6 +1346,7 @@ tr.selected
 	min-height: 24px;
 	padding: 3px 8px;
 	font-size: 11px;
+	font-variant-numeric: tabular-nums;
 	color: var(--text-secondary);
 	background: linear-gradient(#f1f1f1, #dddddd);
 	box-shadow: inset 0 1px #fff;

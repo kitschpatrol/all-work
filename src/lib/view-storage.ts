@@ -5,6 +5,7 @@ import { asRecord, parsePreferences } from './preferences.js'
 export type SavedView = {
 	autoClear: boolean
 	autoClearPredecessors: Record<string, string>
+	columnOrder: string[]
 	columnSizing: Record<string, number>
 	columnVisibility: Record<string, boolean>
 	command: string
@@ -56,6 +57,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 				(entry): entry is [string, string] => typeof entry[1] === 'string',
 			),
 		),
+		columnOrder: strings(record.columnOrder),
 		columnSizing: Object.fromEntries(
 			Object.entries(asRecord(record.columnSizing) ?? {}).filter(
 				(entry): entry is [string, number] =>

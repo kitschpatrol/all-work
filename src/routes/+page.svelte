@@ -13,6 +13,7 @@
 	} from '#lib/workspace.js'
 	import {
 		columnFilteringFeature,
+		columnOrderingFeature,
 		columnResizingFeature,
 		columnSizingFeature,
 		columnVisibilityFeature,
@@ -30,15 +31,16 @@
 	} from '@tanstack/svelte-table'
 	import AppTitle from '#lib/AppTitle.svelte'
 	import AppWindows from '#lib/AppWindows.svelte'
+	import CellContent from '#lib/CellContent.svelte'
 	import { request } from '#lib/client-request.js'
+	import { startColumnDrag } from '#lib/column-drag.js'
+	import { resolveColumnOrder } from '#lib/column-order.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
-		formatColumnCellValue,
 		getColumnDisplay,
 		getColumnPreviewTooltip,
 		getColumnTooltip,
 		getColumnVariables,
-		getMetadataPlaceholder,
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import CommandForm from '#lib/CommandForm.svelte'
@@ -48,11 +50,9 @@
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
-	import OutputPreview from '#lib/OutputPreview.svelte'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositoryLink } from '#lib/repository-links.js'
-	import RepositoryCell from '#lib/RepositoryCell.svelte'
-	import { formatDate, getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
+	import { getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
@@ -78,6 +78,8 @@
 	let selectedOnly = $state(false)
 	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
+	let columnOrder: string[] = $state([])
+	let draggingColumnId = $state<string>()
 	let runs: CommandRun[] = $state([])
 	let filterInput = $state<HTMLInputElement>()
 	let appWindows: {
@@ -106,6 +108,7 @@
 
 	const features = tableFeatures({
 		columnFilteringFeature,
+		columnOrderingFeature,
 		columnResizingFeature,
 		columnSizingFeature,
 		columnVisibilityFeature,
@@ -160,6 +163,17 @@
 			sortFn: 'text',
 		})),
 	])
+	const pinnedColumns = $derived({
+		start: ['select', 'relativePath'],
+		end: runs.slice(-1).map((run) => run.id),
+	})
+	const resolvedColumnOrder = $derived(
+		resolveColumnOrder(
+			columns.flatMap((column) => column.id ?? []),
+			columnOrder,
+			pinnedColumns,
+		),
+	)
 	const columnVariables = $derived(getColumnVariables(runs))
 	const repositories = $derived(
 		(workspace?.repositories ?? []).filter(
@@ -189,6 +203,9 @@
 			scheduleMetadata()
 		},
 		state: {
+			get columnOrder() {
+				return resolvedColumnOrder
+			},
 			get rowSelection() {
 				return rowSelection
 			},
@@ -208,6 +225,7 @@
 	const viewSnapshot = $derived<SavedView>({
 		autoClear,
 		autoClearPredecessors: Object.fromEntries(autoClearPredecessors),
+		columnOrder,
 		columnSizing: table.atoms.columnSizing.get(),
 		columnVisibility: table.atoms.columnVisibility.get(),
 		command,
@@ -249,6 +267,7 @@
 		}
 
 		autoClear = view.autoClear
+		columnOrder = view.columnOrder
 		command = view.command
 		commandHistory = view.commandHistory
 		concurrency = view.concurrency
@@ -335,6 +354,7 @@
 		directory = workspace?.directory ?? data.defaultDirectory
 		recursive = true
 		autoClear = false
+		columnOrder = []
 		command = ''
 		concurrency = 6
 		outputLines = 3
@@ -905,6 +925,27 @@
 		})
 	}
 
+	function startDrag(event: PointerEvent, columnId: string) {
+		if (
+			!(event.target instanceof Element) ||
+			!event.target.closest('.resize-handle, .run-actions')
+		) {
+			startColumnDrag(event, {
+				columns: () => table.getVisibleLeafColumns(),
+				id: columnId,
+				onDragging(id) {
+					draggingColumnId = id
+				},
+				onReorder(order) {
+					columnOrder = order
+				},
+				order: () => resolvedColumnOrder,
+				pinned: () => pinnedColumns,
+				scroller: tableScroll,
+			})
+		}
+	}
+
 	function showError(error: unknown) {
 		errorMessage = error instanceof Error ? error.message : String(error)
 	}
@@ -1221,7 +1262,7 @@
 						>{/if}
 					<MetadataControls
 						columns={table
-							.getAllLeafColumns()
+							.getAllFlatColumns()
 							.filter((column) => column.getCanHide())
 							.map((column) => {
 								const definition = repositoryColumns.find((entry) => entry.id === column.id)
@@ -1277,6 +1318,7 @@
 										(item) => item.id === header.column.id,
 									)}{@const pinned = run !== undefined && run === runs.at(-1)}<th
 										style:width="{header.getSize()}px"
+										class:column-dragged={draggingColumnId === header.column.id}
 										class:last-output-cell={pinned}
 										class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
 										class:output-header={run !== undefined}
@@ -1288,20 +1330,25 @@
 												? 'descending'
 												: undefined}
 										data-column-id={header.column.id}
+										onpointerdown={(event) => {
+											startDrag(event, header.column.id)
+										}}
 										title={previewColumn(header.column.id)}
 									>
-										{#if header.column.id === 'select'}<input
-												aria-label="Select all matching repositories"
-												checked={visibleRepositories.length > 0 &&
-													targets.length === visibleRepositories.length}
-												disabled={visibleRepositories.length === 0}
-												indeterminate={targets.length > 0 &&
-													targets.length < visibleRepositories.length}
-												onchange={(event) => {
-													selectMatching(event.currentTarget.checked)
-												}}
-												type="checkbox"
-											/>
+										{#if header.column.id === 'select'}<label class="selection-hit-area"
+												><input
+													aria-label="Select all matching repositories"
+													checked={visibleRepositories.length > 0 &&
+														targets.length === visibleRepositories.length}
+													disabled={visibleRepositories.length === 0}
+													indeterminate={targets.length > 0 &&
+														targets.length < visibleRepositories.length}
+													onchange={(event) => {
+														selectMatching(event.currentTarget.checked)
+													}}
+													type="checkbox"
+												/></label
+											>
 										{:else if run !== undefined}<div class="run-header">
 												<button
 													class="sort-button run-sort-button"
@@ -1375,80 +1422,35 @@
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
-									)}{@const result = run?.results[repository.id]}{@const tooltip = getColumnTooltip(
-										repository,
-										cell.column.id,
-									)}{@const display = getColumnDisplay(cell.column.id)}<td
+									)}{@const tooltip = getColumnTooltip(repository, cell.column.id)}{@const display =
+										getColumnDisplay(cell.column.id)}<td
 										style:width="{cell.column.getSize()}px"
+										class:column-dragged={draggingColumnId === cell.column.id}
 										class:last-output-cell={run !== undefined && run === runs.at(-1)}
 										class:numeric-cell={display === 'number'}
 										class:output-cell={run !== undefined}
 										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}
+										data-column-id={cell.column.id}
 										title={tooltip}
 									>
-										{#if cell.column.id === 'select'}<input
-												aria-label="Select {repository.name}"
-												checked={row.getIsSelected()}
-												onchange={row.getToggleSelectedHandler()}
-												type="checkbox"
-											/>
-										{:else if cell.column.id === 'relativePath'}<RepositoryCell
+										{#if cell.column.id === 'select'}<label class="selection-hit-area"
+												><input
+													aria-label="Select {repository.name}"
+													checked={row.getIsSelected()}
+													onchange={row.getToggleSelectedHandler()}
+													type="checkbox"
+												/></label
+											>
+										{:else}<CellContent
+												columnId={cell.column.id}
+												onInspect={inspect}
 												onOpen={openInApp}
+												{outputLines}
 												{repository}
+												{runs}
 												{tooltip}
-											/>
-										{:else if cell.column.id === 'name'}<span
-												class="project-name"
-												title={repository.description === ''
-													? tooltip
-													: `${tooltip}\n${repository.description}`}>{repository.name}</span
-											>
-										{:else if cell.column.id === 'branch'}<span class="branch" title={tooltip}
-												>⑂ {repository.branch === ''
-													? getMetadataPlaceholder(repository, 'branch')
-													: repository.branch}</span
-											>
-										{:else if cell.column.id === 'changedFiles'}<span
-												class="status-badge"
-												class:dirty={repository.changedFiles > 0}
-												><span class="status-dot"></span>{repository.gitStatusAvailable
-													? repository.changedFiles > 0
-														? `${repository.changedFiles} changed`
-														: 'Clean'
-													: getMetadataPlaceholder(repository, 'changedFiles')}</span
-											>
-										{:else if cell.column.id === 'sync'}<span
-												class="sync-value"
-												title={`${tooltip}\nTotals across locally cached remotes; no fetch is performed`}
-												>{repository.ahead > 0 || repository.behind > 0
-													? `↑${repository.ahead} ↓${repository.behind}`
-													: '—'}</span
-											>
-										{:else if cell.column.id === 'lastCommitDate'}<span
-												class="date-value"
-												title={repository.lastCommit === ''
-													? tooltip
-													: `${tooltip}\n${repository.lastCommit}`}
-												>{repository.lastCommitDate === '' &&
-												repository.metadata?.groups.git?.status !== 'ready'
-													? getMetadataPlaceholder(repository, 'lastCommitDate')
-													: formatDate(repository.lastCommitDate)}</span
-											>
-										{:else if run !== undefined}{#if result !== undefined}<OutputPreview
-													label="View output for {repository.name}"
-													lineLimit={outputLines}
-													onInspect={() => {
-														inspect(run, repository)
-													}}
-													{result}
-												/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
-										{:else}<span
-												class="cell-text"
-												class:monospace={display !== 'text'}
-												title={tooltip}
-												>{formatColumnCellValue(repository, cell.column.id, runs)}</span
-											>{/if}
+											/>{/if}
 									</td>{/each}<td class="table-filler" aria-hidden="true"></td></tr
 							>{/each}</tbody
 					>

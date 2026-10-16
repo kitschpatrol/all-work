@@ -77,6 +77,7 @@ describe('shared JSON view persistence', () => {
 		expect(
 			parseSavedView(
 				{
+					columnOrder: ['version', 7, 'name'],
 					columnSizing: { huge: 5000, negative: -1, valid: 120 },
 					concurrency: 100,
 					outputLines: 0,
@@ -87,6 +88,7 @@ describe('shared JSON view persistence', () => {
 				'/default',
 			),
 		).toMatchObject({
+			columnOrder: ['version', 'name'],
 			columnSizing: { valid: 120 },
 			concurrency: 6,
 			outputLines: 3,

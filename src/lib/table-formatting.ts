@@ -1,5 +1,5 @@
 import type { CommandRun, Repository } from './workspace.js'
-import { getColumnValue } from './column-variables.js'
+import { formatColumnCellValue } from './column-variables.js'
 
 /** Format the latest commit date for a compact table cell. */
 export function formatDate(value: string) {
@@ -60,10 +60,10 @@ export function getColumnSizingValue(
 	}
 
 	if (columnId === 'changedFiles') {
-		return repository.changedFiles === 0 ? 'Clean' : `${repository.changedFiles} changed`
+		return repository.changedFiles === 0 ? 'Clean' : `${repository.changedFiles} Changed`
 	}
 
 	return columnId === 'branch'
 		? `⑂ ${repository.branch}`
-		: String(getColumnValue(repository, columnId, runs) ?? '').slice(0, 8000)
+		: formatColumnCellValue(repository, columnId, runs).slice(0, 8000)
 }

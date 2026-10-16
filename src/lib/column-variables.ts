@@ -111,6 +111,9 @@ export const repositoryColumns: RepositoryColumn[] = [
 ]
 
 const spacesPattern = /\s+/gv
+const wordStartPattern = /(?<!\p{L})\p{Ll}/gv
+// Metascope reports authorship status as lowercase keywords
+const titleCasedColumns = new Set(['metadata:Status'])
 const commandVariablePattern = /\$\{?(ALLWORK_COLUMN_\w+)/gv
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
 const repositoryVariables = new Map(
@@ -155,7 +158,7 @@ function findVariable(id: string, runs: readonly CommandRun[]) {
  * Read current row values without retaining a table accessor's older cached
  * value.
  */
-export function getColumnValue(
+function getColumnValue(
 	repository: Repository,
 	columnId: string,
 	runs: readonly CommandRun[] = [],
@@ -276,7 +279,9 @@ export function formatColumnCellValue(
 			? value
 				? 'Yes'
 				: 'No'
-			: String(value)
+			: titleCasedColumns.has(columnId)
+				? String(value).replaceAll(wordStartPattern, (letter) => letter.toUpperCase())
+				: String(value)
 }
 
 /** Describe a missing value without confusing it with zero or false. */
