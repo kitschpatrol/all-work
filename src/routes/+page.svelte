@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { ColumnDef, Row, RowSelectionState } from '@tanstack/svelte-table'
+	import type { Preferences } from '#lib/preferences.js'
+	import type { SavedView } from '#lib/view-storage.js'
 	import type {
 		CommandRun,
 		MetadataGroup,
@@ -24,6 +26,7 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
+	import { request } from '#lib/client-request.js'
 	import {
 		formatColumnCellValue,
 		getColumnPreviewTooltip,
@@ -34,21 +37,19 @@
 	} from '#lib/column-variables.js'
 	import { commandPresets } from '#lib/command-presets.js'
 	import CommandAutocomplete from '#lib/CommandAutocomplete.svelte'
-	import FolderIcon from '#lib/FolderIcon.svelte'
-	import GithubIcon from '#lib/GithubIcon.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import NumberField from '#lib/NumberField.svelte'
+	import OutputDialog from '#lib/OutputDialog.svelte'
 	import OutputPreview from '#lib/OutputPreview.svelte'
-	import { getGithubUrl } from '#lib/repository-links.js'
-	import {
-		formatDate,
-		getColumnSizingValue,
-		runProgress,
-		vscodeUrl,
-	} from '#lib/table-formatting.js'
+	import { defaultPreferences, parseIdentity } from '#lib/preferences.js'
+	import PreferencesDialog from '#lib/PreferencesDialog.svelte'
+	import RepositoryCell from '#lib/RepositoryCell.svelte'
+	import { formatDate, getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
+	import { savePreferences } from '#lib/view-storage.js'
+	import ViewPersistence from '#lib/ViewPersistence.svelte'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
@@ -74,7 +75,12 @@
 	let rowSelection: RowSelectionState = $state({})
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
-	let outputDialog: HTMLDialogElement
+	let outputDialog: { close: () => void; show: () => void }
+	let persistence: { reset: () => void }
+	let preferences = $state(defaultPreferences())
+	let savedView = $state<SavedView>()
+	let pendingScroll = $state<SavedView['scroll']>()
+	let scrollPosition = $state({ left: 0, top: 0 })
 	let commandInput = $state<HTMLInputElement>()
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
@@ -179,7 +185,9 @@
 	const visibleRepositories = $derived(table.getRowModel().rows)
 	const targets = $derived(visibleRepositories.filter((row) => rowSelection[row.id]))
 	const previewRepository = $derived(targets[0]?.original ?? visibleRepositories[0]?.original)
-	const selectedCount = $derived(Object.values(rowSelection).filter(Boolean).length)
+	const selectedCount = $derived(
+		workspace === undefined ? 0 : Object.values(rowSelection).filter(Boolean).length,
+	)
 	const activeRuns = $derived(runs.filter((run) => !run.finished))
 	const dirtyCount = $derived(
 		workspace?.repositories.filter((repository) => repository.changedFiles > 0).length ?? 0,
@@ -192,27 +200,152 @@
 		inspected === undefined ? undefined : inspectedRun?.results[inspected.repositoryId],
 	)
 
-	onMount(() => {
-		directory = localStorage.getItem('allwork.directory') ?? data.defaultDirectory
-		recursive = localStorage.getItem('allwork.recursive') !== 'false'
-		autoClear = localStorage.getItem('allwork.autoClear') === 'true'
-		const savedOutputLines = Number(localStorage.getItem('allwork.outputLines') ?? 3)
-		if (Number.isSafeInteger(savedOutputLines) && savedOutputLines >= 1) {
-			outputLines = savedOutputLines
-		}
-
-		try {
-			const history: unknown = JSON.parse(localStorage.getItem('allwork.commandHistory') ?? '[]')
-			if (Array.isArray(history) && history.every((entry: unknown) => typeof entry === 'string')) {
-				commandHistory = history.slice(-100)
-			}
-		} catch {
-			localStorage.removeItem('allwork.commandHistory')
-		}
-
-		void tick().then(() => fitColumns())
-		return disposeStreams
+	const viewSnapshot = $derived<SavedView>({
+		autoClear,
+		autoClearPredecessors: Object.fromEntries(autoClearPredecessors),
+		columnSizing: table.atoms.columnSizing.get(),
+		columnVisibility: table.atoms.columnVisibility.get(),
+		command,
+		commandHistory,
+		concurrency,
+		directory,
+		outputLines,
+		recursive,
+		resizedColumns: [...resizedColumns],
+		rowSelection,
+		runIds: workspace === undefined ? (savedView?.runIds ?? []) : runs.map((run) => run.id),
+		scroll: pendingScroll ?? scrollPosition,
+		search,
+		selectedOnly,
+		sorting: table.atoms.sorting.get(),
+		status: status === 'clean' || status === 'dirty' ? status : 'all',
+		version: 1,
+		workspaceDirectory: workspace?.directory ?? savedView?.workspaceDirectory,
 	})
+
+	onMount(() => disposeStreams)
+
+	function applySavedView(view: SavedView) {
+		autoClearPredecessors.clear()
+		for (const [id, previousId] of Object.entries(view.autoClearPredecessors)) {
+			autoClearPredecessors.set(id, previousId)
+		}
+
+		autoClear = view.autoClear
+		command = view.command
+		commandHistory = view.commandHistory
+		concurrency = view.concurrency
+		outputLines = view.outputLines
+		recursive = view.recursive
+		rowSelection = Object.fromEntries(
+			Object.entries(view.rowSelection)
+				.filter((entry) => entry[1])
+				.map(([id]) => [id, true as const]),
+		)
+		search = view.search
+		selectedOnly = view.selectedOnly
+		status = view.status
+		resizedColumns.clear()
+		for (const id of view.resizedColumns) {
+			resizedColumns.add(id)
+		}
+
+		if (Object.keys(view.columnVisibility).length > 0) {
+			table.setColumnVisibility(view.columnVisibility)
+		}
+
+		table.setColumnSizing(view.columnSizing)
+		table.setSorting(view.sorting.filter((sort) => columns.some((column) => column.id === sort.id)))
+		table.setGlobalFilter(search)
+		table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
+		pendingScroll = view.scroll
+	}
+
+	async function restoreView(view: SavedView, nextPreferences: Preferences) {
+		preferences = nextPreferences
+		savedView = view
+		directory = view.directory
+		applySavedView(view)
+		if (preferences.restoreWorkspace && view.workspaceDirectory !== undefined) {
+			directory = view.workspaceDirectory
+			await loadDirectory(view)
+			directory = view.directory
+		} else {
+			await tick()
+			if (Object.keys(view.columnSizing).length === 0) {
+				fitColumns()
+			}
+		}
+	}
+
+	function restoreScrollPosition() {
+		if (pendingScroll === undefined) {
+			return
+		}
+
+		tableScroll.scrollLeft = pendingScroll.left
+		tableScroll.scrollTop = pendingScroll.top
+		scrollPosition = pendingScroll
+		if (
+			workspace?.repositories.every((repository) =>
+				['local', 'git', 'code', 'files'].every((group) => {
+					const state = repository.metadata?.groups[group as MetadataGroup]?.status
+					return state !== undefined && state !== 'queued' && state !== 'loading'
+				}),
+			)
+		) {
+			pendingScroll = undefined
+		}
+	}
+
+	async function updatePreferences(next: Preferences) {
+		const identity = parseIdentity(next.identity)
+		if (identity === undefined) {
+			throw new Error('Use at most 100 author names and accounts, each under 200 characters.')
+		}
+
+		const normalized = { ...next, identity }
+		savePreferences(localStorage, normalized)
+		preferences = normalized
+		if (workspace !== undefined) {
+			await request('/api/workspace/metadata', {
+				force: true,
+				groups: ['local'],
+				identity: normalized.identity,
+				repositoryIds: workspace.repositories.map((repository) => repository.id),
+				workspaceId: workspace.id,
+			})
+		}
+	}
+
+	async function resetView() {
+		persistence.reset()
+		savedView = undefined
+		pendingScroll = undefined
+		directory = workspace?.directory ?? data.defaultDirectory
+		recursive = true
+		autoClear = false
+		command = ''
+		concurrency = 6
+		outputLines = 3
+		historyIndex = -1
+		commandDraft = ''
+		rowSelection = {}
+		search = ''
+		selectedOnly = false
+		status = 'all'
+		resizedColumns.clear()
+		table.resetColumnVisibility()
+		table.resetColumnSizing()
+		table.resetSorting()
+		table.resetColumnFilters()
+		table.setGlobalFilter('')
+		await tick()
+		fitColumns()
+		tableScroll.scrollLeft = 0
+		tableScroll.scrollTop = 0
+		scrollPosition = { left: 0, top: 0 }
+	}
 
 	function disposeStreams() {
 		closeStreams()
@@ -353,42 +486,38 @@
 		eventStream = undefined
 	}
 
-	async function request<T>(
-		url: string,
-		body: Record<string, unknown>,
-		method = 'POST',
-	): Promise<T> {
-		const response = await fetch(url, {
-			body: JSON.stringify(body),
-			headers: { 'Content-Type': 'application/json', 'X-Allwork-Request': '1' },
-			method,
-		})
-		const result: unknown = await response.json()
-		if (!response.ok) {
-			throw new Error(
-				typeof result === 'object' && result !== null && 'message' in result
-					? String(result.message)
-					: 'The request failed.',
-			)
-		}
-
-		return result as T
-	}
-
-	async function loadDirectory() {
+	async function loadDirectory(restored?: SavedView) {
 		if (loading || activeRuns.length > 0) {
 			return
 		}
+
+		restored ??=
+			workspace === undefined && directory.trim() === savedView?.workspaceDirectory
+				? savedView
+				: undefined
 
 		loading = true
 		errorMessage = ''
 		try {
 			const next = await request<Workspace>('/api/workspace', {
 				directory,
+				identity: preferences.identity,
 				previousWorkspaceId: workspace?.id,
 				recursive,
 			})
-			if (next.directory === workspace?.directory) {
+			if (restored !== undefined) {
+				runs = await request<CommandRun[]>('/api/runs/restore', {
+					ids: restored.runIds,
+					workspaceId: next.id,
+				})
+				applySavedView(restored)
+				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
+				rowSelection = Object.fromEntries(
+					Object.entries(rowSelection).filter(([id]) => repositoryIds.has(id)),
+				)
+				clearPreviousOutputs()
+				watchRuns()
+			} else if (next.directory === workspace?.directory) {
 				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
 				rowSelection = Object.fromEntries(
 					Object.entries(rowSelection).filter(([id]) => repositoryIds.has(id)),
@@ -418,15 +547,17 @@
 			workspace = next
 			watchMetadata(next.id)
 			directory = next.directory
-			localStorage.setItem('allwork.directory', directory)
-			localStorage.setItem('allwork.recursive', String(next.recursive))
 			await tick()
-			fitColumns(
-				table
-					.getAllLeafColumns()
-					.filter((column) => !resizedColumns.has(column.id))
-					.map((column) => column.id),
-			)
+			if (restored === undefined || Object.keys(restored.columnSizing).length === 0) {
+				fitColumns(
+					table
+						.getAllLeafColumns()
+						.filter((column) => !resizedColumns.has(column.id))
+						.map((column) => column.id),
+				)
+			}
+
+			restoreScrollPosition()
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		} finally {
@@ -463,6 +594,7 @@
 				}
 
 				scheduleMetadata()
+				void tick().then(restoreScrollPosition)
 				sizingTimer ??= setTimeout(() => {
 					sizingTimer = undefined
 					void tick().then(() =>
@@ -666,7 +798,6 @@
 			runs = [...runs, run]
 			if (commandHistory.at(-1) !== run.command) {
 				commandHistory = [...commandHistory, run.command].slice(-100)
-				localStorage.setItem('allwork.commandHistory', JSON.stringify(commandHistory))
 			}
 
 			historyIndex = -1
@@ -769,15 +900,7 @@
 
 	function inspect(runId: string, repositoryId: string) {
 		inspected = { repositoryId, runId }
-		outputDialog.showModal()
-	}
-
-	async function copyOutput() {
-		try {
-			await navigator.clipboard.writeText(inspectedResult?.output ?? '')
-		} catch {
-			errorMessage = 'Could not copy output to the clipboard.'
-		}
+		outputDialog.show()
 	}
 
 	function getRepositoryId(repository: Repository) {
@@ -807,6 +930,16 @@
 		content="Discover Git repositories, select a working set, and run shell commands in parallel."
 	/>
 </svelte:head>
+
+<ViewPersistence
+	bind:this={persistence}
+	defaultDirectory={data.defaultDirectory}
+	onError={(message: string) => {
+		errorMessage = message
+	}}
+	onRestore={restoreView}
+	snapshot={viewSnapshot}
+/>
 
 <div class="app-shell">
 	<header class="app-toolbar">
@@ -995,13 +1128,7 @@
 						class="auto-clear-option"
 						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
 					>
-						<input
-							aria-label="Auto clear"
-							onchange={(event) =>
-								localStorage.setItem('allwork.autoClear', String(event.currentTarget.checked))}
-							type="checkbox"
-							bind:checked={autoClear}
-						/>
+						<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
 						Auto clear
 					</label>
 					<div class="output-lines-control">
@@ -1011,7 +1138,6 @@
 							label="Output lines"
 							onChange={(value: number) => {
 								outputLines = value
-								localStorage.setItem('allwork.outputLines', String(value))
 							}}
 							value={outputLines}
 						/>
@@ -1073,7 +1199,25 @@
 					/>
 				</div>
 			</div>
-			<div bind:this={tableScroll} class="table-scroll" onscroll={scheduleMetadata}>
+			<div
+				bind:this={tableScroll}
+				class="table-scroll"
+				aria-label="Repository table"
+				onpointerdown={() => {
+					pendingScroll = undefined
+				}}
+				onscroll={() => {
+					scheduleMetadata()
+					scrollPosition = {
+						left: Math.round(tableScroll.scrollLeft),
+						top: Math.round(tableScroll.scrollTop),
+					}
+				}}
+				onwheel={() => {
+					pendingScroll = undefined
+				}}
+				role="region"
+			>
 				<table style:width="max(100%, {table.getTotalSize()}px)">
 					<colgroup>
 						{#each table.getVisibleLeafColumns() as column (column.id)}
@@ -1203,130 +1347,11 @@
 												onchange={row.getToggleSelectedHandler()}
 												type="checkbox"
 											/>
-										{:else if cell.column.id === 'relativePath'}{@const githubUrl = getGithubUrl(
-												repository.remote,
-											)}
-											<div class="repository-heading">
-												<div class="repository-name" title={`${tooltip}\n${repository.path}`}>
-													<FolderIcon /><strong>{repository.relativePath}</strong>
-												</div>
-												{#if repository.error !== undefined}<span
-														class="metadata-error"
-														aria-label="Metadata incomplete"
-														title={repository.error}>!</span
-													>{/if}
-												<div class="repository-actions">
-													<button
-														class="repository-action"
-														aria-label="Open {repository.name} in Tower"
-														onclick={async () => openInApp(repository, 'tower')}
-														title="Open in Tower"
-														type="button"
-													>
-														<svg
-															aria-hidden="true"
-															fill="none"
-															height="16"
-															viewBox="0 0 16 16"
-															width="16"
-															><path
-																d="M3.5 1.5h2v2h2v-2h1v2h2v-2h2v4l-1 1v7h-7v-7l-1-1v-4Z"
-																stroke="currentColor"
-																stroke-linejoin="round"
-															/><path d="M7 13.5v-3h2v3M6.5 7.5h3" stroke="currentColor" /></svg
-														>
-													</button>
-													<a
-														class="repository-action"
-														aria-label="Open {repository.name} in VS Code"
-														href={vscodeUrl(repository.path)}
-														rel="external"
-														title="Open in VS Code"
-													>
-														<svg
-															aria-hidden="true"
-															fill="none"
-															height="16"
-															viewBox="0 0 16 16"
-															width="16"
-															><path
-																d="m11 1.5 3 1.3v10.4l-3 1.3-7-5.2-2 1.5-1-1V6.2l1-1 2 1.5 7-5.2Z"
-																stroke="currentColor"
-																stroke-linejoin="round"
-															/><path
-																d="M11 1.5v13M4 6.7 11 12M4 9.3 11 4"
-																stroke="currentColor"
-															/></svg
-														>
-													</a>
-													{#if githubUrl !== undefined}
-														<a
-															class="repository-action"
-															aria-label="Open {repository.name} in GitHub"
-															href={githubUrl}
-															rel="external noopener noreferrer"
-															target="_blank"
-															title="Open in GitHub"><GithubIcon /></a
-														>
-													{:else}
-														<button
-															class="repository-action"
-															aria-label="No GitHub origin remote for {repository.name}"
-															disabled
-															title="No GitHub origin remote"
-															type="button"><GithubIcon /></button
-														>
-													{/if}
-													<button
-														class="repository-action"
-														aria-label="Open {repository.name} in Finder"
-														onclick={async () => openInApp(repository, 'finder')}
-														title="Open in Finder"
-														type="button"
-													>
-														<svg
-															aria-hidden="true"
-															fill="none"
-															height="16"
-															viewBox="0 0 16 16"
-															width="16"
-															><path
-																d="M1.5 4a1 1 0 0 1 1-1H6l1.5 2h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4Z"
-																stroke="currentColor"
-																stroke-linejoin="round"
-															/></svg
-														>
-													</button>
-													<button
-														class="repository-action"
-														aria-label="Open {repository.name} in default terminal"
-														onclick={async () => openInApp(repository, 'terminal')}
-														title="Open in default terminal"
-														type="button"
-													>
-														<svg
-															aria-hidden="true"
-															fill="none"
-															height="16"
-															viewBox="0 0 16 16"
-															width="16"
-															><rect
-																height="11"
-																rx="1"
-																stroke="currentColor"
-																width="13"
-																x="1.5"
-																y="2.5"
-															/><path
-																d="m4 6 2 2-2 2m4 0h3"
-																stroke="currentColor"
-																stroke-linecap="round"
-																stroke-linejoin="round"
-															/></svg
-														>
-													</button>
-												</div>
-											</div>
+										{:else if cell.column.id === 'relativePath'}<RepositoryCell
+												onOpen={openInApp}
+												{repository}
+												{tooltip}
+											/>
 										{:else if cell.column.id === 'name'}<span
 												class="project-name"
 												title={repository.description === ''
@@ -1416,43 +1441,33 @@
 								),
 						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
 				>
+				<PreferencesDialog
+					onClearCache={async () => {
+						await request('/api/cache', {}, 'DELETE')
+					}}
+					onResetAll={async () => {
+						commandHistory = []
+						await updatePreferences(defaultPreferences())
+						await resetView()
+					}}
+					onResetView={resetView}
+					onSave={updatePreferences}
+					{preferences}
+				/>
 			</footer>
 		</section>
 	</main>
 </div>
 
-<dialog
+<OutputDialog
 	bind:this={outputDialog}
-	class="output-dialog"
-	onclose={() => {
+	onClose={() => {
 		inspected = undefined
 	}}
->
-	<div class="dialog-heading">
-		<button
-			class="remove-button dialog-close-button"
-			aria-label="Close output"
-			onclick={() => outputDialog.close()}
-			type="button">×</button
-		>
-		<div>
-			<span class="eyebrow">{inspectedRepository?.name}</span>
-			<h2><code>$ {inspectedRun?.command}</code></h2>
-			<p>{inspectedRepository?.path}</p>
-		</div>
-	</div>
-	<div class="dialog-toolbar">
-		<span
-			>{inspectedResult?.status}{inspectedResult?.exitCode === undefined
-				? ''
-				: ` · exit ${inspectedResult.exitCode}`}</span
-		><button class="button subtle" onclick={async () => copyOutput()} type="button"
-			>Copy output</button
-		>
-	</div>
-	<pre class="full-output">{inspectedResult?.output === ''
-			? 'No output yet.'
-			: (inspectedResult?.output ?? 'No output yet.')}{inspectedResult?.truncated === true
-			? '\n\n[Output truncated at 128,000 characters. The command continues to run.]'
-			: ''}</pre>
-</dialog>
+	onError={(message: string) => {
+		errorMessage = message
+	}}
+	repository={inspectedRepository}
+	result={inspectedResult}
+	run={inspectedRun}
+/>

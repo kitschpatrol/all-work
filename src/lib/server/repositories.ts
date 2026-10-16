@@ -1,3 +1,4 @@
+import type { ProjectIdentity } from '#lib/preferences.js'
 import type { Repository, Workspace } from '#lib/workspace.js'
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
@@ -142,7 +143,11 @@ async function createRepository(directory: string, root: string): Promise<Reposi
 }
 
 /** Find Git roots and worktrees at the chosen depth, without following symlinks. */
-export async function scanWorkspace(input: string, recursive = true): Promise<Workspace> {
+export async function scanWorkspace(
+	input: string,
+	recursive = true,
+	identity?: ProjectIdentity,
+): Promise<Workspace> {
 	const expanded =
 		input === '~'
 			? os.homedir()
@@ -158,6 +163,7 @@ export async function scanWorkspace(input: string, recursive = true): Promise<Wo
 	const workspace: Workspace = {
 		directory,
 		id: randomUUID(),
+		identity,
 		recursive,
 		repositories: [],
 		warnings: [],

@@ -267,6 +267,57 @@ describe('progressive Metascope metadata', () => {
 		expect(reloaded.repositories[0]?.metadata?.values['Latest Release Version']).toBe('2.0.0')
 	})
 
+	it('uses the workspace identity in Metascope and recomputes classifications when preferences change', async () => {
+		vi.mocked(extractMetadata).mockResolvedValue(
+			context({
+				nodePackageJson: {
+					data: {
+						// eslint-disable-next-line ts/naming-convention -- Normalized package metadata requires the npm _id field.
+						_id: 'fixture@1.0.0',
+						author: 'Fixture Author',
+						name: 'fixture',
+						readme: '',
+						repository: { type: 'git', url: 'https://github.com/fixture-owner/fixture' },
+						version: '1.0.0',
+					},
+					source: 'fixture',
+				},
+			}),
+		)
+		const workspace = fixture()
+		workspace.identity = { authorNames: ['Someone Else'], githubAccounts: ['other'] }
+		const controller = begin(workspace)
+		await ready(workspace)
+		expect(workspace.repositories[0]?.metadata?.values.Status).toBe('observer')
+		workspace.identity = { authorNames: ['Fixture Author'], githubAccounts: ['fixture-owner'] }
+		controller.request(['fixture'], ['local'], true)
+		await vi.waitFor(() =>
+			expect(workspace.repositories[0]?.metadata?.values.Status).toBe('author'),
+		)
+	})
+
+	it('keeps cached classifications and remote metadata separate for different identities', async () => {
+		const workspace = fixture()
+		workspace.identity = { authorNames: ['First'], githubAccounts: ['first'] }
+		const controller = begin(workspace)
+		await ready(workspace)
+		vi.mocked(extractMetadata).mockResolvedValueOnce(
+			Object.assign(context(), {
+				github: { data: { isFork: false, isPrivate: true, stargazerCount: 7 }, source: 'fixture' },
+			}),
+		)
+		controller.request(['fixture'], ['github'], true)
+		await vi.waitFor(() => expect(workspace.repositories[0]?.metadata?.values.Stars).toBe(7))
+		await vi.waitFor(async () =>
+			expect(await readdir(path.join(temporaryDirectory, 'cache'))).toHaveLength(1),
+		)
+		const reloaded = fixture()
+		reloaded.identity = { authorNames: ['Second'], githubAccounts: ['second'] }
+		begin(reloaded)
+		await ready(reloaded)
+		expect(reloaded.repositories[0]?.metadata?.values.Stars).toBeUndefined()
+	})
+
 	it('limits work to four repositories and coalesces duplicate source requests', async () => {
 		const workspace = fixture()
 		const original = workspace.repositories[0]

@@ -1,6 +1,7 @@
 import type { MetadataGroup } from '#lib/workspace.js'
 import { error } from '@sveltejs/kit'
 import { metadataGroups } from '#lib/metadata-columns.js'
+import { parseIdentity } from '#lib/preferences.js'
 import { getWorkspace, requestWorkspaceMetadata } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
 import type { RequestHandler } from './$types'
@@ -32,6 +33,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		(body.force !== undefined && typeof body.force !== 'boolean')
 	) {
 		error(400, 'Choose valid metadata sources.')
+	}
+
+	if (body.identity !== undefined) {
+		const identity = parseIdentity(body.identity)
+		if (identity === undefined) {
+			error(400, 'Enter valid author names and GitHub accounts.')
+		}
+
+		workspace.identity = identity
 	}
 
 	requestWorkspaceMetadata(

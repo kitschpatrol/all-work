@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit'
+import { defaultPreferences, parseIdentity } from '#lib/preferences.js'
 import { forgetWorkspace, scanWorkspace } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
 import type { RequestHandler } from './$types'
@@ -14,8 +15,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		error(400, 'Recursive must be a checkbox value.')
 	}
 
+	const identity =
+		body.identity === undefined ? defaultPreferences().identity : parseIdentity(body.identity)
+	if (identity === undefined) {
+		error(400, 'Enter valid author names and GitHub accounts.')
+	}
+
 	try {
-		const workspace = await scanWorkspace(body.directory.trim(), recursive)
+		const workspace = await scanWorkspace(body.directory.trim(), recursive, identity)
 		if (typeof body.previousWorkspaceId === 'string') {
 			forgetWorkspace(body.previousWorkspaceId)
 		}

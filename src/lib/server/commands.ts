@@ -5,11 +5,14 @@ import { execa } from 'execa'
 import { randomUUID } from 'node:crypto'
 import { stripVTControlCharacters } from 'node:util'
 import { verifyRepository } from './repositories.js'
+import { deleteRunCache, readRunCache, saveRunCache } from './run-cache.js'
 import { userShellCommand } from './user-shell.js'
 
 type Job = {
+	cacheTimer?: ReturnType<typeof setTimeout>
 	cancelled: boolean
 	controller: AbortController
+	deleted: boolean
 	environments: Map<string, Record<string, string>>
 	listeners: Set<(event: RunEvent) => void>
 	run: CommandRun
@@ -23,6 +26,15 @@ function isCancelled(job: Job) {
 }
 
 function emit(job: Job, event: RunEvent) {
+	if (event.type === 'result' && !job.deleted) {
+		job.cacheTimer ??= setTimeout(() => {
+			job.cacheTimer = undefined
+			if (!job.deleted) {
+				void saveRunCache(job.run)
+			}
+		}, 500)
+	}
+
 	for (const listener of job.listeners) {
 		listener(event)
 	}
@@ -130,6 +142,7 @@ export function startRun(
 	const job: Job = {
 		cancelled: false,
 		controller: new AbortController(),
+		deleted: false,
 		environments: new Map(
 			repositories.map((repository) => [
 				repository.id,
@@ -140,6 +153,7 @@ export function startRun(
 		run,
 	}
 	jobs.set(run.id, job)
+	void saveRunCache(run)
 	let next = 0
 	void Promise.all(
 		Array.from({ length: Math.min(concurrency, repositories.length) }, async () => {
@@ -150,8 +164,13 @@ export function startRun(
 				}
 			}
 		}),
-	).then(() => {
+	).then(async () => {
 		job.environments.clear()
+		clearTimeout(job.cacheTimer)
+		if (!job.deleted) {
+			await saveRunCache({ ...run, finished: true })
+		}
+
 		run.finished = true
 		emit(job, { type: 'finished' })
 	})
@@ -204,6 +223,62 @@ export function stopRun(id: string): void {
 
 /** Release a run's history after stopping any remaining commands. */
 export function deleteRun(id: string): void {
+	const job = jobs.get(id)
+	if (job !== undefined) {
+		job.deleted = true
+		clearTimeout(job.cacheTimer)
+	}
+
 	stopRun(id)
 	jobs.delete(id)
+	void deleteRunCache(id)
+}
+
+function markInterrupted(run: CommandRun) {
+	for (const result of Object.values(run.results)) {
+		if (result.status !== 'queued' && result.status !== 'running') {
+			continue
+		}
+
+		result.status = 'cancelled'
+		result.output += '\n[Interrupted when AllWork closed.]'
+	}
+
+	run.finished = true
+}
+
+/** Reattach live runs or restore cached output without rerunning shell commands. */
+export async function restoreRuns(ids: string[], repositoryIds: Set<string>) {
+	const restored: CommandRun[] = []
+	const uniqueIds = new Set(ids)
+	for (const id of uniqueIds) {
+		const run = getRun(id) ?? (await readRunCache(id))
+		if (
+			run === undefined ||
+			Object.keys(run.results).every((repositoryId) => !repositoryIds.has(repositoryId))
+		) {
+			continue
+		}
+
+		if (!jobs.has(id)) {
+			if (!run.finished) {
+				markInterrupted(run)
+
+				await saveRunCache(run)
+			}
+
+			jobs.set(id, {
+				cancelled: true,
+				controller: new AbortController(),
+				deleted: false,
+				environments: new Map(),
+				listeners: new Set(),
+				run,
+			})
+		}
+
+		restored.push(run)
+	}
+
+	return restored
 }

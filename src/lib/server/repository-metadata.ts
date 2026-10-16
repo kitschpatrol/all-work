@@ -1,3 +1,4 @@
+import type { ProjectIdentity } from '#lib/preferences.js'
 import type {
 	MetadataGroup,
 	MetadataState,
@@ -7,11 +8,12 @@ import type {
 } from '#lib/workspace.js'
 import type { MetadataContext, SourceName } from 'metascope'
 import { metadataColumns, metadataGroups } from '#lib/metadata-columns.js'
+import { defaultPreferences } from '#lib/preferences.js'
 import { sourceNames } from 'metascope'
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
+import { cacheDirectory } from './cache.js'
 import { extractMetadata } from './metascope-process.js'
 import { repositoryTemplate } from './repository-template.js'
 
@@ -62,24 +64,15 @@ const persistedGroups = new Set<MetadataGroup>([
 ])
 const releaseFields = new Set(['Latest Release Date', 'Latest Release Version', 'Releases'])
 
-function cacheDirectory() {
-	return (
-		process.env.ALLWORK_CACHE_DIRECTORY ??
-		path.join(
-			os.homedir(),
-			process.platform === 'darwin' ? 'Library/Caches/AllWork' : '.cache/allwork',
-			'metadata',
-		)
-	)
-}
-
-function cachePath(repository: Repository, group: MetadataGroup) {
+function cachePath(repository: Repository, group: MetadataGroup, identity?: ProjectIdentity) {
 	// Include the credential identity without persisting credentials themselves.
-	const identity = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? 'default-user'
+	const credentialsIdentity = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? 'default-user'
 	const key = createHash('sha256')
-		.update(`2\0${repository.path}\0${identity}\0${group}`)
+		.update(
+			`3\0${repository.path}\0${credentialsIdentity}\0${JSON.stringify(identity ?? defaultPreferences().identity)}\0${group}`,
+		)
 		.digest('hex')
-	return path.join(cacheDirectory(), `${key}.json`)
+	return path.join(cacheDirectory('metadata'), `${key}.json`)
 }
 
 function isValue(value: unknown): value is MetadataValue {
@@ -91,10 +84,12 @@ function isValue(value: unknown): value is MetadataValue {
 	)
 }
 
-async function restoreCache(repository: Repository) {
+async function restoreCache(repository: Repository, identity?: ProjectIdentity) {
 	for (const group of persistedGroups) {
 		try {
-			const cached: unknown = JSON.parse(await readFile(cachePath(repository, group), 'utf8'))
+			const cached: unknown = JSON.parse(
+				await readFile(cachePath(repository, group, identity), 'utf8'),
+			)
 			if (
 				typeof cached !== 'object' ||
 				cached === null ||
@@ -126,7 +121,7 @@ async function restoreCache(repository: Repository) {
 	}
 }
 
-async function saveCache(repository: Repository, group: MetadataGroup) {
+async function saveCache(repository: Repository, group: MetadataGroup, identity?: ProjectIdentity) {
 	if (!persistedGroups.has(group) || repository.metadata === undefined) {
 		return
 	}
@@ -147,10 +142,10 @@ async function saveCache(repository: Repository, group: MetadataGroup) {
 			.filter((field) => metadata.values[field] !== undefined)
 			.map((field) => [field, metadata.values[field]]),
 	)
-	const file = cachePath(repository, group)
+	const file = cachePath(repository, group, identity)
 	const temporaryFile = `${file}.${process.pid}.tmp`
 	try {
-		await mkdir(cacheDirectory(), { mode: 0o700, recursive: true })
+		await mkdir(cacheDirectory('metadata'), { mode: 0o700, recursive: true })
 		await writeFile(
 			temporaryFile,
 			JSON.stringify({ updatedAt: metadata.groups[group]?.updatedAt, values }),
@@ -219,10 +214,15 @@ function preserveCachedRemoteValue(
 	)
 }
 
-function applyContext(repository: Repository, context: MetadataContext, refreshed: MetadataGroup) {
+function applyContext(
+	repository: Repository,
+	context: MetadataContext,
+	refreshed: MetadataGroup,
+	identity = defaultPreferences().identity,
+) {
 	const project = repositoryTemplate(context, {
-		authorName: ['Eric Mika', 'kitschpatrol', 'scalarstudio'],
-		githubAccount: ['kitschpatrol', 'scalarstudio'],
+		authorName: identity.authorNames,
+		githubAccount: identity.githubAccounts,
 		originRemote: repository.remote,
 	})
 	const { metadata } = repository
@@ -388,7 +388,7 @@ export function startWorkspaceMetadata(
 			}
 
 			contexts.set(repository.id, combined)
-			applyContext(repository, combined, group)
+			applyContext(repository, combined, group, workspace.identity)
 			const { available } = repositoryTemplate(context, {})
 			if (group === 'local') {
 				await detectMonorepo(repository, context)
@@ -407,7 +407,7 @@ export function startWorkspaceMetadata(
 						status: 'unavailable',
 					}
 			if (succeeded) {
-				await saveCache(repository, group)
+				await saveCache(repository, group, workspace.identity)
 			}
 		} catch (error) {
 			metadata.groups[group] = {
@@ -512,7 +512,7 @@ export function startWorkspaceMetadata(
 
 	void Promise.all(
 		workspace.repositories.map(async (repository) => {
-			await restoreCache(repository)
+			await restoreCache(repository, workspace.identity)
 			if (disposed) {
 				return
 			}

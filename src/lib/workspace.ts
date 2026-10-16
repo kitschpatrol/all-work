@@ -36,6 +36,7 @@ export type Repository = {
 export type Workspace = {
 	directory: string
 	id: string
+	identity?: ProjectIdentity
 	recursive: boolean
 	repositories: Repository[]
 	warnings: string[]
@@ -65,3 +66,4 @@ export type RunEvent =
 	| { type: 'finished' }
 
 export type StreamEvent = RunEvent & { runId: string }
+import type { ProjectIdentity } from './preferences.js'
