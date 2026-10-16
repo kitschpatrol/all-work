@@ -57,11 +57,47 @@ export type MenuState = {
 	visibleCount: number
 }
 
+/** A secondary window the renderer asks Electron to open, sized by the caller. */
+export type AppWindowRequest = {
+	height: number
+	name: string
+	resizable: boolean
+	url: string
+	width: number
+}
+
 /** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
 export type AllWorkApi = {
 	chooseDirectory: () => Promise<string | undefined>
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
+	openWindow: (request: AppWindowRequest) => Promise<void>
 	updateMenuState: (state: MenuState) => void
+}
+
+/**
+ * Validate a window request arriving over IPC; only same-origin paths may be
+ * opened.
+ */
+export function isAppWindowRequest(value: unknown): value is AppWindowRequest {
+	if (typeof value !== 'object' || value === null) {
+		return false
+	}
+
+	const request = value as Record<keyof AppWindowRequest, unknown>
+	return (
+		typeof request.height === 'number' &&
+		request.height >= 200 &&
+		request.height <= 4000 &&
+		typeof request.name === 'string' &&
+		request.name !== '' &&
+		typeof request.resizable === 'boolean' &&
+		typeof request.url === 'string' &&
+		request.url.startsWith('/') &&
+		!request.url.startsWith('//') &&
+		typeof request.width === 'number' &&
+		request.width >= 200 &&
+		request.width <= 4000
+	)
 }
 
 /** Narrow a menu payload to a column visibility preset. */

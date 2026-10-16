@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AllWorkApi, MenuCommand, MenuState } from '../src/lib/electron-api.js'
+import type {
+	AllWorkApi,
+	AppWindowRequest,
+	MenuCommand,
+	MenuState,
+} from '../src/lib/electron-api.js'
 
 const api: AllWorkApi = {
 	async chooseDirectory(): Promise<string | undefined> {
@@ -21,6 +26,9 @@ const api: AllWorkApi = {
 		return (): void => {
 			ipcRenderer.removeListener('allwork:menu-command', listener)
 		}
+	},
+	async openWindow(request: AppWindowRequest): Promise<void> {
+		await ipcRenderer.invoke('allwork:open-window', request)
 	},
 	updateMenuState(state: MenuState): void {
 		ipcRenderer.send('allwork:menu-state', state)

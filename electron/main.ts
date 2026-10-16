@@ -2,7 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, shell, utilityProcess } from 'elec
 import { getJsonFileTransportDestinations, log, setDefaultLogOptions } from 'lognow'
 import net from 'node:net'
 import path from 'node:path'
-import { isMenuState } from '../src/lib/electron-api.js'
+import type { AppWindowRequest } from '../src/lib/electron-api.js'
+import { isAppWindowRequest, isMenuState } from '../src/lib/electron-api.js'
 import { initialMenuState, syncMenu } from './menu.js'
 
 // The packaged app serves the adapter-node build from a fixed loopback origin.
@@ -17,6 +18,33 @@ setDefaultLogOptions({ logJsonToFile: true, name: 'AllWork' })
 let isQuitting = false
 
 let mainWindow: BrowserWindow | undefined
+// Preferences and output windows, keyed by the name the renderer asked for
+const secondaryWindows = new Map<string, BrowserWindow>()
+
+const webPreferences = {
+	contextIsolation: true,
+	preload: path.join(import.meta.dirname, '../preload/preload.cjs'),
+}
+
+/**
+ * Keep navigation inside the app: anything else opens in the default browser or
+ * app.
+ */
+function guardNavigation(window: BrowserWindow): void {
+	window.webContents.setWindowOpenHandler(({ url }) => {
+		void shell.openExternal(url)
+		return { action: 'deny' }
+	})
+
+	window.webContents.on('will-navigate', (event, url) => {
+		if (url === window.webContents.getURL()) {
+			return
+		}
+
+		event.preventDefault()
+		void shell.openExternal(url)
+	})
+}
 
 function getAppUrl(): URL {
 	if (app.isPackaged) {
@@ -39,39 +67,48 @@ function createWindow(appUrl: URL): void {
 		minHeight: 640,
 		minWidth: 800,
 		title: 'AllWork',
-		webPreferences: {
-			contextIsolation: true,
-			preload: path.join(import.meta.dirname, '../preload/preload.cjs'),
-		},
+		webPreferences,
 		width: 1440,
 	})
 
 	log.info('Window created')
 
 	mainWindow.menuBarVisible = false // Windows: hides the menu bar
+	guardNavigation(mainWindow)
 	void mainWindow.loadURL(appUrl.href)
-
-	// Links that would open a new window open in the default browser instead
-	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-		void shell.openExternal(url)
-		return { action: 'deny' }
-	})
-
-	// Keep navigation inside the app: anything that would leave the current
-	// page, including gittower:// and vscode:// links, opens externally
-	mainWindow.webContents.on('will-navigate', (event, url) => {
-		if (url === mainWindow?.webContents.getURL()) {
-			return
-		}
-
-		event.preventDefault()
-		void shell.openExternal(url)
-	})
 
 	mainWindow.on('closed', () => {
 		mainWindow = undefined
 		syncMenu(initialMenuState, () => mainWindow)
 	})
+}
+
+function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
+	const existing = secondaryWindows.get(request.name)
+	if (existing !== undefined) {
+		existing.show()
+		existing.focus()
+		return
+	}
+
+	const window = new BrowserWindow({
+		fullscreenable: request.resizable,
+		height: request.height,
+		maximizable: request.resizable,
+		minHeight: 240,
+		minWidth: 360,
+		resizable: request.resizable,
+		title: 'AllWork',
+		webPreferences,
+		width: request.width,
+	})
+	window.menuBarVisible = false
+	guardNavigation(window)
+	secondaryWindows.set(request.name, window)
+	window.on('closed', () => {
+		secondaryWindows.delete(request.name)
+	})
+	void window.loadURL(new URL(request.url, appUrl).href)
 }
 
 /** Only the app's own page may invoke privileged IPC handlers. */
@@ -159,6 +196,18 @@ async function main(): Promise<void> {
 
 			const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
 			return result.canceled ? undefined : result.filePaths[0]
+		})
+
+		ipcMain.handle('allwork:open-window', (event, request: unknown) => {
+			if (!isTrustedSender(event, appUrl)) {
+				throw new Error('Windows can only be opened from inside AllWork.')
+			}
+
+			if (!isAppWindowRequest(request)) {
+				throw new Error('Invalid window request.')
+			}
+
+			openSecondaryWindow(appUrl, request)
 		})
 
 		ipcMain.on('allwork:menu-state', (event, state: unknown) => {

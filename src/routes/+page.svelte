@@ -27,6 +27,7 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
+	import { openAppWindow } from '#lib/app-windows.js'
 	import { request } from '#lib/client-request.js'
 	import {
 		formatColumnCellValue,
@@ -42,17 +43,15 @@
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import NumberField from '#lib/NumberField.svelte'
-	import OutputDialog from '#lib/OutputDialog.svelte'
 	import OutputPreview from '#lib/OutputPreview.svelte'
-	import { defaultPreferences, parseIdentity } from '#lib/preferences.js'
-	import PreferencesDialog from '#lib/PreferencesDialog.svelte'
+	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositoryLink } from '#lib/repository-links.js'
 	import RepositoryCell from '#lib/RepositoryCell.svelte'
 	import { formatDate, getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
-	import { savePreferences } from '#lib/view-storage.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
+	import { listenForWindowMessages, postWindowMessage } from '#lib/window-messages.js'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity'
@@ -75,9 +74,6 @@
 	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
 	let runs: CommandRun[] = $state([])
-	let inspected: undefined | { repositoryId: string; runId: string } = $state()
-	let outputDialog: { close: () => void; show: () => void }
-	let preferencesDialog: { show: () => void }
 	let filterInput = $state<HTMLInputElement>()
 	let persistence: { reset: () => Promise<void> }
 	let preferences = $state(defaultPreferences())
@@ -199,13 +195,6 @@
 	const dirtyCount = $derived(
 		workspace?.repositories.filter((repository) => repository.changedFiles > 0).length ?? 0,
 	)
-	const inspectedRun = $derived(runs.find((run) => run.id === inspected?.runId))
-	const inspectedRepository = $derived(
-		workspace?.repositories.find((repository) => repository.id === inspected?.repositoryId),
-	)
-	const inspectedResult = $derived(
-		inspected === undefined ? undefined : inspectedRun?.results[inspected.repositoryId],
-	)
 
 	const viewSnapshot = $derived<SavedView>({
 		autoClear,
@@ -230,7 +219,23 @@
 		workspaceDirectory: workspace?.directory ?? savedView?.workspaceDirectory,
 	})
 
-	onMount(() => disposeStreams)
+	onMount(() => {
+		const stopMessages = listenForWindowMessages((message) => {
+			if (message.type === 'preferences-changed') {
+				void applyPreferences(message.preferences)
+			} else if (message.type === 'reset-view') {
+				if (message.clearHistory) {
+					commandHistory = []
+				}
+
+				void resetView()
+			}
+		})
+		return () => {
+			stopMessages()
+			disposeStreams()
+		}
+	})
 
 	function applySavedView(view: SavedView) {
 		autoClearPredecessors.clear()
@@ -305,20 +310,13 @@
 		}
 	}
 
-	async function updatePreferences(next: Preferences) {
-		const identity = parseIdentity(next.identity)
-		if (identity === undefined) {
-			throw new Error('Use at most 100 author names and accounts, each under 200 characters.')
-		}
-
-		const normalized = { ...next, identity }
-		await savePreferences(normalized)
-		preferences = normalized
+	async function applyPreferences(next: Preferences) {
+		preferences = next
 		if (workspace !== undefined) {
 			await request('/api/workspace/metadata', {
 				force: true,
 				groups: ['local'],
-				identity: normalized.identity,
+				identity: next.identity,
 				repositoryIds: workspace.repositories.map((repository) => repository.id),
 				workspaceId: workspace.id,
 			})
@@ -810,9 +808,7 @@
 			runs = runs.filter((run) => run.id !== runId)
 			resizedColumns.delete(runId)
 			autoClearPredecessors.delete(runId)
-			if (inspected?.runId === runId) {
-				outputDialog.close()
-			}
+			postWindowMessage({ runId, type: 'run-removed' })
 
 			watchRuns()
 		} catch (error) {
@@ -896,9 +892,30 @@
 		}
 	}
 
-	function inspect(runId: string, repositoryId: string) {
-		inspected = { repositoryId, runId }
-		outputDialog.show()
+	function showError(error: unknown) {
+		errorMessage = error instanceof Error ? error.message : String(error)
+	}
+
+	async function inspect(run: CommandRun, repository: Repository) {
+		try {
+			await openAppWindow({
+				kind: 'output',
+				name: repository.name,
+				path: repository.path,
+				repositoryId: repository.id,
+				runId: run.id,
+			})
+		} catch (error) {
+			showError(error)
+		}
+	}
+
+	async function openPreferences() {
+		try {
+			await openAppWindow({ kind: 'preferences' })
+		} catch (error) {
+			showError(error)
+		}
 	}
 
 	function getRepositoryId(repository: Repository) {
@@ -944,7 +961,7 @@
 			void refreshMetadata(['local', 'git', 'github', 'registry', 'ci', 'code', 'files'])
 		},
 		'preferences.open'() {
-			preferencesDialog.show()
+			void openPreferences()
 		},
 		'repositories.deselectAll'() {
 			rowSelection = {}
@@ -1007,6 +1024,21 @@
 		},
 	}
 </script>
+
+<svelte:window
+	onkeydown={(event: KeyboardEvent) => {
+		if (
+			globalThis._allwork !== undefined ||
+			(!event.metaKey && !event.ctrlKey) ||
+			event.key !== ','
+		) {
+			return
+		}
+
+		event.preventDefault()
+		void openPreferences()
+	}}
+/>
 
 <svelte:head>
 	<title>AllWork</title>
@@ -1406,7 +1438,9 @@
 										{:else if run !== undefined}{#if result !== undefined}<OutputPreview
 													label="View output for {repository.name}"
 													lineLimit={outputLines}
-													onInspect={() => inspect(run.id, repository.id)}
+													onInspect={() => {
+														void inspect(run, repository)
+													}}
 													{result}
 												/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
 										{:else}<span class="cell-text" title={tooltip}
@@ -1455,34 +1489,13 @@
 								),
 						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
 				>
-				<PreferencesDialog
-					bind:this={preferencesDialog}
-					onClearCache={async () => {
-						await request('/api/cache', {}, 'DELETE')
-					}}
-					onResetAll={async () => {
-						commandHistory = []
-						await updatePreferences(defaultPreferences())
-						await resetView()
-					}}
-					onResetView={resetView}
-					onSave={updatePreferences}
-					{preferences}
-				/>
+				<button
+					class="button subtle preferences-button"
+					onclick={async () => openPreferences()}
+					title="Preferences… (⌘,)"
+					type="button">Preferences…</button
+				>
 			</footer>
 		</section>
 	</main>
 </div>
-
-<OutputDialog
-	bind:this={outputDialog}
-	onClose={() => {
-		inspected = undefined
-	}}
-	onError={(message: string) => {
-		errorMessage = message
-	}}
-	repository={inspectedRepository}
-	result={inspectedResult}
-	run={inspectedRun}
-/>
