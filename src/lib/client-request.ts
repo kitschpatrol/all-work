@@ -3,10 +3,12 @@ export async function request<T>(
 	url: string,
 	body: Record<string, unknown>,
 	method = 'POST',
+	{ keepalive = false } = {},
 ): Promise<T> {
 	const response = await fetch(url, {
 		body: JSON.stringify(body),
 		headers: { 'Content-Type': 'application/json', 'X-Allwork-Request': '1' },
+		keepalive,
 		method,
 	})
 	const result: unknown = await response.json()

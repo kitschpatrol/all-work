@@ -120,8 +120,8 @@
 					><input type="checkbox" bind:checked={restoreWorkspace} /> Restore the last workspace on launch</label
 				>
 				<p class="preference-help">
-					Preferences, toolbar settings, filters, selection, column layout and scroll position are
-					saved in this browser or app profile. Metadata and command output are cached on this Mac.
+					Preferences and view settings are saved as JSON files in AllWork’s application data
+					folder. Metadata and command output are cached separately.
 				</p>
 				<div class="preference-reset">
 					<button

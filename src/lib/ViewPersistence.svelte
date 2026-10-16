@@ -3,7 +3,7 @@
 	import type { Preferences } from './preferences.js'
 	import type { SavedView } from './view-storage.js'
 	import { defaultPreferences } from './preferences.js'
-	import { createViewWriter, loadLocalState, parseSavedView } from './view-storage.js'
+	import { createViewWriter, loadSettings, parseSavedView } from './view-storage.js'
 
 	const {
 		defaultDirectory,
@@ -20,27 +20,25 @@
 	let ready = $state(false)
 
 	function flush() {
-		try {
-			writer?.flush()
-		} catch {
-			onError('View settings could not be saved to local storage.')
-		}
+		void writer?.flush(true)
 	}
 
 	/** Clear the saved layout before restoring the current view's defaults. */
-	export function reset() {
-		writer?.reset()
+	export async function reset() {
+		await writer?.reset()
+		ready = true
 	}
 
 	onMount(() => {
 		void (async () => {
-			let saved: ReturnType<typeof loadLocalState>
+			let saved: Awaited<ReturnType<typeof loadSettings>>
+			let loaded = false
 			try {
-				writer = createViewWriter(localStorage, () =>
-					onError('View settings could not be saved to local storage.'),
-				)
-				saved = loadLocalState(localStorage, defaultDirectory)
+				writer = createViewWriter(() => onError('View settings could not be saved to disk.'))
+				saved = await loadSettings(defaultDirectory)
+				loaded = true
 			} catch {
+				onError('Saved settings could not be loaded from disk.')
 				saved = {
 					preferences: defaultPreferences(),
 					view: parseSavedView(undefined, defaultDirectory),
@@ -52,7 +50,7 @@
 			} catch (error) {
 				onError(error instanceof Error ? error.message : 'Saved settings could not be restored.')
 			} finally {
-				ready = true
+				ready = loaded
 			}
 		})()
 

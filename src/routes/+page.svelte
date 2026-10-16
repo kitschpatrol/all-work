@@ -76,7 +76,7 @@
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: { close: () => void; show: () => void }
-	let persistence: { reset: () => void }
+	let persistence: { reset: () => Promise<void> }
 	let preferences = $state(defaultPreferences())
 	let savedView = $state<SavedView>()
 	let pendingScroll = $state<SavedView['scroll']>()
@@ -305,7 +305,7 @@
 		}
 
 		const normalized = { ...next, identity }
-		savePreferences(localStorage, normalized)
+		await savePreferences(normalized)
 		preferences = normalized
 		if (workspace !== undefined) {
 			await request('/api/workspace/metadata', {
@@ -319,7 +319,7 @@
 	}
 
 	async function resetView() {
-		persistence.reset()
+		await persistence.reset()
 		savedView = undefined
 		pendingScroll = undefined
 		directory = workspace?.directory ?? data.defaultDirectory

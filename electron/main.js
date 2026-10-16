@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 // Vite default dev & production ports
 const sveltePort = app.isPackaged ? '4173' : '5173'
 const SVELTE_HOST = '127.0.0.1'
+app.setName('AllWork')
 
 function createWindow() {
 	const mainWindow = new BrowserWindow({
@@ -116,7 +117,13 @@ async function startApp() {
 		if (app.isPackaged) {
 			utilityProcess.fork(path.join(app.getAppPath(), 'electron', 'server.js'), {
 				// @ts-expect-error - string[] index
-				env: { ...process.env, HOST: SVELTE_HOST, PORT: sveltePort },
+				env: {
+					...process.env,
+					ALLWORK_SETTINGS_DIRECTORY:
+						process.env.ALLWORK_SETTINGS_DIRECTORY ?? app.getPath('userData'),
+					HOST: SVELTE_HOST,
+					PORT: sveltePort,
+				},
 			})
 		} else {
 			console.warn('##### Running Electron in development mode')

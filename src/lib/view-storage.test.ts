@@ -1,92 +1,79 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { request } from './client-request.js'
 import { defaultPreferences } from './preferences.js'
-import {
-	createViewWriter,
-	loadLocalState,
-	parseSavedView,
-	savePreferences,
-} from './view-storage.js'
+import { createViewWriter, loadSettings, parseSavedView, savePreferences } from './view-storage.js'
 
-function storageFixture() {
-	const values = new Map<string, string>()
-	return {
-		getItem: vi.fn<Window['localStorage']['getItem']>(
-			(key) =>
-				values.get(key) ?? (JSON.parse('null') as ReturnType<Window['localStorage']['getItem']>),
-		),
-		removeItem: vi.fn((key: string) => {
-			values.delete(key)
-		}),
-		setItem: vi.fn((key: string, value: string) => {
-			values.set(key, value)
-		}),
-	}
-}
+vi.mock('./client-request.js', () => ({ request: vi.fn() }))
 
 afterEach(() => {
 	vi.useRealTimers()
+	vi.mocked(request).mockReset()
 })
 
-describe('local view persistence', () => {
-	it('migrates existing toolbar settings and history without auto-opening an unsaved workspace', () => {
-		const storage = storageFixture()
-		storage.setItem('allwork.directory', '/projects')
-		storage.setItem('allwork.outputLines', '5')
-		storage.setItem('allwork.commandHistory', '["pwd"]')
-		storage.setItem('allwork.recursive', 'false')
-		expect(loadLocalState(storage, '/default').view).toMatchObject({
-			commandHistory: ['pwd'],
-			directory: '/projects',
-			outputLines: 5,
-			recursive: false,
-			workspaceDirectory: undefined,
+describe('shared JSON view persistence', () => {
+	it('loads identity and view data from the server without accessing browser storage', async () => {
+		const preferences = {
+			...defaultPreferences(),
+			identity: { authorNames: ['Fixture'], githubAccounts: ['fixture'] },
+		}
+		vi.mocked(request).mockResolvedValue({
+			preferences,
+			view: { commandHistory: ['pwd'], directory: '/projects', outputLines: 5, recursive: false },
 		})
+		expect(await loadSettings('/default')).toMatchObject({
+			preferences,
+			view: { commandHistory: ['pwd'], directory: '/projects', outputLines: 5, recursive: false },
+		})
+		expect(request).toHaveBeenCalledWith('/api/settings', {})
+		await savePreferences(preferences)
+		expect(request).toHaveBeenLastCalledWith(
+			'/api/settings',
+			{ kind: 'preferences', value: preferences },
+			'PUT',
+		)
 	})
 
-	it('round-trips table geometry, selection, sorting, scroll and runs while debouncing writes', () => {
+	it('debounces snapshots, flushes the latest draft on close, and orders requests', async () => {
 		vi.useFakeTimers()
-		const storage = storageFixture()
+		vi.mocked(request).mockResolvedValue({ saved: true })
 		const onError = vi.fn<() => void>()
-		const writer = createViewWriter(storage, onError)
+		const writer = createViewWriter(onError)
 		const view = parseSavedView(
 			{
-				autoClear: true,
 				columnSizing: { name: 123 },
-				columnVisibility: { description: false },
-				command: 'printf draft',
-				commandHistory: ['pwd'],
-				concurrency: 9,
-				directory: '/draft',
-				outputLines: 4,
-				recursive: false,
-				resizedColumns: ['name'],
 				rowSelection: { fixture: true },
-				runIds: ['run-1'],
 				scroll: { left: 40, top: 80 },
-				search: 'fixture',
-				selectedOnly: true,
-				sorting: [{ desc: true, id: 'run-1' }],
-				status: 'dirty',
-				workspaceDirectory: '/projects',
+				sorting: [{ desc: true, id: 'name' }],
 			},
-			'/default',
+			'/projects',
 		)
 		writer.queue(parseSavedView(undefined, '/default'))
 		writer.queue(view)
-		expect(storage.setItem).not.toHaveBeenCalled()
-		vi.advanceTimersByTime(200)
-		expect(storage.setItem).toHaveBeenCalledTimes(1)
-		expect(loadLocalState(storage, '/default').view).toEqual(view)
+		expect(request).not.toHaveBeenCalled()
+		await vi.advanceTimersByTimeAsync(200)
+		expect(request).toHaveBeenCalledOnce()
+		expect(request).toHaveBeenLastCalledWith(
+			'/api/settings',
+			{ kind: 'view', value: view, writer: { id: expect.any(String) as unknown, sequence: 1 } },
+			'PUT',
+			{ keepalive: false },
+		)
 		writer.queue({ ...view, command: 'latest draft' })
-		writer.flush()
-		expect(loadLocalState(storage, '/default').view.command).toBe('latest draft')
+		await writer.flush(true)
+		expect(request).toHaveBeenLastCalledWith(
+			'/api/settings',
+			{
+				kind: 'view',
+				value: { ...view, command: 'latest draft' },
+				writer: { id: expect.any(String) as unknown, sequence: 2 },
+			},
+			'PUT',
+			{ keepalive: true },
+		)
 		expect(onError).not.toHaveBeenCalled()
 	})
 
-	it('rejects corrupt sizes and controls, and recovers from malformed JSON', () => {
-		const storage = storageFixture()
-		storage.setItem('allwork.view.v1', '{broken')
-		expect(loadLocalState(storage, '/default').view.directory).toBe('/default')
+	it('sanitizes corrupt sizes and controls while retaining valid table state', () => {
 		expect(
 			parseSavedView(
 				{
@@ -109,37 +96,53 @@ describe('local view persistence', () => {
 		})
 	})
 
-	it('keeps identity when resetting the view and removes migrated keys', () => {
-		const storage = storageFixture()
-		const preferences = {
-			...defaultPreferences(),
-			identity: { authorNames: ['Fixture'], githubAccounts: ['fixture'] },
-		}
-		savePreferences(storage, preferences)
-		storage.setItem('allwork.directory', '/old')
-		const writer = createViewWriter(storage, vi.fn<() => void>())
+	it('discards queued snapshots on reset and prevents them from resurrecting the old view', async () => {
+		vi.useFakeTimers()
+		vi.mocked(request).mockResolvedValue({ reset: true })
+		const writer = createViewWriter(vi.fn<() => void>())
 		writer.queue(parseSavedView({ command: 'discard' }, '/old'))
-		writer.reset()
-		writer.flush()
-		expect(loadLocalState(storage, '/default')).toMatchObject({
-			preferences,
-			view: { command: '', directory: '/default' },
-		})
+		await writer.reset()
+		await vi.runAllTimersAsync()
+		expect(request).toHaveBeenCalledOnce()
+		expect(request).toHaveBeenLastCalledWith(
+			'/api/settings',
+			{ kind: 'view', writer: { id: expect.any(String) as unknown, sequence: 1 } },
+			'DELETE',
+		)
 	})
 
-	it('reports unavailable storage without throwing from a background save', () => {
+	it('waits for in-flight saves before resetting and ignores snapshots queued during reset', async () => {
 		vi.useFakeTimers()
-		const storage = storageFixture()
-		storage.setItem.mockImplementation(() => {
-			throw new Error('Quota exceeded')
-		})
+		const deferred = Promise.withResolvers<unknown>()
+		vi.mocked(request).mockReturnValueOnce(deferred.promise).mockResolvedValue({ reset: true })
+		const writer = createViewWriter(vi.fn<() => void>())
+		writer.queue(parseSavedView({ command: 'old' }, '/projects'))
+		const saving = writer.flush()
+		const resetting = writer.reset()
+		writer.queue(parseSavedView({ command: 'discard during reset' }, '/projects'))
+		expect(request).toHaveBeenCalledOnce()
+		deferred.resolve({ saved: true })
+		await Promise.all([saving, resetting])
+		await vi.runAllTimersAsync()
+		expect(request).toHaveBeenCalledTimes(2)
+		expect(request).toHaveBeenLastCalledWith(
+			'/api/settings',
+			{ kind: 'view', writer: { id: expect.any(String) as unknown, sequence: 2 } },
+			'DELETE',
+		)
+	})
+
+	it('reports failed disk saves without leaving an unhandled background rejection', async () => {
+		vi.useFakeTimers()
+		vi.mocked(request).mockRejectedValue(new Error('Disk unavailable'))
 		const onError = vi.fn<() => void>()
-		const writer = createViewWriter(storage, onError)
+		const writer = createViewWriter(onError)
 		writer.queue(parseSavedView(undefined, '/default'))
-		vi.advanceTimersByTime(200)
+		await vi.advanceTimersByTimeAsync(200)
 		expect(onError).toHaveBeenCalledOnce()
-		storage.setItem.mockReset()
-		writer.flush()
-		expect(storage.setItem).toHaveBeenCalledOnce()
+		vi.mocked(request).mockResolvedValue({ saved: true })
+		writer.queue(parseSavedView({ command: 'retry' }, '/default'))
+		await writer.flush()
+		expect(request).toHaveBeenCalledTimes(2)
 	})
 })

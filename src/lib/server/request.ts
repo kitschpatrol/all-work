@@ -4,7 +4,11 @@ import { error } from '@sveltejs/kit'
  * Restrict local filesystem and shell actions to deliberate same-origin app
  * requests.
  */
-export async function readRequest(request: Request, url: URL): Promise<Record<string, unknown>> {
+export async function readRequest(
+	request: Request,
+	url: URL,
+	maxBytes = 64_000,
+): Promise<Record<string, unknown>> {
 	if (
 		!['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ||
 		request.headers.get('x-allwork-request') !== '1' ||
@@ -13,7 +17,7 @@ export async function readRequest(request: Request, url: URL): Promise<Record<st
 		error(403, 'This action must be requested from AllWork.')
 	}
 
-	if (Number(request.headers.get('content-length') ?? 0) > 64_000) {
+	if (Number(request.headers.get('content-length') ?? 0) > maxBytes) {
 		error(413, 'Request too large.')
 	}
 

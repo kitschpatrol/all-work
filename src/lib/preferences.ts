@@ -13,8 +13,7 @@ const separator = /[,\n]/v
 const accountPrefix = /^@/v
 
 /**
- * Preserve the existing profile when upgrading an installation without
- * preferences.
+ * Provide the initial identity and workspace restoration preferences.
  */
 export function defaultPreferences(): Preferences {
 	return {
