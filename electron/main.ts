@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, shell, utilityProcess } from 'elec
 import { getJsonFileTransportDestinations, log, setDefaultLogOptions } from 'lognow'
 import net from 'node:net'
 import path from 'node:path'
+import { isMenuState } from '../src/lib/electron-api.js'
+import { initialMenuState, syncMenu } from './menu.js'
 
 // The packaged app serves the adapter-node build from a fixed loopback origin.
 // In development, electron-vite starts the SvelteKit dev server and reports
@@ -13,6 +15,8 @@ setDefaultLogOptions({ logJsonToFile: true, name: 'AllWork' })
 
 // Distinguishes a deliberate shutdown from the server dying underneath us
 let isQuitting = false
+
+let mainWindow: BrowserWindow | undefined
 
 function getAppUrl(): URL {
 	if (app.isPackaged) {
@@ -30,7 +34,7 @@ function getAppUrl(): URL {
 }
 
 function createWindow(appUrl: URL): void {
-	const mainWindow = new BrowserWindow({
+	mainWindow = new BrowserWindow({
 		height: 1024,
 		minHeight: 640,
 		minWidth: 800,
@@ -56,13 +60,28 @@ function createWindow(appUrl: URL): void {
 	// Keep navigation inside the app: anything that would leave the current
 	// page, including gittower:// and vscode:// links, opens externally
 	mainWindow.webContents.on('will-navigate', (event, url) => {
-		if (url === mainWindow.webContents.getURL()) {
+		if (url === mainWindow?.webContents.getURL()) {
 			return
 		}
 
 		event.preventDefault()
 		void shell.openExternal(url)
 	})
+
+	mainWindow.on('closed', () => {
+		mainWindow = undefined
+		syncMenu(initialMenuState, () => mainWindow)
+	})
+}
+
+/** Only the app's own page may invoke privileged IPC handlers. */
+function isTrustedSender(
+	event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
+	appUrl: URL,
+): boolean {
+	return (
+		event.senderFrame?.url !== undefined && new URL(event.senderFrame.url).origin === appUrl.origin
+	)
 }
 
 async function waitForServer(host: string, port: number): Promise<void> {
@@ -134,16 +153,21 @@ async function main(): Promise<void> {
 		const appUrl = getAppUrl()
 
 		ipcMain.handle('allwork:choose-directory', async (event) => {
-			if (
-				event.senderFrame?.url === undefined ||
-				new URL(event.senderFrame.url).origin !== appUrl.origin
-			) {
+			if (!isTrustedSender(event, appUrl)) {
 				throw new Error('Directory picker is only available inside AllWork.')
 			}
 
 			const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
 			return result.canceled ? undefined : result.filePaths[0]
 		})
+
+		ipcMain.on('allwork:menu-state', (event, state: unknown) => {
+			if (isTrustedSender(event, appUrl) && isMenuState(state)) {
+				syncMenu(state, () => mainWindow)
+			}
+		})
+
+		syncMenu(initialMenuState, () => mainWindow)
 
 		if (app.isPackaged) {
 			log.info(`Logging to ${getJsonFileTransportDestinations().join(', ')}`)

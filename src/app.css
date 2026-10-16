@@ -155,6 +155,7 @@ h1 {
 	min-width: 760px;
 	height: var(--toolbar-height);
 	padding: 6px 8px;
+	border-top: 1px solid #969696;
 	border-bottom: 1px solid #969696;
 	background: linear-gradient(#ececec, #c8c8c8);
 	box-shadow:

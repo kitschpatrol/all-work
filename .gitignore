@@ -27,3 +27,6 @@ vendor/
 
 # Customizations
 out/
+
+# Lognow file rotation metadata
+/audit.json

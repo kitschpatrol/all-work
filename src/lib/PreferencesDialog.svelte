@@ -28,7 +28,8 @@
 		restoreWorkspace = preferences.restoreWorkspace
 	}
 
-	function show() {
+	/** Open the preferences dialog with a fresh draft of the saved preferences. */
+	export function show() {
 		readDraft()
 		message = ''
 		dialog.showModal()
@@ -51,7 +52,12 @@
 
 <svelte:window
 	onkeydown={(event: KeyboardEvent) => {
-		if ((!event.metaKey && !event.ctrlKey) || event.key !== ',') {
+		// Electron's application menu owns this shortcut
+		if (
+			globalThis._allwork !== undefined ||
+			(!event.metaKey && !event.ctrlKey) ||
+			event.key !== ','
+		) {
 			return
 		}
 

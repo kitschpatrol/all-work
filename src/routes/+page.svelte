@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ColumnDef, Row, RowSelectionState } from '@tanstack/svelte-table'
+	import type { MenuActions, OpenTarget } from '#lib/electron-api.js'
 	import type { Preferences } from '#lib/preferences.js'
 	import type { SavedView } from '#lib/view-storage.js'
 	import type {
@@ -35,8 +36,9 @@
 		getMetadataPlaceholder,
 		repositoryColumns,
 	} from '#lib/column-variables.js'
-	import { commandPresets } from '#lib/command-presets.js'
-	import CommandAutocomplete from '#lib/CommandAutocomplete.svelte'
+	import CommandForm from '#lib/CommandForm.svelte'
+	import { isColumnPreset, isOpenTarget, isWorkingTreeStatus } from '#lib/electron-api.js'
+	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import NumberField from '#lib/NumberField.svelte'
@@ -44,6 +46,7 @@
 	import OutputPreview from '#lib/OutputPreview.svelte'
 	import { defaultPreferences, parseIdentity } from '#lib/preferences.js'
 	import PreferencesDialog from '#lib/PreferencesDialog.svelte'
+	import { openRepositoryLink } from '#lib/repository-links.js'
 	import RepositoryCell from '#lib/RepositoryCell.svelte'
 	import { formatDate, getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
@@ -64,24 +67,28 @@
 	let errorMessage = $state('')
 	let command = $state('')
 	let commandHistory: string[] = $state([])
-	let historyIndex = $state(-1)
-	let commandDraft = $state('')
 	let concurrency = $state(6)
 	let autoClear = $state(false)
 	let search = $state('')
-	let status = $state('all')
+	let status = $state<SavedView['status']>('all')
 	let selectedOnly = $state(false)
 	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
 	let runs: CommandRun[] = $state([])
 	let inspected: undefined | { repositoryId: string; runId: string } = $state()
 	let outputDialog: { close: () => void; show: () => void }
+	let preferencesDialog: { show: () => void }
+	let filterInput = $state<HTMLInputElement>()
 	let persistence: { reset: () => Promise<void> }
 	let preferences = $state(defaultPreferences())
 	let savedView = $state<SavedView>()
 	let pendingScroll = $state<SavedView['scroll']>()
 	let scrollPosition = $state({ left: 0, top: 0 })
-	let commandInput = $state<HTMLInputElement>()
+	let commandForm: {
+		choose: (value: string) => Promise<void>
+		focus: () => void
+		resetRecall: () => void
+	}
 	let tableScroll: HTMLDivElement
 	let eventStream: undefined | { close: () => void }
 	let metadataStream: undefined | { close: () => void }
@@ -328,8 +335,7 @@
 		command = ''
 		concurrency = 6
 		outputLines = 3
-		historyIndex = -1
-		commandDraft = ''
+		commandForm.resetRecall()
 		rowSelection = {}
 		search = ''
 		selectedOnly = false
@@ -415,54 +421,6 @@
 		if (followEnd) {
 			tableScroll.scrollLeft = tableScroll.scrollWidth
 		}
-	}
-
-	function recallCommand(event: KeyboardEvent) {
-		if (
-			event.isComposing ||
-			event.altKey ||
-			event.ctrlKey ||
-			event.metaKey ||
-			event.shiftKey ||
-			(event.key !== 'ArrowUp' && event.key !== 'ArrowDown') ||
-			commandHistory.length === 0
-		) {
-			return
-		}
-
-		event.preventDefault()
-		if (event.key === 'ArrowUp') {
-			if (historyIndex === -1) {
-				commandDraft = command
-				historyIndex = commandHistory.length - 1
-			} else {
-				historyIndex = Math.max(0, historyIndex - 1)
-			}
-
-			command = commandHistory[historyIndex] ?? ''
-		} else if (historyIndex !== -1) {
-			historyIndex++
-			if (historyIndex >= commandHistory.length) {
-				historyIndex = -1
-				command = commandDraft
-			} else {
-				command = commandHistory[historyIndex] ?? ''
-			}
-		}
-
-		const input = event.currentTarget
-		if (input instanceof HTMLInputElement) {
-			void tick().then(() => input.setSelectionRange(input.value.length, input.value.length))
-		}
-	}
-
-	async function choosePreset(value: string, caret = value.length) {
-		command = value
-		historyIndex = -1
-		commandDraft = ''
-		await tick()
-		commandInput?.focus()
-		commandInput?.setSelectionRange(caret, caret)
 	}
 
 	function refreshOutputSorting(runId: string) {
@@ -800,8 +758,7 @@
 				commandHistory = [...commandHistory, run.command].slice(-100)
 			}
 
-			historyIndex = -1
-			commandDraft = ''
+			commandForm.resetRecall()
 			if (previousRunId !== undefined) {
 				autoClearPredecessors.set(run.id, previousRunId)
 			}
@@ -814,16 +771,6 @@
 		} finally {
 			starting = false
 		}
-	}
-
-	async function insertVariable(name: string) {
-		const insertion = `$${name}`
-		const start = commandInput?.selectionStart ?? command.length
-		const end = commandInput?.selectionEnd ?? start
-		await choosePreset(
-			command.slice(0, start) + insertion + command.slice(end),
-			start + insertion.length,
-		)
 	}
 
 	function columnTooltip(repository: Repository, columnId: string) {
@@ -886,16 +833,67 @@
 		}
 	}
 
-	function toggleMatching(event: Event) {
-		const { checked } = event.currentTarget as HTMLInputElement
-		const matchingIds = new Set(visibleRepositories.map((row) => row.id))
-		rowSelection = checked
-			? {
-					...rowSelection,
-					...Object.fromEntries(visibleRepositories.map((row) => [row.id, true as const])),
-				}
-			: Object.fromEntries(Object.entries(rowSelection).filter(([id]) => !matchingIds.has(id)))
+	function selectRows(rows: typeof visibleRepositories) {
+		rowSelection = {
+			...rowSelection,
+			...Object.fromEntries(rows.map((row) => [row.id, true as const])),
+		}
 		scheduleMetadata()
+	}
+
+	function selectMatching(selected: boolean) {
+		if (selected) {
+			selectRows(visibleRepositories)
+			return
+		}
+
+		const matchingIds = new Set(visibleRepositories.map((row) => row.id))
+		rowSelection = Object.fromEntries(
+			Object.entries(rowSelection).filter(([id]) => !matchingIds.has(id)),
+		)
+		scheduleMetadata()
+	}
+
+	function applyWorkingTreeFilter() {
+		table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
+		scheduleMetadata()
+	}
+
+	function clearFinishedRuns() {
+		for (const run of runs) {
+			if (run.finished) {
+				void removeRun(run.id)
+			}
+		}
+	}
+
+	async function resetColumnDefaults() {
+		table.resetColumnVisibility()
+		await tick()
+		fitColumns(
+			table
+				.getVisibleLeafColumns()
+				.filter((column) => !resizedColumns.has(column.id))
+				.map((column) => column.id),
+		)
+		scheduleMetadata()
+	}
+
+	function optionalColumnIds() {
+		return table
+			.getAllLeafColumns()
+			.filter((column) => column.getCanHide())
+			.map((column) => column.id)
+	}
+
+	async function openSelected(target: OpenTarget) {
+		for (const row of targets) {
+			if (target === 'github' || target === 'vscode') {
+				openRepositoryLink(row.original, target)
+			} else {
+				await openInApp(row.original, target)
+			}
+		}
 	}
 
 	function inspect(runId: string, repositoryId: string) {
@@ -921,6 +919,93 @@
 			errorMessage = error instanceof Error ? error.message : String(error)
 		}
 	}
+
+	const menuActions: MenuActions = {
+		'command.focus'() {
+			commandForm.focus()
+		},
+		'command.preset'(payload) {
+			if (payload !== undefined) {
+				void commandForm.choose(payload)
+			}
+		},
+		'command.run'() {
+			void runCommand()
+		},
+		'command.stopAll'() {
+			for (const run of activeRuns) {
+				void stop(run.id)
+			}
+		},
+		'metadata.checkDependencies'() {
+			void refreshMetadata(['updates'])
+		},
+		'metadata.refresh'() {
+			void refreshMetadata(['local', 'git', 'github', 'registry', 'ci', 'code', 'files'])
+		},
+		'preferences.open'() {
+			preferencesDialog.show()
+		},
+		'repositories.deselectAll'() {
+			rowSelection = {}
+			scheduleMetadata()
+		},
+		'repositories.open'(payload) {
+			if (isOpenTarget(payload)) {
+				void openSelected(payload)
+			}
+		},
+		'repositories.selectAll'() {
+			selectMatching(true)
+		},
+		'repositories.selectChanged'() {
+			selectRows(
+				visibleRepositories.filter(
+					(row) => row.original.gitStatusAvailable && row.original.changedFiles > 0,
+				),
+			)
+		},
+		'runs.clearFinished': clearFinishedRuns,
+		'runs.toggleAutoClear'() {
+			autoClear = !autoClear
+		},
+		'view.columns'(payload) {
+			if (payload === 'defaults') {
+				void resetColumnDefaults()
+			} else if (isColumnPreset(payload)) {
+				void setColumnsVisible(optionalColumnIds(), payload === 'all')
+			}
+		},
+		'view.fitColumns'() {
+			resizedColumns.clear()
+			fitColumns()
+		},
+		'view.focusFilter'() {
+			filterInput?.focus()
+			filterInput?.select()
+		},
+		'view.reset'() {
+			void resetView()
+		},
+		'view.status'(payload) {
+			if (!isWorkingTreeStatus(payload)) {
+				return
+			}
+
+			status = payload
+			applyWorkingTreeFilter()
+		},
+		'view.toggleSelectedOnly'() {
+			selectedOnly = !selectedOnly
+			scheduleMetadata()
+		},
+		'workspace.browse'() {
+			void browseDirectory()
+		},
+		'workspace.reload'() {
+			void loadDirectory()
+		},
+	}
 </script>
 
 <svelte:head>
@@ -930,6 +1015,27 @@
 		content="Discover Git repositories, select a working set, and run shell commands in parallel."
 	/>
 </svelte:head>
+
+<ElectronMenu
+	actions={menuActions}
+	state={{
+		autoClear,
+		canReload: directory.trim() !== '' && !loading && activeRuns.length === 0,
+		canRun:
+			workspace !== undefined &&
+			!starting &&
+			!loading &&
+			targets.length > 0 &&
+			command.trim() !== '',
+		hasActiveRuns: activeRuns.length > 0,
+		hasFinishedRuns: runs.some((run) => run.finished),
+		loading,
+		selectedCount: targets.length,
+		selectedOnly,
+		status,
+		visibleCount: visibleRepositories.length,
+	}}
+/>
 
 <ViewPersistence
 	bind:this={persistence}
@@ -987,90 +1093,20 @@
 				>
 			</form>
 		</div>
-		<form
-			class="command-form"
-			aria-label="Run a command"
-			onsubmit={(event) => {
-				event.preventDefault()
-				void runCommand()
-			}}
-		>
-			<label class="field-label" for="shell-command">Command</label>
-			<div class="command-input">
-				<span class="prompt-symbol" aria-hidden="true">$</span>
-				<input
-					bind:this={commandInput}
-					id="shell-command"
-					aria-label="Shell command"
-					autocomplete="off"
-					oninput={() => {
-						historyIndex = -1
-					}}
-					onkeydown={recallCommand}
-					placeholder="git status --short"
-					spellcheck="false"
-					bind:value={command}
-				/>
-				<CommandAutocomplete
-					input={commandInput}
-					onComplete={choosePreset}
-					variables={columnVariables}
-				/>
-
-				<select
-					class="command-picker command-variables"
-					aria-label="Column variables"
-					onchange={async (event) => {
-						const name = event.currentTarget.value
-						event.currentTarget.value = ''
-						await insertVariable(name)
-					}}
-					title="Insert a column variable at the cursor"
-					value=""
-				>
-					<option disabled value="">Variables</option>
-					{#each columnVariables as variable (variable.id)}
-						<option title={previewColumn(variable.id)} value={variable.name}
-							>{variable.label}</option
-						>
-					{/each}
-				</select>
-				<select
-					class="command-picker command-presets"
-					aria-label="Command presets"
-					onchange={async (event) => {
-						const { value } = event.currentTarget
-						event.currentTarget.value = ''
-						await choosePreset(value)
-					}}
-					title="Choose a preset command"
-					value=""
-				>
-					<option disabled value="">Presets</option>
-					{#each commandPresets as preset (preset.label)}
-						<option title={preset.command} value={preset.command}>{preset.label}</option>
-					{/each}
-				</select>
-			</div>
-			<div class="parallel-label">
-				<label for="parallel-jobs">Jobs</label>
-				<NumberField
-					id="parallel-jobs"
-					label="Parallel jobs"
-					max={32}
-					onChange={(value: number) => {
-						concurrency = value
-					}}
-					required
-					value={concurrency}
-				/>
-			</div>
-			<button
-				class="button primary run-button"
-				disabled={targets.length === 0 || command.trim() === '' || starting || loading}
-				type="submit">▶ {starting ? 'Starting…' : `Run in ${targets.length}`}</button
-			>
-		</form>
+		<CommandForm
+			bind:this={commandForm}
+			history={commandHistory}
+			{loading}
+			onRun={runCommand}
+			{starting}
+			targetCount={targets.length}
+			variables={columnVariables.map((variable) => ({
+				...variable,
+				preview: previewColumn(variable.id),
+			}))}
+			bind:command
+			bind:concurrency
+		/>
 	</header>
 	<main>
 		{#if errorMessage !== ''}<div class="message error" role="alert">
@@ -1098,6 +1134,7 @@
 								stroke-width="1.5"
 							/></svg
 						><input
+							bind:this={filterInput}
 							aria-label="Filter repositories"
 							oninput={() => {
 								refreshTableData()
@@ -1110,10 +1147,7 @@
 					</div>
 					<select
 						aria-label="Working tree filter"
-						onchange={() => {
-							table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
-							scheduleMetadata()
-						}}
+						onchange={applyWorkingTreeFilter}
 						bind:value={status}
 						><option value="all">All working trees</option><option value="dirty"
 							>With changes</option
@@ -1148,13 +1182,7 @@
 							><span class="connection-dot"></span>{activeRuns.length} running</span
 						>{/if}{#if runs.some((run) => run.finished)}<button
 							class="button subtle"
-							onclick={() => {
-								for (const run of runs) {
-									if (run.finished) {
-										void removeRun(run.id)
-									}
-								}
-							}}
+							onclick={clearFinishedRuns}
 							type="button">Clear finished runs</button
 						>{/if}
 					<MetadataControls
@@ -1176,24 +1204,8 @@
 						onRefresh={refreshMetadata}
 						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
 						onVisibilityAll={async (visible: boolean) =>
-							setColumnsVisible(
-								table
-									.getAllLeafColumns()
-									.filter((column) => column.getCanHide())
-									.map((column) => column.id),
-								visible,
-							)}
-						onVisibilityDefaults={async () => {
-							table.resetColumnVisibility()
-							await tick()
-							fitColumns(
-								table
-									.getVisibleLeafColumns()
-									.filter((column) => !resizedColumns.has(column.id))
-									.map((column) => column.id),
-							)
-							scheduleMetadata()
-						}}
+							setColumnsVisible(optionalColumnIds(), visible)}
+						onVisibilityDefaults={resetColumnDefaults}
 						onVisibilityMany={setColumnsVisible}
 						{selectedCount}
 					/>
@@ -1249,7 +1261,9 @@
 												disabled={visibleRepositories.length === 0}
 												indeterminate={targets.length > 0 &&
 													targets.length < visibleRepositories.length}
-												onchange={toggleMatching}
+												onchange={(event) => {
+													selectMatching(event.currentTarget.checked)
+												}}
 												type="checkbox"
 											/>
 										{:else if run !== undefined}<div class="run-header">
@@ -1442,6 +1456,7 @@
 						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
 				>
 				<PreferencesDialog
+					bind:this={preferencesDialog}
 					onClearCache={async () => {
 						await request('/api/cache', {}, 'DELETE')
 					}}
