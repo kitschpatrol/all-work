@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ColumnDef, Row, RowSelectionState } from '@tanstack/svelte-table'
+	import type { AppWindow } from '#lib/app-windows.js'
 	import type { MenuActions, OpenTarget } from '#lib/electron-api.js'
 	import type { Preferences } from '#lib/preferences.js'
 	import type { SavedView } from '#lib/view-storage.js'
@@ -27,7 +28,7 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
-	import { openAppWindow } from '#lib/app-windows.js'
+	import AppWindows from '#lib/AppWindows.svelte'
 	import { request } from '#lib/client-request.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
@@ -76,6 +77,10 @@
 	let rowSelection: RowSelectionState = $state({})
 	let runs: CommandRun[] = $state([])
 	let filterInput = $state<HTMLInputElement>()
+	let appWindows: {
+		open: (target: AppWindow) => Promise<void>
+		closeOutput: (runId: string) => void
+	}
 	let persistence: { reset: () => Promise<void> }
 	let preferences = $state(defaultPreferences())
 	let savedView = $state<SavedView>()
@@ -225,11 +230,7 @@
 			if (message.type === 'preferences-changed') {
 				void applyPreferences(message.preferences)
 			} else if (message.type === 'reset-view') {
-				if (message.clearHistory) {
-					commandHistory = []
-				}
-
-				void resetView()
+				resetFromWindow(message.clearHistory)
 			}
 		})
 		return () => {
@@ -806,6 +807,7 @@
 			resizedColumns.delete(runId)
 			autoClearPredecessors.delete(runId)
 			postWindowMessage({ runId, type: 'run-removed' })
+			appWindows.closeOutput(runId)
 
 			watchRuns()
 		} catch (error) {
@@ -904,26 +906,22 @@
 		errorMessage = error instanceof Error ? error.message : String(error)
 	}
 
-	async function inspect(run: CommandRun, repository: Repository) {
-		try {
-			await openAppWindow({
-				kind: 'output',
-				name: repository.name,
-				path: repository.path,
-				repositoryId: repository.id,
-				runId: run.id,
-			})
-		} catch (error) {
-			showError(error)
+	function resetFromWindow(clearHistory: boolean) {
+		if (clearHistory) {
+			commandHistory = []
 		}
+
+		void resetView()
 	}
 
-	async function openPreferences() {
-		try {
-			await openAppWindow({ kind: 'preferences' })
-		} catch (error) {
-			showError(error)
-		}
+	function inspect(run: CommandRun, repository: Repository) {
+		void appWindows.open({
+			kind: 'output',
+			name: repository.name,
+			path: repository.path,
+			repositoryId: repository.id,
+			runId: run.id,
+		})
 	}
 
 	async function openInApp(repository: Repository, app: 'finder' | 'terminal' | 'tower') {
@@ -965,7 +963,7 @@
 			void refreshMetadata(['local', 'git', 'github', 'registry', 'ci', 'code', 'files'])
 		},
 		'preferences.open'() {
-			void openPreferences()
+			void appWindows.open({ kind: 'preferences' })
 		},
 		'repositories.deselectAll'() {
 			rowSelection = {}
@@ -1029,21 +1027,6 @@
 	}
 </script>
 
-<svelte:window
-	onkeydown={(event: KeyboardEvent) => {
-		if (
-			globalThis._allwork !== undefined ||
-			(!event.metaKey && !event.ctrlKey) ||
-			event.key !== ','
-		) {
-			return
-		}
-
-		event.preventDefault()
-		void openPreferences()
-	}}
-/>
-
 <svelte:head>
 	<title>AllWork</title>
 	<meta
@@ -1073,6 +1056,16 @@
 	}}
 />
 
+<AppWindows
+	bind:this={appWindows}
+	isElectron={data.isElectron}
+	onError={showError}
+	onPreferences={(next: Preferences) => {
+		void applyPreferences(next)
+	}}
+	onResetView={resetFromWindow}
+/>
+
 <ViewPersistence
 	bind:this={persistence}
 	defaultDirectory={data.defaultDirectory}
@@ -1086,7 +1079,7 @@
 <div class="app-shell">
 	<header class="app-toolbar">
 		<div class="workspace-tools">
-			<h1>AllWork</h1>
+			{#if !data.isElectron}<h1>AllWork</h1>{/if}
 			<form
 				class="directory-form"
 				aria-label="Load a workspace"
@@ -1439,7 +1432,7 @@
 													label="View output for {repository.name}"
 													lineLimit={outputLines}
 													onInspect={() => {
-														void inspect(run, repository)
+														inspect(run, repository)
 													}}
 													{result}
 												/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
@@ -1489,12 +1482,12 @@
 								),
 						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
 				>
-				<button
-					class="button subtle preferences-button"
-					onclick={async () => openPreferences()}
-					title="Preferences… (⌘,)"
-					type="button">Preferences…</button
-				>
+				{#if !data.isElectron}<button
+						class="button subtle preferences-button"
+						onclick={async () => appWindows.open({ kind: 'preferences' })}
+						title="Preferences… (⌘,)"
+						type="button">Preferences…</button
+					>{/if}
 			</footer>
 		</section>
 	</main>

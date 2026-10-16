@@ -22,7 +22,7 @@ AllWork is a local desktop and browser workspace for running one shell command a
 - Columns initially fit their contents. Drag a column divider to resize it, or double-click the divider to fit its contents again.
 - Runs commands in each selected repository with configurable parallelism (1–32 jobs per run), live output, exit codes, and cancellation.
 - Adds a column for every run. Open a result in its own window for full, live output, delete individual columns, or clear finished runs.
-- Preferences and run output open in separate windows: native windows in the Electron app, pop-ups in a browser.
+- Preferences and run output open in native windows in the Electron app, and in dialogs over the page in a browser. The Electron app also drops the title and Preferences button from the toolbar, since the menu bar covers them.
 
 ## Getting started
 

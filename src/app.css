@@ -804,12 +804,6 @@ th.last-output-cell {
 	z-index: 4;
 }
 
-/* The pinned column resizes from its left edge; a right-side handle would overflow the table */
-.last-output-cell .resize-handle {
-	right: auto;
-	left: -3px;
-}
-
 .table-filler {
 	pointer-events: none;
 	user-select: none;
@@ -891,6 +885,12 @@ th[aria-sort='descending'] {
 	height: 100%;
 	border: 0;
 	background: transparent;
+}
+
+/* The pinned column resizes from its left edge; a right-side handle would overflow the table */
+.last-output-cell .resize-handle {
+	right: auto;
+	left: -3px;
 }
 
 .repository-heading {
@@ -1279,6 +1279,50 @@ tr.selected
 	background: #efefef;
 }
 
+.output-panel,
+.preferences-panel {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.output-dialog,
+.preferences-dialog {
+	width: min(920px, 90vw);
+	max-height: 85vh;
+	margin: auto;
+	padding: 0;
+	border: 1px solid #737373;
+	border-radius: 5px;
+	color: #222;
+	background: #fff;
+	box-shadow:
+		0 12px 40px #0006,
+		0 0 0 1px #ffffff80;
+}
+
+.output-dialog[open],
+.preferences-dialog[open] {
+	display: flex;
+	flex-direction: column;
+}
+
+.output-dialog::backdrop,
+.preferences-dialog::backdrop {
+	background: #0003;
+}
+
+.preferences-dialog {
+	width: min(560px, calc(100vw - 32px));
+	max-height: calc(100dvh - 32px);
+	background: #efefef;
+}
+
+.dialog-close-button {
+	flex-shrink: 0;
+}
+
 .preferences-content {
 	overflow: auto;
 	display: grid;
@@ -1427,6 +1471,10 @@ tr.selected
 	line-height: 1.5;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
+}
+
+.output-dialog .full-output {
+	max-height: 55vh;
 }
 
 .table-scroll::-webkit-scrollbar,

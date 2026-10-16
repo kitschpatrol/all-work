@@ -32,24 +32,13 @@ function describeWindow(target: AppWindow): AppWindowRequest {
 }
 
 /**
- * Open a secondary window: a native window in Electron, a popup in a browser.
- * Reopening a window that is already open brings it to the front instead.
+ * Open a native Electron window for the target. Reopening a window that is
+ * already open brings it to the front instead.
  */
-export async function openAppWindow(target: AppWindow): Promise<void> {
-	const request = describeWindow(target)
-	if (globalThis._allwork !== undefined) {
-		await globalThis._allwork.openWindow(request)
-		return
+export async function openElectronWindow(target: AppWindow): Promise<void> {
+	if (globalThis._allwork === undefined) {
+		throw new Error('Native windows are only available in the AllWork app.')
 	}
 
-	const opened = open(
-		request.url,
-		request.name,
-		`popup,width=${request.width},height=${request.height}`,
-	)
-	if (opened === null) {
-		throw new Error('The browser blocked the window. Allow pop-ups for AllWork to open it.')
-	}
-
-	opened.focus()
+	await globalThis._allwork.openWindow(describeWindow(target))
 }
