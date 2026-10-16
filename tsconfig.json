@@ -1,4 +1,4 @@
 {
 	"extends": ["@kitschpatrol/typescript-config/svelte", "$app/tsconfig"],
-	"exclude": ["**/build/"]
+	"exclude": ["**/build/", "**/out/"]
 }

@@ -22,15 +22,15 @@
 	"imports": {
 		"#lib/*": "./src/lib/*"
 	},
-	"main": "./electron/main.js",
+	"main": "./out/main/main.js",
 	"scripts": {
-		"build": "svelte-kit sync && vite build",
+		"build": "svelte-kit sync && vite build && electron-vite build",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json --watch",
 		"clean-deep": "shx rm -f pnpm-lock.yaml && git clean -fdX -e !.claude/",
 		"dev": "poptab && vite dev --host 127.0.0.1 --open",
-		"electron": "electron .",
-		"electron:build": "svelte-kit sync && vite build && electron-builder",
+		"dev:electron": "electron-vite dev",
+		"electron:build": "pnpm build && electron-builder",
 		"fix": "ksc fix",
 		"lint": "ksc lint",
 		"move": "shx rm -rf /Applications/AllWork.app && shx mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
@@ -38,15 +38,17 @@
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm build",
 		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && electron-builder build --publish always",
-		"start": "node electron/server.js",
+		"start": "node out/main/server.js",
 		"test": "vitest run"
 	},
 	"dependencies": {
 		"execa": "^10.1.1",
 		"git-url-parse": "^16.1.0",
+		"lognow": "^0.8.5",
 		"metascope": "^0.13.0"
 	},
 	"devDependencies": {
+		"@kitschpatrol/electron-vite": "6.0.0-beta.4",
 		"@kitschpatrol/shared-config": "^8.13.1",
 		"@sveltejs/adapter-node": "^6.0.0",
 		"@sveltejs/kit": "^3.0.1",

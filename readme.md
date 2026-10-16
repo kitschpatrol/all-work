@@ -32,9 +32,9 @@ pnpm install
 pnpm dev
 ```
 
-The dev command runs [Poptab](https://github.com/kitschpatrol/poptab) to close stale local development tabs, then starts Vite and opens the app in your browser. For the Electron app, run `pnpm electron` in a second terminal while the development server is running. Electron also provides a native folder picker.
+The dev command runs [Poptab](https://github.com/kitschpatrol/poptab) to close stale local development tabs, then starts Vite and opens the app in your browser. For the Electron app, run `pnpm dev:electron` instead. It builds the main and preload scripts with [electron-vite](https://electron-vite.org) (via the [@kitschpatrol/electron-vite](https://github.com/kitschpatrol/electron-vite) fork), starts the SvelteKit dev server, and opens the Electron window against it. Electron also provides a native folder picker.
 
-To run the production build in a browser, use `pnpm build` followed by `pnpm start`, then open `http://127.0.0.1:4173`. The local server wrapper is also used by the packaged Electron app.
+To run the production build in a browser, use `pnpm build` followed by `pnpm start`, then open `http://127.0.0.1:4173`. The build writes the SvelteKit app to `build/` and the Electron main, preload, and local server wrapper to `out/`. The packaged Electron app starts the same server wrapper. Run `pnpm electron:build` to package the app with [electron-builder](https://www.electron.build/).
 
 ## Usage
 
