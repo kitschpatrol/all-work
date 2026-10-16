@@ -29,6 +29,7 @@
 	} from '@tanstack/svelte-table'
 	import { openAppWindow } from '#lib/app-windows.js'
 	import { request } from '#lib/client-request.js'
+	import { startColumnResize } from '#lib/column-resize.js'
 	import {
 		formatColumnCellValue,
 		getColumnPreviewTooltip,
@@ -167,7 +168,7 @@
 		},
 		defaultColumn: { maxSize: 4000, minSize: 24, size: 80, sortFn: 'alphanumeric' },
 		features,
-		getRowId: getRepositoryId,
+		getRowId: (repository: Repository) => repository.id,
 		globalFilterFn: 'includesString',
 		initialState: {
 			columnVisibility: Object.fromEntries(
@@ -771,10 +772,6 @@
 		}
 	}
 
-	function columnTooltip(repository: Repository, columnId: string) {
-		return getColumnTooltip(repository, columnId)
-	}
-
 	function previewColumn(columnId: string) {
 		return getColumnPreviewTooltip(previewRepository, columnId, runs)
 	}
@@ -892,6 +889,17 @@
 		}
 	}
 
+	function startResize(
+		event: MouseEvent | TouchEvent,
+		header: Parameters<typeof startColumnResize>[1],
+		pinned: boolean,
+	) {
+		resizedColumns.add(header.column.id)
+		startColumnResize(event, header, pinned, (size) => {
+			table.setColumnSizing((previous) => ({ ...previous, [header.column.id]: size }))
+		})
+	}
+
 	function showError(error: unknown) {
 		errorMessage = error instanceof Error ? error.message : String(error)
 	}
@@ -916,10 +924,6 @@
 		} catch (error) {
 			showError(error)
 		}
-	}
-
-	function getRepositoryId(repository: Repository) {
-		return repository.id
 	}
 
 	async function openInApp(repository: Repository, app: 'finder' | 'terminal' | 'tower') {
@@ -1273,8 +1277,9 @@
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
 								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
 										(item) => item.id === header.column.id,
-									)}<th
+									)}{@const pinned = run !== undefined && run === runs.at(-1)}<th
 										style:width="{header.getSize()}px"
+										class:last-output-cell={pinned}
 										class:output-header={run !== undefined}
 										class:repository-cell={header.column.id === 'relativePath'}
 										class:selection-cell={header.column.id === 'select'}
@@ -1357,14 +1362,8 @@
 													resizedColumns.delete(header.column.id)
 													fitColumns([header.column.id], { automatic: false })
 												}}
-												onmousedown={(event) => {
-													resizedColumns.add(header.column.id)
-													header.getResizeHandler()(event)
-												}}
-												ontouchstart={(event) => {
-													resizedColumns.add(header.column.id)
-													header.getResizeHandler()(event)
-												}}
+												onmousedown={(event) => startResize(event, header, pinned)}
+												ontouchstart={(event) => startResize(event, header, pinned)}
 												type="button"
 											></button>{/if}
 									</th>{/each}<th class="table-filler" aria-hidden="true"></th></tr
@@ -1377,11 +1376,12 @@
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
-									)}{@const result = run?.results[repository.id]}{@const tooltip = columnTooltip(
+									)}{@const result = run?.results[repository.id]}{@const tooltip = getColumnTooltip(
 										repository,
 										cell.column.id,
 									)}<td
 										style:width="{cell.column.getSize()}px"
+										class:last-output-cell={run !== undefined && run === runs.at(-1)}
 										class:output-cell={run !== undefined}
 										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}

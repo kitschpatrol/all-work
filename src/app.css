@@ -788,6 +788,28 @@ tr.selected td {
 	background: linear-gradient(#e2ecf8, #d3e2f4);
 }
 
+td.output-cell {
+	vertical-align: top;
+}
+
+/* The newest run stays in view at the right edge, as the repository column does at the left */
+.last-output-cell {
+	position: sticky;
+	z-index: 2;
+	right: 0;
+	box-shadow: -1px 0 #b8c0cc;
+}
+
+th.last-output-cell {
+	z-index: 4;
+}
+
+/* The pinned column resizes from its left edge; a right-side handle would overflow the table */
+.last-output-cell .resize-handle {
+	right: auto;
+	left: -3px;
+}
+
 .table-filler {
 	pointer-events: none;
 	user-select: none;
@@ -1419,12 +1441,23 @@ tr.selected
 	background: linear-gradient(90deg, #ddd, #f2f2f2);
 }
 
+.table-scroll::-webkit-scrollbar-track:horizontal,
+.full-output::-webkit-scrollbar-track:horizontal {
+	background: linear-gradient(180deg, #ddd, #f2f2f2);
+}
+
 .table-scroll::-webkit-scrollbar-thumb,
 .full-output::-webkit-scrollbar-thumb {
 	border: 1px solid #8d9baa;
 	border-radius: 7px;
 	background: linear-gradient(90deg, #edf4fc, #c1cfdf 48%, #adbed3 49%, #d2dfee);
 	box-shadow: inset 0 1px #fff;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:horizontal,
+.full-output::-webkit-scrollbar-thumb:horizontal {
+	background: linear-gradient(180deg, #edf4fc, #c1cfdf 48%, #adbed3 49%, #d2dfee);
+	box-shadow: inset 1px 0 #fff;
 }
 
 .table-scroll::-webkit-scrollbar-corner {
