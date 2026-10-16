@@ -28,11 +28,13 @@
 		sortFn_text,
 		tableFeatures,
 	} from '@tanstack/svelte-table'
+	import AppTitle from '#lib/AppTitle.svelte'
 	import AppWindows from '#lib/AppWindows.svelte'
 	import { request } from '#lib/client-request.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
 		formatColumnCellValue,
+		getColumnDisplay,
 		getColumnPreviewTooltip,
 		getColumnTooltip,
 		getColumnVariables,
@@ -44,6 +46,7 @@
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
+	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
 	import OutputPreview from '#lib/OutputPreview.svelte'
 	import { defaultPreferences } from '#lib/preferences.js'
@@ -1079,7 +1082,9 @@
 <div class="app-shell">
 	<header class="app-toolbar">
 		<div class="workspace-tools">
-			{#if !data.isElectron}<h1>AllWork</h1>{/if}
+			{#if !data.isElectron}<AppTitle
+					onPreferences={async () => appWindows.open({ kind: 'preferences' })}
+				/>{/if}
 			<form
 				class="directory-form"
 				aria-label="Load a workspace"
@@ -1273,6 +1278,7 @@
 									)}{@const pinned = run !== undefined && run === runs.at(-1)}<th
 										style:width="{header.getSize()}px"
 										class:last-output-cell={pinned}
+										class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
 										class:output-header={run !== undefined}
 										class:repository-cell={header.column.id === 'relativePath'}
 										class:selection-cell={header.column.id === 'select'}
@@ -1372,9 +1378,10 @@
 									)}{@const result = run?.results[repository.id]}{@const tooltip = getColumnTooltip(
 										repository,
 										cell.column.id,
-									)}<td
+									)}{@const display = getColumnDisplay(cell.column.id)}<td
 										style:width="{cell.column.getSize()}px"
 										class:last-output-cell={run !== undefined && run === runs.at(-1)}
+										class:numeric-cell={display === 'number'}
 										class:output-cell={run !== undefined}
 										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}
@@ -1436,7 +1443,10 @@
 													}}
 													{result}
 												/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
-										{:else}<span class="cell-text" title={tooltip}
+										{:else}<span
+												class="cell-text"
+												class:monospace={display !== 'text'}
+												title={tooltip}
 												>{formatColumnCellValue(repository, cell.column.id, runs)}</span
 											>{/if}
 									</td>{/each}<td class="table-filler" aria-hidden="true"></td></tr
@@ -1474,20 +1484,12 @@
 					>{visibleRepositories.length} of {workspace?.repositories.length ?? 0} repositories
 					<span class="caption-divider">·</span>
 					{dirtyCount} with changes <span class="caption-divider">·</span>
-					{runs.length} command {runs.length === 1 ? 'run' : 'runs'}
-					{#if workspace !== undefined}{@const pending = workspace.repositories.filter(
-							(repository) =>
-								Object.values(repository.metadata?.groups ?? {}).some(
-									(state) => state.status === 'queued' || state.status === 'loading',
-								),
-						).length}{#if pending > 0}<span class="caption-divider">·</span> Loading metadata for {pending}{/if}{/if}</span
+					{runs.length} command {runs.length === 1 ? 'run' : 'runs'}</span
 				>
-				{#if !data.isElectron}<button
-						class="button subtle preferences-button"
-						onclick={async () => appWindows.open({ kind: 'preferences' })}
-						title="Preferences… (⌘,)"
-						type="button">Preferences…</button
-					>{/if}
+				<MetadataProgress
+					repositories={workspace?.repositories ?? []}
+					workspaceId={workspace?.id ?? ''}
+				/>
 			</footer>
 		</section>
 	</main>

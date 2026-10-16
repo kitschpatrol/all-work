@@ -1,9 +1,11 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
+import type { ColumnDisplay } from './metadata-columns.js'
 import type { CommandRun, MetadataGroup, Repository } from './workspace.js'
 import { metadataColumns, metadataHint, metadataText } from './metadata-columns.js'
 
 type RepositoryColumn = {
 	category: string
+	display: ColumnDisplay
 	field?: string
 	group: MetadataGroup
 	header: string
@@ -74,6 +76,12 @@ export const repositoryColumns: RepositoryColumn[] = [
 		category: ['branch', 'changedFiles', 'lastCommitDate', 'sync'].includes(column.id)
 			? 'Git'
 			: 'Identity',
+		display:
+			column.id === 'sync'
+				? 'number'
+				: ['packageManager', 'remote', 'version'].includes(column.id)
+					? 'code'
+					: 'text',
 		field: Object.entries(representedFields).find(([, id]) => id === column.id)?.[0],
 		group: ['branch', 'changedFiles', 'lastCommitDate', 'sync'].includes(column.id)
 			? 'git'
@@ -244,6 +252,15 @@ export function getColumnPreviewTooltip(
 	]
 		.filter(Boolean)
 		.join('\n')
+}
+
+/**
+ * How a column's values are set: numbers right-align in monospace, code such as
+ * versions and paths is monospace, and everything else, including run output
+ * columns, is text.
+ */
+export function getColumnDisplay(columnId: string): ColumnDisplay {
+	return columnsById.get(columnId)?.display ?? 'text'
 }
 
 /** Format a current row value for its table cell. */

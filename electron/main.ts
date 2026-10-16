@@ -67,6 +67,13 @@ function createWindow(appUrl: URL): void {
 		minHeight: 640,
 		minWidth: 800,
 		title: 'AllWork',
+		// macOS: the app toolbar fills the title bar. The overlay centers the traffic
+		// lights in its height and reports their extent to the page as titlebar-area-*
+		// CSS environment variables.
+		...(process.platform === 'darwin' && {
+			titleBarOverlay: { height: 46 },
+			titleBarStyle: 'hiddenInset',
+		}),
 		webPreferences,
 		width: 1440,
 	})

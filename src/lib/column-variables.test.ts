@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, Repository } from './workspace.js'
 import {
+	getColumnDisplay,
 	getColumnEnvironment,
 	getColumnVariables,
 	getPendingCommandColumns,
@@ -41,6 +42,33 @@ function outputRun(id: string, output: string): CommandRun {
 }
 
 describe('column variables', () => {
+	it('sets counts as numbers, versions and locations as code, and prose, names, and booleans as text', () => {
+		const expected = {
+			description: 'text',
+			'metadata:Author': 'text',
+			'metadata:Created': 'code',
+			'metadata:Fork': 'text',
+			'metadata:Git Remotes Ahead': 'number',
+			'metadata:Latest Release Version': 'code',
+			'metadata:Libyears': 'number',
+			'metadata:Public': 'text',
+			'metadata:Repo URL': 'code',
+			'metadata:Stars': 'number',
+			'metadata:Tags': 'text',
+			name: 'text',
+			packageManager: 'code',
+			remote: 'code',
+			repoName: 'text',
+			repoOwner: 'text',
+			'run-1': 'text',
+			sync: 'number',
+			version: 'code',
+		}
+		expect(
+			Object.fromEntries(Object.keys(expected).map((id) => [id, getColumnDisplay(id)])),
+		).toEqual(expected)
+	})
+
 	it('formats expanded metadata and keeps unknown values distinct from zero and false', () => {
 		const expanded = {
 			...repository,

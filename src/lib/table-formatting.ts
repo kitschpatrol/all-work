@@ -29,6 +29,26 @@ export function runProgress(run: CommandRun) {
 	return `${results.filter((result) => result.status !== 'queued' && result.status !== 'running').length}/${results.length}`
 }
 
+/**
+ * Count the metadata groups still queued or loading, and the repositories
+ * waiting on them.
+ */
+export function pendingMetadata(repositories: readonly Repository[]) {
+	let groups = 0
+	let waiting = 0
+	for (const repository of repositories) {
+		const count = Object.values(repository.metadata?.groups ?? {}).filter(
+			(state) => state.status === 'queued' || state.status === 'loading',
+		).length
+		groups += count
+		if (count > 0) {
+			waiting++
+		}
+	}
+
+	return { groups, repositories: waiting }
+}
+
 /** Format the displayed cell text for inexpensive width measurement. */
 export function getColumnSizingValue(
 	repository: Repository,

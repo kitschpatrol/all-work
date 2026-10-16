@@ -1,5 +1,16 @@
 type SizingColumn = { header: string; id: string; maxSize: number; values: string[] }
 
+/**
+ * Describe an element's font for the canvas from its individual font
+ * properties. The computed `font` shorthand is empty whenever a property it
+ * can't express, such as `font-variant-numeric`, is set, and the canvas ignores
+ * an empty font.
+ */
+function canvasFont(element: HTMLElement): string {
+	const { fontFamily, fontSize, fontStyle, fontWeight } = getComputedStyle(element)
+	return `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`
+}
+
 /** Measure text without cloning the entire table or forcing a layout per cell. */
 export function measureColumns(
 	container: HTMLElement,
@@ -25,13 +36,13 @@ export function measureColumns(
 		const header = headers.find((entry) => entry.dataset.columnId === column.id)
 		const index = header === undefined ? -1 : headers.indexOf(header)
 		const cell = cells[index]
-		context.font = header === undefined ? '11px sans-serif' : getComputedStyle(header).font
+		context.font = header === undefined ? '11px sans-serif' : canvasFont(header)
 		let width = context.measureText(column.header).width + 30
 		const content =
 			cell?.querySelector<HTMLElement>(
 				'.cell-text, .project-name, .branch, .date-value, strong, pre',
 			) ?? cell
-		context.font = content === undefined ? '10px sans-serif' : getComputedStyle(content).font
+		context.font = content === undefined ? '10px sans-serif' : canvasFont(content)
 		const extra =
 			column.id === 'relativePath'
 				? (cell?.querySelector('.repository-actions')?.getBoundingClientRect().width ?? 110) + 42

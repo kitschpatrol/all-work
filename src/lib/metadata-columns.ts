@@ -31,8 +31,15 @@ function formatUpdatedAt(value: string) {
 	return 'just now'
 }
 
+/**
+ * Numbers right-align in monospace; code is monospace; text is set in the
+ * system font.
+ */
+export type ColumnDisplay = 'code' | 'number' | 'text'
+
 type MetadataColumn = {
 	category: string
+	display: ColumnDisplay
 	field: string
 	group: MetadataGroup
 	note?: string
@@ -169,6 +176,34 @@ const basicFields = new Set([
 	'Vulnerability Alerts',
 	'Watchers',
 ])
+const booleanFields = new Set([
+	'Fork',
+	'Git LFS',
+	'Homebrew',
+	'Monorepo',
+	'Organization',
+	'Public',
+	'Published',
+])
+const numberFields = basicFields.difference(booleanFields)
+// Versions, dates, paths, and URLs are compared character by character down a column
+const codeFields = new Set([
+	'CI URL',
+	'Created',
+	'First Commit Date',
+	'Homepage URL',
+	'ID',
+	'Issues URL',
+	'Latest Push Date',
+	'Latest Release Date',
+	'Latest Release Version',
+	'Package URL',
+	'Readme Path',
+	'Readme URL',
+	'Repo Path',
+	'Repo URL',
+	'VS Code Path',
+])
 const notes: Record<string, string> = {
 	CI: 'Latest completed default-branch run of a workflow named CI.',
 	Contributors: 'Unique Git author emails; distinct from the Contributor names column.',
@@ -194,6 +229,7 @@ const notes: Record<string, string> = {
 function fields(names: string[], group: MetadataGroup, category: string): MetadataColumn[] {
 	return names.map((field) => ({
 		category,
+		display: numberFields.has(field) ? 'number' : codeFields.has(field) ? 'code' : 'text',
 		field,
 		group,
 		note: notes[field],
