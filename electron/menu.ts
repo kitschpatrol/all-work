@@ -100,7 +100,7 @@ function buildTemplate(
 			{ role: 'delete' },
 			{ accelerator: 'CmdOrCtrl+A', click: selectAll, label: 'Select All' },
 			separator,
-			item('Filter Repositories…', 'view.focusFilter', { accelerator: 'CmdOrCtrl+F' }),
+			item('Search Repositories…', 'view.focusSearch', { accelerator: 'CmdOrCtrl+F' }),
 		],
 	}
 

@@ -169,7 +169,7 @@
 		style:left="{position.left}px"
 		style:top="{position.top}px"
 		style:width="{position.width}px"
-		class="command-completions"
+		class="completions"
 		aria-label="Column variable suggestions"
 		role="listbox"
 	>
@@ -186,7 +186,7 @@
 				role="option"
 				tabindex="-1"
 			>
-				<span>{variable.label}</span><code>${variable.name}</code>
+				<span class="completion-label">{variable.label}</span><code>${variable.name}</code>
 			</li>
 		{/each}
 	</ul>

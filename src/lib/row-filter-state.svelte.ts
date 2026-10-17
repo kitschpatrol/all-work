@@ -81,10 +81,6 @@ export function createRowFilter(options: RowFilterOptions) {
 		open = true
 	}
 
-	function expand() {
-		open = true
-	}
-
 	async function savePreset(label: string, id?: FilterPresetId) {
 		const name = label.trim()
 		if (name === '' || name.length > 80) {
@@ -92,7 +88,7 @@ export function createRowFilter(options: RowFilterOptions) {
 		}
 
 		if (filter.rules.length === 0) {
-			throw new Error('Add a condition before saving a preset.')
+			throw new Error('Add a rule before saving a preset.')
 		}
 
 		if (options.onPresetsChange === undefined) {
@@ -183,7 +179,6 @@ export function createRowFilter(options: RowFilterOptions) {
 			return columns
 		},
 		deletePreset,
-		expand,
 		get filter() {
 			return filter
 		},
@@ -211,9 +206,6 @@ export function createRowFilter(options: RowFilterOptions) {
 			return selectedPreset
 		},
 		set,
-		get shown() {
-			return open
-		},
 		get storedPreset() {
 			return savedPresets.some((entry) => entry.id === selectedPreset?.id)
 		},

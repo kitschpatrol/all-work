@@ -47,14 +47,13 @@ function setup(runs: CommandRun[] = [], savedPresets: FilterPreset[] = []) {
 describe('row filter state', () => {
 	it('expands and collapses the editor without changing the filter', () => {
 		const { onChange, state } = setup()
-		expect(state.shown).toBe(false)
+		expect(state.open).toBe(false)
 		state.toggle()
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 		expect(state.filter.rules).toHaveLength(0)
 		expect(state.activeRules).toBe(0)
 		expect(onChange).not.toHaveBeenCalled()
 		state.toggle()
-		expect(state.shown).toBe(false)
 		expect(state.open).toBe(false)
 	})
 
@@ -63,14 +62,13 @@ describe('row filter state', () => {
 		state.toggle()
 		state.set(emptyFilter())
 		expect(state.open).toBe(true)
-		expect(state.shown).toBe(true)
 	})
 
 	it('starts a new draft independently of the selected preset', () => {
 		const { state } = setup()
 		state.applyPreset('changed')
 		state.newFilter()
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 		expect(state.filter.rules).toEqual([{ column: 'name', operator: 'contains', value: '' }])
 		expect(state.selectedPreset).toBeUndefined()
 		expect(state.activeRules).toBe(0)
@@ -92,7 +90,7 @@ describe('row filter state', () => {
 		)
 		const existing = state.filter
 		state.addColumnRule('branch')
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 		expect(state.filter.match).toBe('any')
 		expect(state.filter.rules).toEqual([
 			...existing.rules,
@@ -112,7 +110,7 @@ describe('row filter state', () => {
 			{ command: 'pwd', concurrency: 1, createdAt: '', finished: true, id: 'run-1', results: {} },
 		])
 		state.addColumnRule(rule.column)
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 		expect(state.filter.rules).toEqual([rule])
 	})
 
@@ -128,7 +126,7 @@ describe('row filter state', () => {
 		const { rows, state } = setup()
 		state.togglePreset('changed')
 		expect(state.preset).toBe('changed')
-		expect(state.shown).toBe(false)
+		expect(state.open).toBe(false)
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['dirty'])
 		state.togglePreset('clean')
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['clean'])
@@ -140,18 +138,16 @@ describe('row filter state', () => {
 	it('keeps filtering when the editor is collapsed and cleared while expanded', () => {
 		const { rows, state } = setup()
 		state.applyPreset('changed')
-		state.expand()
-		state.toggle()
-		expect(state.shown).toBe(false)
+		expect(state.open).toBe(false)
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['dirty'])
-		state.expand()
+		state.toggle()
 		state.clear()
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 		expect(state.selectedPreset).toBeUndefined()
 		expect(rows.every((row) => state.matches(row))).toBe(true)
 	})
 
-	it('retains the preset being edited and can revert to its saved conditions', () => {
+	it('retains the preset being edited and can revert to its saved rules', () => {
 		const { state } = setup()
 		state.applyPreset('changed')
 		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
@@ -220,7 +216,7 @@ describe('row filter state', () => {
 		expect(state.modified).toBe(false)
 	})
 
-	it('updates a matching name and keeps the conditions when deleting a custom preset', async () => {
+	it('updates a matching name and keeps the rules when deleting a custom preset', async () => {
 		const { savedPresets, state } = setup()
 		state.applyPreset('clean')
 		await state.savePreset('My filter')
@@ -265,7 +261,7 @@ describe('row filter state', () => {
 		expect(saved).toHaveLength(100)
 	})
 
-	it('restores the source of an edited preset even when its conditions differ', () => {
+	it('restores the source of an edited preset even when its rules differ', () => {
 		const { onChange, state } = setup()
 		state.restore(
 			{ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] },
@@ -274,7 +270,7 @@ describe('row filter state', () => {
 		)
 		expect(state.selectedPreset?.id).toBe('changed')
 		expect(state.modified).toBe(true)
-		expect(state.shown).toBe(false)
+		expect(state.open).toBe(false)
 		expect(onChange).not.toHaveBeenCalled()
 	})
 
@@ -286,7 +282,7 @@ describe('row filter state', () => {
 		)
 		expect(onChange).not.toHaveBeenCalled()
 		expect(state.preset).toBe('clean')
-		expect(state.shown).toBe(true)
+		expect(state.open).toBe(true)
 	})
 
 	it('drops rules on runs that are gone', () => {

@@ -87,7 +87,7 @@
 	let columnOrder: string[] = $state([])
 	let draggingColumnId = $state<string>()
 	let runs: CommandRun[] = $state([])
-	let filterInput = $state<HTMLInputElement>()
+	let searchInput = $state<HTMLInputElement>()
 	let appWindows: {
 		open: (target: AppWindow) => Promise<void>
 		closeOutput: (runId: string) => void
@@ -1035,9 +1035,9 @@
 			resizedColumns.clear()
 			fitColumns()
 		},
-		'view.focusFilter'() {
-			filterInput?.focus()
-			filterInput?.select()
+		'view.focusSearch'() {
+			searchInput?.focus()
+			searchInput?.select()
 		},
 		'view.reset'() {
 			void resetView()
@@ -1086,7 +1086,7 @@
 		filterActive: rowFilter.activeRules > 0,
 		filterPreset: rowFilter.preset,
 		filterPresets: rowFilter.presets.map(({ id, label }) => ({ id, label })),
-		filterShown: rowFilter.shown,
+		filterShown: rowFilter.open,
 		hasActiveRuns: activeRuns.length > 0,
 		hasFinishedRuns: runs.some((run) => run.finished),
 		loading,
@@ -1206,14 +1206,14 @@
 								stroke-width="1.5"
 							/></svg
 						><input
-							bind:this={filterInput}
-							aria-label="Filter repositories"
+							bind:this={searchInput}
+							aria-label="Search repositories"
 							oninput={() => {
 								refreshTableData()
 								table.setGlobalFilter(search)
 								scheduleMetadata()
 							}}
-							placeholder="Filter repositories…"
+							placeholder="Search repositories…"
 							bind:value={search}
 						/>
 					</div>

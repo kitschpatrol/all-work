@@ -319,7 +319,7 @@ main {
 	outline: none;
 }
 
-.command-completions {
+.completions {
 	user-select: none;
 	position: fixed;
 	z-index: 30;
@@ -333,7 +333,7 @@ main {
 	box-shadow: var(--popover-shadow);
 }
 
-.command-completions li {
+.completions li {
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 12px;
@@ -345,7 +345,15 @@ main {
 	font-size: 12px;
 }
 
-.command-completions code {
+.completion-label {
+	overflow: hidden;
+	min-width: 0;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.completions code,
+.completion-count {
 	overflow: hidden;
 	font-size: 11px;
 	color: var(--text-tertiary);
@@ -353,12 +361,17 @@ main {
 	white-space: nowrap;
 }
 
-.command-completions [aria-selected='true'] {
+.completion-count {
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+.completions [aria-selected='true'] {
 	color: #fff;
 	background: var(--selected-face);
 }
 
-.command-completions :where([aria-selected='true']) code {
+.completions :where([aria-selected='true']) :is(code, .completion-count) {
 	color: inherit;
 }
 
@@ -727,8 +740,7 @@ h2 {
 
 .filter-toolbar,
 .filter-save,
-.filter-empty,
-.filter-editor-footer {
+.filter-empty {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
@@ -770,8 +782,7 @@ h2 {
 }
 
 .filter-edited,
-.filter-results,
-.filter-editor-footer {
+.filter-results {
 	font-size: 11px;
 	color: var(--text-secondary);
 }
@@ -785,10 +796,6 @@ h2 {
 	white-space: nowrap;
 }
 
-.filter-save {
-	padding: 3px 8px 6px;
-}
-
 .filter-error {
 	margin: 0;
 	padding: 3px 8px 6px;
@@ -798,11 +805,6 @@ h2 {
 .filter-empty {
 	min-height: 32px;
 	color: var(--text-secondary);
-}
-
-.filter-editor-footer {
-	gap: 12px;
-	padding: 2px 8px 6px;
 }
 
 .filter-bar {

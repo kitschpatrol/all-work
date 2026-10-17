@@ -29,7 +29,7 @@ export type MenuCommand =
 	| 'view.columns'
 	| 'view.filterPreset'
 	| 'view.fitColumns'
-	| 'view.focusFilter'
+	| 'view.focusSearch'
 	| 'view.reset'
 	| 'view.toggleFilter'
 	| 'view.toggleRepositoryShortcuts'

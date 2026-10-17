@@ -2,6 +2,7 @@
 	import type { FilterColumn, FilterRule } from './row-filter.js'
 	import type { CommandRun, Repository } from './workspace.js'
 	import FilterRowActions from './FilterRowActions.svelte'
+	import FilterValueInput from './FilterValueInput.svelte'
 	import {
 		changeOperator,
 		dateUnits,
@@ -35,7 +36,6 @@
 		runs: CommandRun[]
 		showAdd: boolean
 	} = $props()
-	const listId = $props.id()
 	const categories = $derived([...new Set(columns.map((column) => column.category))])
 	const column = $derived(columns.find((entry) => entry.id === rule.column))
 	const kind = $derived(column?.kind ?? 'text')
@@ -91,26 +91,15 @@
 			<option value={operator}>{getOperatorLabel(kind, operator)}</option>
 		{/each}
 	</select>
-	{#if shape === 'text'}<input
-			class="filter-value"
-			class:invalid
-			aria-invalid={invalid}
-			aria-label="Value"
-			list={suggestions.length > 0 ? listId : undefined}
-			oninput={(event) => {
-				edit({ value: event.currentTarget.value })
+	{#if shape === 'text'}<FilterValueInput
+			{invalid}
+			onChange={(value: string) => {
+				edit({ value })
 			}}
 			placeholder={rule.operator === 'matches' ? 'Regular expression' : 'Value'}
-			spellcheck="false"
-			title={invalid ? 'Enter a valid regular expression' : undefined}
-			type="text"
+			{suggestions}
 			value={rule.value}
-		/>{#if suggestions.length > 0}<datalist id={listId}
-				>{#each suggestions as suggestion (suggestion.value)}<option
-						label="{suggestion.count} {suggestion.count === 1 ? 'repository' : 'repositories'}"
-						value={suggestion.value}
-					></option>{/each}</datalist
-			>{/if}
+		/>
 	{:else if shape === 'number'}<input
 			class="filter-number"
 			aria-label="Value"

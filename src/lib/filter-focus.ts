@@ -1,6 +1,6 @@
 import { tick } from 'svelte'
 
-/** Reveal the appended condition and focus its value or comparison control. */
+/** Reveal the appended rule and focus its value or comparison control. */
 export async function focusLastFilterRule(): Promise<void> {
 	await tick()
 	const bar = document.querySelector<HTMLElement>('.filter-bar')
