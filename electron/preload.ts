@@ -2,9 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
 	AllWorkApi,
 	AppWindowRequest,
+	ColumnMenuRequest,
 	MenuCommand,
 	MenuState,
+	OpenTarget,
 } from '../src/lib/electron-api.js'
+import { isOpenTarget } from '../src/lib/electron-api.js'
 
 const api: AllWorkApi = {
 	async chooseDirectory(): Promise<string | undefined> {
@@ -29,6 +32,13 @@ const api: AllWorkApi = {
 	},
 	async openWindow(request: AppWindowRequest): Promise<void> {
 		await ipcRenderer.invoke('allwork:open-window', request)
+	},
+	async showColumnMenu(request: ColumnMenuRequest): Promise<void> {
+		await ipcRenderer.invoke('allwork:column-menu', request)
+	},
+	async showRepositoryMenu(hasGithubRemote: boolean): Promise<OpenTarget | undefined> {
+		const result: unknown = await ipcRenderer.invoke('allwork:repository-menu', hasGithubRemote)
+		return isOpenTarget(result) ? result : undefined
 	},
 	updateMenuState(state: MenuState): void {
 		ipcRenderer.send('allwork:menu-state', state)

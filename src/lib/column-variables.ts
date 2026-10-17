@@ -123,9 +123,10 @@ const titleCasedColumns = new Set(['metadata:Status'])
 const commandVariablePattern = /\$\{?(ALLWORK_COLUMN_\w+)/gv
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
 const repositoryVariables = new Map(
-	repositoryColumns.map(({ header, id }) => [
+	repositoryColumns.map(({ category, header, id }) => [
 		id,
 		{
+			category,
 			id,
 			label: header,
 			name: `ALLWORK_COLUMN_${header.toUpperCase().replaceAll(spacesPattern, '_')}`,
@@ -143,6 +144,7 @@ export function getColumnVariables(runs: ReadonlyArray<Pick<CommandRun, 'command
 
 function runVariable(run: Pick<CommandRun, 'command' | 'id'>, index: number) {
 	return {
+		category: 'Runs',
 		id: run.id,
 		label: `Run ${index + 1}: ${run.command}`,
 		name: `ALLWORK_COLUMN_RUN_${index + 1}`,

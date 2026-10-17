@@ -157,8 +157,18 @@ describe('column variables', () => {
 			getColumnEnvironment({ ...repository, id: 'not-targeted' }, runs).ALLWORK_COLUMN_RUN_1,
 		).toBe('')
 		expect(getColumnVariables(runs).slice(-2)).toEqual([
-			{ id: 'first', label: 'Run 1: git status --short', name: 'ALLWORK_COLUMN_RUN_1' },
-			{ id: 'second', label: 'Run 2: git status --short', name: 'ALLWORK_COLUMN_RUN_2' },
+			{
+				category: 'Runs',
+				id: 'first',
+				label: 'Run 1: git status --short',
+				name: 'ALLWORK_COLUMN_RUN_1',
+			},
+			{
+				category: 'Runs',
+				id: 'second',
+				label: 'Run 2: git status --short',
+				name: 'ALLWORK_COLUMN_RUN_2',
+			},
 		])
 		expect(getColumnEnvironment(repository, runs.slice(1)).ALLWORK_COLUMN_RUN_1).toBe('three\n')
 	})

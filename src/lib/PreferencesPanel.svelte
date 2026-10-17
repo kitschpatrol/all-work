@@ -4,6 +4,7 @@
 	import { request } from './client-request.js'
 	import { defaultPreferences, parseIdentity, parseIdentityNames } from './preferences.js'
 	import { loadSettings, savePreferences } from './view-storage.js'
+	import { listenForWindowMessages } from './window-messages.js'
 
 	/**
 	 * The preferences form, shared by the Electron preferences window and the
@@ -23,6 +24,7 @@
 	let authorNames = $state('')
 	let githubAccounts = $state('')
 	let restoreWorkspace = $state(true)
+	let showRepositoryShortcuts = $state(false)
 	let busy = $state(true)
 	let message = $state('')
 
@@ -30,9 +32,18 @@
 		authorNames = preferences.identity.authorNames.join('\n')
 		githubAccounts = preferences.identity.githubAccounts.join('\n')
 		restoreWorkspace = preferences.restoreWorkspace
+		showRepositoryShortcuts = preferences.showRepositoryShortcuts
 	}
 
 	onMount(() => {
+		const stopMessages = listenForWindowMessages((update) => {
+			if (update.type !== 'preferences-changed') {
+				return
+			}
+
+			preferences = update.preferences
+			showRepositoryShortcuts = update.preferences.showRepositoryShortcuts
+		})
 		void (async () => {
 			try {
 				const settings = await loadSettings('')
@@ -44,6 +55,8 @@
 				busy = false
 			}
 		})()
+
+		return stopMessages
 	})
 
 	async function action(callback: () => Promise<void> | void, success: string) {
@@ -75,7 +88,7 @@
 			throw new Error('Use at most 100 author names and accounts, each under 200 characters.')
 		}
 
-		await persist({ identity, restoreWorkspace, version: 1 })
+		await persist({ identity, restoreWorkspace, showRepositoryShortcuts, version: 1 })
 		onClose()
 	}
 
@@ -113,6 +126,12 @@
 				One name or account per line. Used by Metascope to identify your authored and maintained
 				projects.
 			</p>
+		</fieldset>
+		<fieldset disabled={busy}>
+			<legend>Appearance</legend>
+			<label class="preference-checkbox"
+				><input type="checkbox" bind:checked={showRepositoryShortcuts} /> Show repo shortcut buttons</label
+			>
 		</fieldset>
 		<fieldset disabled={busy}>
 			<legend>Storage</legend>

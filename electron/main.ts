@@ -1,9 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, utilityProcess } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } from 'electron'
 import { getJsonFileTransportDestinations, log, setDefaultLogOptions } from 'lognow'
 import net from 'node:net'
 import path from 'node:path'
-import type { AppWindowRequest } from '../src/lib/electron-api.js'
-import { isAppWindowRequest, isMenuState } from '../src/lib/electron-api.js'
+import type { AppWindowRequest, MenuCommand, OpenTarget } from '../src/lib/electron-api.js'
+import { isAppWindowRequest, isColumnMenuRequest, isMenuState } from '../src/lib/electron-api.js'
 import { initialMenuState, syncMenu } from './menu.js'
 
 // The packaged app serves the adapter-node build from a fixed loopback origin.
@@ -67,13 +67,6 @@ function createWindow(appUrl: URL): void {
 		minHeight: 640,
 		minWidth: 800,
 		title: 'AllWork',
-		// macOS: the app toolbar fills the title bar. The overlay centers the traffic
-		// lights in its height and reports their extent to the page as titlebar-area-*
-		// CSS environment variables.
-		...(process.platform === 'darwin' && {
-			titleBarOverlay: { height: 46 },
-			titleBarStyle: 'hiddenInset',
-		}),
 		webPreferences,
 		width: 1440,
 	})
@@ -215,6 +208,76 @@ async function main(): Promise<void> {
 			}
 
 			openSecondaryWindow(appUrl, request)
+		})
+
+		ipcMain.handle('allwork:column-menu', (event, request: unknown) => {
+			if (!isTrustedSender(event, appUrl)) {
+				throw new Error('Column menus are only available inside AllWork.')
+			}
+
+			if (!isColumnMenuRequest(request)) {
+				throw new Error('Invalid column.')
+			}
+
+			const window = BrowserWindow.fromWebContents(event.sender)
+			if (window === null) {
+				return
+			}
+
+			const items: Array<[string, MenuCommand, boolean]> = [
+				['Sort Ascending', 'column.sortAscending', request.canSort],
+				['Sort Descending', 'column.sortDescending', request.canSort],
+				['Hide Column', 'column.hide', request.canHide],
+				['Filter By…', 'column.filter', request.canFilter],
+			]
+			Menu.buildFromTemplate(
+				items.map(([label, command, enabled]) => ({
+					click() {
+						event.sender.send('allwork:menu-command', command, request.columnId)
+					},
+					enabled,
+					label,
+				})),
+			).popup({ window })
+		})
+
+		ipcMain.handle('allwork:repository-menu', async (event, hasGithubRemote: unknown) => {
+			if (!isTrustedSender(event, appUrl)) {
+				throw new Error('Repository menus are only available inside AllWork.')
+			}
+
+			if (typeof hasGithubRemote !== 'boolean') {
+				throw new TypeError('Invalid repository menu request.')
+			}
+
+			const window = BrowserWindow.fromWebContents(event.sender)
+			if (window === null) {
+				return
+			}
+
+			return new Promise<OpenTarget | undefined>((resolve) => {
+				const items: Array<[string, OpenTarget]> = [
+					['Open in Tower', 'tower'],
+					['Open in GitHub', 'github'],
+					['Open in VS Code', 'vscode'],
+					['Open in Terminal', 'terminal'],
+					['Reveal in Finder', 'finder'],
+				]
+				Menu.buildFromTemplate(
+					items.map(([label, target]) => ({
+						click() {
+							resolve(target)
+						},
+						enabled: target !== 'github' || hasGithubRemote,
+						label,
+					})),
+				).popup({
+					callback() {
+						resolve(undefined)
+					},
+					window,
+				})
+			})
 		})
 
 		ipcMain.on('allwork:menu-state', (event, state: unknown) => {

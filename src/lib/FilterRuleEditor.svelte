@@ -23,6 +23,7 @@
 		repositories,
 		rule,
 		runs,
+		showAdd,
 	}: {
 		altHeld: boolean
 		columns: FilterColumn[]
@@ -32,6 +33,7 @@
 		repositories: Repository[]
 		rule: FilterRule
 		runs: CommandRun[]
+		showAdd: boolean
 	} = $props()
 	const listId = $props.id()
 	const categories = $derived([...new Set(columns.map((column) => column.category))])
@@ -180,5 +182,5 @@
 				>{/each}</select
 		>
 	{/if}
-	<FilterRowActions {altHeld} {onAdd} {onRemove} />
+	<FilterRowActions {altHeld} {onAdd} {onRemove} {showAdd} />
 </div>

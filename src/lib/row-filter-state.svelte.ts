@@ -5,6 +5,7 @@ import { findFilterPreset, getPresetFilter } from './filter-presets.js'
 import {
 	compileFilter,
 	countActiveRules,
+	createRule,
 	emptyFilter,
 	getFilterColumns,
 	getFilterMetadataGroups,
@@ -56,6 +57,16 @@ export function createRowFilter(options: RowFilterOptions) {
 		open = true
 	}
 
+	function addColumnRule(columnId: string) {
+		const column = columns.find((entry) => entry.id === columnId)
+		if (column === undefined) {
+			return
+		}
+
+		set({ ...filter, rules: [...filter.rules, createRule(column)] })
+		open = true
+	}
+
 	// Drop rules on columns that no longer exist, such as deleted runs
 	function prune() {
 		filter = pruneFilter(
@@ -102,6 +113,7 @@ export function createRowFilter(options: RowFilterOptions) {
 		get activeRules() {
 			return activeRules
 		},
+		addColumnRule,
 		applyPreset,
 		get columns() {
 			return columns

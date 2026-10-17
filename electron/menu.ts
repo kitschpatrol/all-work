@@ -5,8 +5,6 @@ import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
 const HOMEPAGE = 'https://github.com/kitschpatrol/allwork'
-// Opening more repositories than this at once in an external app is almost certainly a mistake
-const MAX_OPEN_SELECTED = 10
 
 export const initialMenuState: MenuState = {
 	autoClear: false,
@@ -20,6 +18,7 @@ export const initialMenuState: MenuState = {
 	loading: false,
 	selectedCount: 0,
 	selectedOnly: false,
+	showRepositoryShortcuts: false,
 	visibleCount: 0,
 }
 
@@ -51,7 +50,7 @@ function buildTemplate(
 	const preferences = item('Preferences…', 'preferences.open', { accelerator: 'CmdOrCtrl+,' })
 	const canChangeWorkspace = !state.loading && !state.hasActiveRuns
 	const canRefresh = state.selectedCount > 0 && !state.loading
-	const canOpenSelected = state.selectedCount > 0 && state.selectedCount <= MAX_OPEN_SELECTED
+	const canOpenSelected = state.selectedCount > 0
 
 	const appMenu: MenuItemConstructorOptions = {
 		label: app.name,
@@ -158,16 +157,23 @@ function buildTemplate(
 					item('Tower', 'repositories.open', { payload: 'tower' }),
 					item('VS Code', 'repositories.open', { payload: 'vscode' }),
 					item('GitHub', 'repositories.open', { payload: 'github' }),
-					item('Finder', 'repositories.open', { payload: 'finder' }),
 					item('Terminal', 'repositories.open', { payload: 'terminal' }),
 				],
 			},
+			item('Reveal Selected in Finder', 'repositories.open', {
+				enabled: canOpenSelected,
+				payload: 'finder',
+			}),
 		],
 	}
 
 	const view: MenuItemConstructorOptions = {
 		label: 'View',
 		submenu: [
+			item('Show Repo Shortcut Buttons', 'view.toggleRepositoryShortcuts', {
+				checked: state.showRepositoryShortcuts,
+				type: 'checkbox',
+			}),
 			item('Show Selected Only', 'view.toggleSelectedOnly', {
 				checked: state.selectedOnly,
 				type: 'checkbox',

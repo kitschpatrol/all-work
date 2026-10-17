@@ -16,6 +16,7 @@
 		outputLines,
 		repository,
 		runs,
+		showShortcuts,
 		tooltip,
 	}: {
 		columnId: string
@@ -24,6 +25,7 @@
 		outputLines: number
 		repository: Repository
 		runs: CommandRun[]
+		showShortcuts: boolean
 		tooltip: string
 	} = $props()
 	const run = $derived(runs.find((item) => item.id === columnId))
@@ -31,7 +33,7 @@
 	const display = $derived(getColumnDisplay(columnId))
 </script>
 
-{#if columnId === 'relativePath'}<RepositoryCell {onOpen} {repository} {tooltip} />
+{#if columnId === 'relativePath'}<RepositoryCell {onOpen} {repository} {showShortcuts} {tooltip} />
 {:else if columnId === 'name'}<span
 		class="project-name"
 		title={repository.description === '' ? tooltip : `${tooltip}\n${repository.description}`}

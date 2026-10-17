@@ -6,6 +6,10 @@ import { isFilterPresetId } from './filter-presets.js'
  * renderer.
  */
 export type MenuCommand =
+	| 'column.filter'
+	| 'column.hide'
+	| 'column.sortAscending'
+	| 'column.sortDescending'
 	| 'command.focus'
 	| 'command.preset'
 	| 'command.run'
@@ -27,6 +31,7 @@ export type MenuCommand =
 	| 'view.focusFilter'
 	| 'view.reset'
 	| 'view.toggleFilter'
+	| 'view.toggleRepositoryShortcuts'
 	| 'view.toggleSelectedOnly'
 	| 'workspace.browse'
 	| 'workspace.reload'
@@ -58,6 +63,7 @@ export type MenuState = {
 	loading: boolean
 	selectedCount: number
 	selectedOnly: boolean
+	showRepositoryShortcuts: boolean
 	visibleCount: number
 }
 
@@ -70,11 +76,21 @@ export type AppWindowRequest = {
 	width: number
 }
 
+/** Available actions for the column whose native context menu is opening. */
+export type ColumnMenuRequest = {
+	canFilter: boolean
+	canHide: boolean
+	canSort: boolean
+	columnId: string
+}
+
 /** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
 export type AllWorkApi = {
 	chooseDirectory: () => Promise<string | undefined>
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
 	openWindow: (request: AppWindowRequest) => Promise<void>
+	showColumnMenu: (request: ColumnMenuRequest) => Promise<void>
+	showRepositoryMenu: (hasGithubRemote: boolean) => Promise<OpenTarget | undefined>
 	updateMenuState: (state: MenuState) => void
 }
 
@@ -109,6 +125,25 @@ export function isColumnPreset(value: unknown): value is ColumnPreset {
 	return columnPresets.includes(value as ColumnPreset)
 }
 
+/**
+ * Validate column actions requested by the renderer before opening a native
+ * menu.
+ */
+export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest {
+	if (typeof value !== 'object' || value === null) {
+		return false
+	}
+
+	const request = value as Record<keyof ColumnMenuRequest, unknown>
+	return (
+		typeof request.columnId === 'string' &&
+		request.columnId !== '' &&
+		typeof request.canFilter === 'boolean' &&
+		typeof request.canHide === 'boolean' &&
+		typeof request.canSort === 'boolean'
+	)
+}
+
 /** Narrow a menu payload to an application the selection can be opened in. */
 export function isOpenTarget(value: unknown): value is OpenTarget {
 	return openTargets.includes(value as OpenTarget)
@@ -133,6 +168,7 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.loading === 'boolean' &&
 		typeof state.selectedCount === 'number' &&
 		typeof state.selectedOnly === 'boolean' &&
+		typeof state.showRepositoryShortcuts === 'boolean' &&
 		typeof state.visibleCount === 'number'
 	)
 }

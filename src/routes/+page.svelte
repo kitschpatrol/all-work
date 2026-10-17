@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ColumnDef, RowSelectionState } from '@tanstack/svelte-table'
 	import type { AppWindow } from '#lib/app-windows.js'
-	import type { MenuActions, OpenTarget } from '#lib/electron-api.js'
+	import type { MenuActions } from '#lib/electron-api.js'
 	import type { Preferences } from '#lib/preferences.js'
 	import type { SavedView } from '#lib/view-storage.js'
 	import type {
@@ -34,6 +34,7 @@
 	import CellContent from '#lib/CellContent.svelte'
 	import { request } from '#lib/client-request.js'
 	import { startColumnDrag } from '#lib/column-drag.js'
+	import { createColumnMenu } from '#lib/column-menu.js'
 	import { resolveColumnOrder } from '#lib/column-order.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
@@ -52,8 +53,9 @@
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
+	import { updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
-	import { openRepositoryLink } from '#lib/repository-links.js'
+	import { openRepositories } from '#lib/repository-links.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
@@ -220,6 +222,15 @@
 			},
 		},
 	})
+	const columnMenu = createColumnMenu({
+		beforeSort: refreshTableData,
+		getColumn: (id) => table.getColumn(id),
+		onError: showError,
+		onFilter: rowFilter.addColumnRule,
+		onHide: async (id) => setColumnsVisible([id], false),
+		onSort: scheduleMetadata,
+		pinned: () => pinnedColumns,
+	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
 	const selection = createRowSelection({
 		ids: () => visibleRepositories.map((row) => row.id),
@@ -353,16 +364,12 @@
 		}
 	}
 
-	async function applyPreferences(next: Preferences) {
-		preferences = next
-		if (workspace !== undefined) {
-			await request('/api/workspace/metadata', {
-				force: true,
-				groups: ['local'],
-				identity: next.identity,
-				repositoryIds: workspace.repositories.map((repository) => repository.id),
-				workspaceId: workspace.id,
-			})
+	async function applyPreferences(next: Preferences, persist = false) {
+		try {
+			await updatePreferences(preferences, next, workspace, persist)
+			preferences = next
+		} catch (error) {
+			showError(error)
 		}
 	}
 
@@ -882,16 +889,6 @@
 			.map((column) => column.id)
 	}
 
-	async function openSelected(target: OpenTarget) {
-		for (const row of targets) {
-			if (target === 'github' || target === 'vscode') {
-				openRepositoryLink(row.original, target)
-			} else {
-				await openInApp(row.original, target)
-			}
-		}
-	}
-
 	function startResize(
 		event: MouseEvent | TouchEvent,
 		header: Parameters<typeof startColumnResize>[1],
@@ -962,6 +959,7 @@
 	}
 
 	const menuActions: MenuActions = {
+		...columnMenu.actions,
 		'command.focus'() {
 			commandForm.focus()
 		},
@@ -991,7 +989,11 @@
 		'repositories.deselectAll': selection.clear,
 		'repositories.open'(payload) {
 			if (isOpenTarget(payload)) {
-				void openSelected(payload)
+				void openRepositories(
+					targets.map((row) => row.original),
+					payload,
+					openInApp,
+				)
 			}
 		},
 		'repositories.selectAll'() {
@@ -1036,6 +1038,12 @@
 			void resetView()
 		},
 		'view.toggleFilter': rowFilter.toggle,
+		'view.toggleRepositoryShortcuts'() {
+			void applyPreferences(
+				{ ...preferences, showRepositoryShortcuts: !preferences.showRepositoryShortcuts },
+				true,
+			)
+		},
 		'view.toggleSelectedOnly'() {
 			selectedOnly = !selectedOnly
 			scheduleMetadata()
@@ -1078,6 +1086,7 @@
 		loading,
 		selectedCount: targets.length,
 		selectedOnly,
+		showRepositoryShortcuts: preferences.showRepositoryShortcuts,
 		visibleCount: visibleRepositories.length,
 	}}
 />
@@ -1322,6 +1331,7 @@
 												? 'descending'
 												: undefined}
 										data-column-id={header.column.id}
+										oncontextmenu={async (event) => columnMenu.show(event, header.column.id)}
 										onpointerdown={(event) => {
 											startDrag(event, header.column.id)
 										}}
@@ -1442,6 +1452,7 @@
 												{outputLines}
 												{repository}
 												{runs}
+												showShortcuts={preferences.showRepositoryShortcuts}
 												{tooltip}
 											/>{/if}
 									</td>{/each}<td class="table-filler" aria-hidden="true"></td></tr

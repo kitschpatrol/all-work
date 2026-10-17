@@ -44,15 +44,20 @@ export async function openRepository(
 
 	try {
 		await verifyRepository(repository)
-		const targetApp =
-			app === 'Terminal'
-				? await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', defaultTerminalScript])
-				: app
-		if (targetApp === '') {
-			throw new Error('No default terminal application is configured in macOS.')
+		if (app === 'Finder') {
+			await execute('/usr/bin/open', ['-R', '--', repository.path])
+		} else {
+			const targetApp =
+				app === 'Terminal'
+					? await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', defaultTerminalScript])
+					: app
+			if (targetApp === '') {
+				throw new Error('No default terminal application is configured in macOS.')
+			}
+
+			await execute('/usr/bin/open', ['-a', targetApp, '--', repository.path])
 		}
 
-		await execute('/usr/bin/open', ['-a', targetApp, '--', repository.path])
 		return Response.json({ opened: true })
 	} catch (error_) {
 		error(

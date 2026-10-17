@@ -6,6 +6,7 @@ export type ProjectIdentity = {
 export type Preferences = {
 	identity: ProjectIdentity
 	restoreWorkspace: boolean
+	showRepositoryShortcuts: boolean
 	version: 1
 }
 
@@ -13,7 +14,8 @@ const separator = /[,\n]/v
 const accountPrefix = /^@/v
 
 /**
- * Provide the initial identity and workspace restoration preferences.
+ * Provide the initial identity, appearance, and workspace restoration
+ * preferences.
  */
 export function defaultPreferences(): Preferences {
 	return {
@@ -22,6 +24,7 @@ export function defaultPreferences(): Preferences {
 			githubAccounts: ['kitschpatrol', 'scalarstudio'],
 		},
 		restoreWorkspace: true,
+		showRepositoryShortcuts: false,
 		version: 1,
 	}
 }
@@ -77,6 +80,7 @@ export function parsePreferences(value: unknown): Preferences {
 	return {
 		identity: parseIdentity(record?.identity) ?? defaults.identity,
 		restoreWorkspace: record?.restoreWorkspace !== false,
+		showRepositoryShortcuts: record?.showRepositoryShortcuts === true,
 		version: 1,
 	}
 }

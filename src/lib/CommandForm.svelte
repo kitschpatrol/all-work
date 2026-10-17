@@ -22,9 +22,10 @@
 		onRun: () => Promise<void>
 		starting: boolean
 		targetCount: number
-		variables: Array<{ id: string; label: string; name: string; preview: string }>
+		variables: Array<{ category: string; id: string; label: string; name: string; preview: string }>
 	} = $props()
 	/* eslint-enable ts/no-useless-default-assignment */
+	const categories = $derived([...new Set(variables.map((variable) => variable.category))])
 	let input = $state<HTMLInputElement>()
 	let historyIndex = $state(-1)
 	let draft = $state('')
@@ -112,7 +113,6 @@
 >
 	<label class="field-label" for="shell-command">Command</label>
 	<div class="command-input">
-		<span class="prompt-symbol" aria-hidden="true">$</span>
 		<input
 			bind:this={input}
 			id="shell-command"
@@ -140,8 +140,12 @@
 			value=""
 		>
 			<option disabled value="">Variables</option>
-			{#each variables as variable (variable.id)}
-				<option title={variable.preview} value={variable.name}>{variable.label}</option>
+			{#each categories as category (category)}
+				<optgroup label={category}>
+					{#each variables.filter((variable) => variable.category === category) as variable (variable.id)}
+						<option title={variable.preview} value={variable.name}>{variable.label}</option>
+					{/each}
+				</optgroup>
 			{/each}
 		</select>
 		<select

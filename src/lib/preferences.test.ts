@@ -7,6 +7,15 @@ import {
 } from './preferences.js'
 
 describe('saved project identity', () => {
+	it('hides repository shortcuts unless they were explicitly enabled', () => {
+		expect(defaultPreferences().showRepositoryShortcuts).toBe(false)
+		expect(parsePreferences({}).showRepositoryShortcuts).toBe(false)
+		expect(parsePreferences({ showRepositoryShortcuts: 'true' }).showRepositoryShortcuts).toBe(
+			false,
+		)
+		expect(parsePreferences({ showRepositoryShortcuts: true }).showRepositoryShortcuts).toBe(true)
+	})
+
 	it('normalizes aliases without changing author casing', () => {
 		expect(
 			parseIdentity({

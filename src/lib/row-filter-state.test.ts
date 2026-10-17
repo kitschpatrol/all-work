@@ -55,6 +55,54 @@ describe('row filter state', () => {
 		expect(state.shown).toBe(false)
 	})
 
+	it('appends a column rule and opens the editor without replacing existing groups', () => {
+		const { onChange, state } = setup()
+		state.restore(
+			{
+				match: 'any',
+				rules: [
+					{
+						match: 'none',
+						rules: [{ column: 'changedFiles', operator: 'is', value: '0' }],
+					},
+				],
+			},
+			false,
+		)
+		const existing = state.filter
+		state.addColumnRule('branch')
+		expect(state.shown).toBe(true)
+		expect(state.filter.match).toBe('any')
+		expect(state.filter.rules).toEqual([
+			...existing.rules,
+			{ column: 'branch', operator: 'contains', value: '' },
+		])
+		expect(onChange).toHaveBeenCalledOnce()
+	})
+
+	it.each([
+		{ column: 'changedFiles', operator: 'is', value: '' },
+		{ column: 'lastCommitDate', operator: 'inLast', value: '' },
+		{ column: 'metadata:Public', operator: 'isYes', value: '' },
+		{ column: 'metadata:Tags', operator: 'includes', value: '' },
+		{ column: 'run-1', operator: 'statusIs', value: 'failed' },
+	])('starts a rule with the appropriate controls for $column', (rule) => {
+		const { state } = setup([
+			{ command: 'pwd', concurrency: 1, createdAt: '', finished: true, id: 'run-1', results: {} },
+		])
+		state.addColumnRule(rule.column)
+		expect(state.shown).toBe(true)
+		expect(state.filter.rules).toEqual([rule])
+	})
+
+	it('ignores columns that no longer exist', () => {
+		const { onChange, state } = setup()
+		state.addColumnRule('removed-run')
+		expect(state.filter).toEqual(emptyFilter())
+		expect(state.open).toBe(false)
+		expect(onChange).not.toHaveBeenCalled()
+	})
+
 	it('applies a preset, recognizes it, and clears it when chosen again', () => {
 		const { rows, state } = setup()
 		state.togglePreset('changed')

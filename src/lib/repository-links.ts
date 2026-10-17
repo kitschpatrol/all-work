@@ -1,3 +1,5 @@
+import type { OpenTarget } from './electron-api.js'
+import type { Repository } from './workspace.js'
 import { vscodeUrl } from './table-formatting.js'
 const githubScpRemote = /^(?:[^\/@:\s]+@)?github\.com:(.+)$/iv
 const trailingSlashes = /\/+$/v
@@ -47,4 +49,22 @@ export function openRepositoryLink(
 	anchor.href = vscodeUrl(repository.path)
 	anchor.rel = 'external'
 	anchor.click()
+}
+
+/**
+ * Open the chosen repositories in order using the matching browser or native
+ * action.
+ */
+export async function openRepositories(
+	repositories: readonly Repository[],
+	target: OpenTarget,
+	openInApp: (repository: Repository, app: 'finder' | 'terminal' | 'tower') => Promise<void>,
+): Promise<void> {
+	for (const repository of repositories) {
+		if (target === 'github' || target === 'vscode') {
+			openRepositoryLink(repository, target)
+		} else {
+			await openInApp(repository, target)
+		}
+	}
 }

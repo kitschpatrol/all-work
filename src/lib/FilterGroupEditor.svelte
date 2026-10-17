@@ -96,6 +96,7 @@
 				onRemove={() => {
 					remove(index)
 				}}
+				showAdd={index === group.rules.length - 1}
 			/>
 		</div>
 		<div class="filter-group">
@@ -126,6 +127,7 @@
 			{repositories}
 			rule={node}
 			{runs}
+			showAdd={index === group.rules.length - 1}
 		/>
 	{/if}
 {/each}

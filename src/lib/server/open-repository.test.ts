@@ -84,7 +84,9 @@ describe.skipIf(process.platform !== 'darwin').each(['Finder', 'Terminal', 'Towe
 			expect(launch).toHaveBeenCalledTimes(app === 'Terminal' ? 2 : 1)
 			expect(launch).toHaveBeenLastCalledWith(
 				'/usr/bin/open',
-				['-a', app === 'Terminal' ? '/Applications/Ghostty.app' : app, '--', repository.path],
+				app === 'Finder'
+					? ['-R', '--', repository.path]
+					: ['-a', app === 'Terminal' ? '/Applications/Ghostty.app' : app, '--', repository.path],
 				{ timeout: 15_000 },
 			)
 		})
