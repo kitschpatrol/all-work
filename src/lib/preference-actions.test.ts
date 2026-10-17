@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { updatePreferences } from './preference-actions.js'
+import { getPresetFilter } from './filter-presets.js'
+import { saveFilterPresets, updatePreferences } from './preference-actions.js'
 import { defaultPreferences } from './preferences.js'
 import { savePreferences } from './view-storage.js'
 import { postWindowMessage } from './window-messages.js'
@@ -12,6 +13,21 @@ vi.mock('./window-messages.js', () => ({
 }))
 
 describe('preference actions', () => {
+	it('persists preset edits while retaining other settings and broadcasting plain data', async () => {
+		const previous = { ...defaultPreferences(), showRepositoryShortcuts: true }
+		const next = await saveFilterPresets(previous, [
+			{ filter: new Proxy(getPresetFilter('clean'), {}), id: 'custom:fixture', label: 'Fixture' },
+		])
+		expect(next.showRepositoryShortcuts).toBe(true)
+		expect(next.identity).toEqual(previous.identity)
+		expect(savePreferences).toHaveBeenCalledWith(next)
+		expect(postWindowMessage).toHaveBeenCalledWith({
+			preferences: next,
+			type: 'preferences-changed',
+		})
+		expect(() => structuredClone(next)).not.toThrow()
+	})
+
 	it('broadcasts saved menu changes even when the current identity is reactive', async () => {
 		const previous = defaultPreferences()
 		const next = {

@@ -1,7 +1,7 @@
-import type { FilterPresetId } from './filter-presets.js'
+import type { FilterPreset, FilterPresetId } from './filter-presets.js'
 import type { FilterGroup } from './row-filter.js'
 import type { CommandRun, Repository } from './workspace.js'
-import { findFilterPreset, getPresetFilter } from './filter-presets.js'
+import { findFilterPreset, getPresetFilter, resolveFilterPresets } from './filter-presets.js'
 import {
 	compileFilter,
 	countActiveRules,
@@ -17,6 +17,8 @@ import {
 type RowFilterOptions = {
 	/** Called after the rules change so newly shown rows can load metadata. */
 	onChange: () => void
+	onPresetsChange?: (presets: FilterPreset[]) => Promise<void>
+	presets?: () => readonly FilterPreset[]
 	repositories: () => Repository[]
 	runs: () => CommandRun[]
 }
@@ -32,13 +34,19 @@ type RowFilterOptions = {
 export function createRowFilter(options: RowFilterOptions) {
 	let filter = $state.raw<FilterGroup>(emptyFilter())
 	let open = $state(false)
+	let selectedId = $state<FilterPresetId>()
 	const columns = $derived(getFilterColumns(options.runs()))
+	const savedPresets = $derived(options.presets?.() ?? [])
+	const presets = $derived(resolveFilterPresets(savedPresets))
 	const predicate = $derived(compileFilter(filter, options.runs()))
-	// The editor shows only while open with at least one rule
-	const shown = $derived(open && filter.rules.length > 0)
 	// Blank or invalid rules take no part in filtering
 	const activeRules = $derived(countActiveRules(filter, options.runs()))
-	const preset = $derived(findFilterPreset(parseFilter(filter)))
+	const preset = $derived(findFilterPreset(filter, presets))
+	const selectedPreset = $derived(presets.find((entry) => entry.id === (selectedId ?? preset)))
+	const modified = $derived(
+		selectedPreset !== undefined &&
+			JSON.stringify(parseFilter(filter)) !== JSON.stringify(parseFilter(selectedPreset.filter)),
+	)
 	const groups = $derived(getFilterMetadataGroups(filter, options.runs()))
 	// Rows hidden only because metadata a rule reads has not loaded
 	const undecided = $derived(
@@ -48,13 +56,76 @@ export function createRowFilter(options: RowFilterOptions) {
 	)
 
 	function set(next: FilterGroup) {
+		selectedId ??= preset
 		filter = next
 		options.onChange()
 	}
 
 	function applyPreset(id: FilterPresetId) {
-		set(getPresetFilter(id))
+		if (presets.every((entry) => entry.id !== id)) {
+			return
+		}
+
+		selectedId = id
+		set(getPresetFilter(id, presets))
+	}
+
+	function clear() {
+		set(emptyFilter())
+		selectedId = undefined
+	}
+
+	function newFilter() {
+		set(starterFilter())
+		selectedId = undefined
 		open = true
+	}
+
+	function expand() {
+		open = true
+	}
+
+	async function savePreset(label: string, id?: FilterPresetId) {
+		const name = label.trim()
+		if (name === '' || name.length > 80) {
+			throw new Error('Use a preset name between 1 and 80 characters.')
+		}
+
+		if (filter.rules.length === 0) {
+			throw new Error('Add a condition before saving a preset.')
+		}
+
+		if (options.onPresetsChange === undefined) {
+			throw new Error('Filter presets could not be saved.')
+		}
+
+		const existing = presets.find((entry) =>
+			id === undefined ? entry.label.toLowerCase() === name.toLowerCase() : entry.id === id,
+		)
+		if (savedPresets.every((entry) => entry.id !== existing?.id) && savedPresets.length >= 100) {
+			throw new Error('Delete a saved preset before adding another. You can keep up to 100.')
+		}
+
+		const saved: FilterPreset = {
+			filter: parseFilter(filter),
+			id: existing?.id ?? `custom:${crypto.randomUUID()}`,
+			label: name,
+		}
+		await options.onPresetsChange([...savedPresets.filter((entry) => entry.id !== saved.id), saved])
+		selectedId = saved.id
+	}
+
+	async function deletePreset() {
+		const selected = selectedPreset
+		if (selected === undefined || options.onPresetsChange === undefined) {
+			return
+		}
+
+		await options.onPresetsChange(savedPresets.filter((entry) => entry.id !== selected.id))
+		selectedId = undefined
+		if (!selected.id.startsWith('custom:')) {
+			applyPreset(selected.id)
+		}
 	}
 
 	function addColumnRule(columnId: string) {
@@ -76,29 +147,21 @@ export function createRowFilter(options: RowFilterOptions) {
 	}
 
 	// Replace the rules and editor visibility without side effects, as when restoring a view
-	function restore(next: FilterGroup, nextOpen: boolean) {
+	function restore(next: FilterGroup, nextOpen: boolean, sourceId?: FilterPresetId) {
 		filter = next
 		open = nextOpen
+		selectedId = sourceId
 	}
 
-	// Start a blank rule when showing an editor with none
+	// Disclosure changes the editor visibility without changing the applied filter
 	function toggle() {
-		if (shown) {
-			open = false
-			return
-		}
-
-		if (filter.rules.length === 0) {
-			set(starterFilter())
-		}
-
-		open = true
+		open = !open
 	}
 
 	// Choosing the applied preset again clears it, like a checked menu item
 	function togglePreset(id: FilterPresetId) {
 		if (id === preset) {
-			set(emptyFilter())
+			clear()
 		} else {
 			applyPreset(id)
 		}
@@ -115,9 +178,12 @@ export function createRowFilter(options: RowFilterOptions) {
 		},
 		addColumnRule,
 		applyPreset,
+		clear,
 		get columns() {
 			return columns
 		},
+		deletePreset,
+		expand,
 		get filter() {
 			return filter
 		},
@@ -125,17 +191,31 @@ export function createRowFilter(options: RowFilterOptions) {
 			return groups
 		},
 		matches,
+		get modified() {
+			return modified
+		},
+		newFilter,
 		get open() {
 			return open
 		},
 		get preset() {
 			return preset
 		},
+		get presets() {
+			return presets
+		},
 		prune,
 		restore,
+		savePreset,
+		get selectedPreset() {
+			return selectedPreset
+		},
 		set,
 		get shown() {
-			return shown
+			return open
+		},
+		get storedPreset() {
+			return savedPresets.some((entry) => entry.id === selectedPreset?.id)
 		},
 		toggle,
 		togglePreset,

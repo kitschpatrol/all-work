@@ -1,3 +1,4 @@
+import type { FilterPreset } from './filter-presets.js'
 import type { Preferences } from './preferences.js'
 import type { Workspace } from './workspace.js'
 import { request } from './client-request.js'
@@ -35,4 +36,14 @@ export async function updatePreferences(
 	if (persist) {
 		postWindowMessage({ preferences: parsePreferences(next), type: 'preferences-changed' })
 	}
+}
+
+/** Persist named filters independently of edits to the current filter draft. */
+export async function saveFilterPresets(
+	previous: Preferences,
+	filterPresets: readonly FilterPreset[],
+): Promise<Preferences> {
+	const next = parsePreferences({ ...previous, filterPresets })
+	await updatePreferences(previous, next, undefined, true)
+	return next
 }

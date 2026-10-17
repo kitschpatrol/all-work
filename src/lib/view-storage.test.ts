@@ -11,6 +11,15 @@ afterEach(() => {
 })
 
 describe('shared JSON view persistence', () => {
+	it('restores the preset source of an edited filter and ignores invalid preset IDs', () => {
+		expect(parseSavedView({ filterPreset: 'custom:fixture' }, '/projects').filterPreset).toBe(
+			'custom:fixture',
+		)
+		expect(parseSavedView({ filterPreset: 'changed' }, '/projects').filterPreset).toBe('changed')
+		expect(parseSavedView({ filterPreset: 'broken' }, '/projects').filterPreset).toBeUndefined()
+		expect(parseSavedView(undefined, '/projects').filterPreset).toBeUndefined()
+	})
+
 	it('loads identity and view data from the server without accessing browser storage', async () => {
 		const preferences = {
 			...defaultPreferences(),

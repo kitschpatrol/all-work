@@ -12,6 +12,7 @@ export const initialMenuState: MenuState = {
 	canRun: false,
 	filterActive: false,
 	filterPreset: undefined,
+	filterPresets: filterPresets.map(({ id, label }) => ({ id, label })),
 	filterShown: false,
 	hasActiveRuns: false,
 	hasFinishedRuns: false,
@@ -187,7 +188,7 @@ function buildTemplate(
 						type: 'checkbox',
 					}),
 					separator,
-					...filterPresets.map((preset) =>
+					...state.filterPresets.map((preset) =>
 						item(preset.label, 'view.filterPreset', {
 							checked: state.filterPreset === preset.id,
 							payload: preset.id,

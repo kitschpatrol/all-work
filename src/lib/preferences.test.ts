@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getPresetFilter } from './filter-presets.js'
 import {
 	defaultPreferences,
 	parseIdentity,
@@ -7,6 +8,17 @@ import {
 } from './preferences.js'
 
 describe('saved project identity', () => {
+	it('keeps saved filters alongside appearance and identity preferences', () => {
+		const filterPresets = [
+			{ filter: getPresetFilter('clean'), id: 'custom:fixture', label: 'Fixture' },
+		]
+		expect(defaultPreferences().filterPresets).toEqual([])
+		expect(parsePreferences({ filterPresets, showRepositoryShortcuts: true })).toMatchObject({
+			filterPresets,
+			showRepositoryShortcuts: true,
+		})
+	})
+
 	it('hides repository shortcuts unless they were explicitly enabled', () => {
 		expect(defaultPreferences().showRepositoryShortcuts).toBe(false)
 		expect(parsePreferences({}).showRepositoryShortcuts).toBe(false)

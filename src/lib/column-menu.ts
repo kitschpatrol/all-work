@@ -1,6 +1,6 @@
-import { tick } from 'svelte'
 import type { PinnedColumns } from './column-order.js'
 import type { MenuActions } from './electron-api.js'
+import { focusLastFilterRule } from './filter-focus.js'
 
 type MenuColumn = {
 	getCanFilter: () => boolean
@@ -37,18 +37,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 
 	async function filter(id: string) {
 		options.onFilter(id)
-		await tick()
-		const bar = document.querySelector<HTMLElement>('.filter-bar')
-		const row = bar?.querySelector(':scope > .filter-row:last-of-type')
-		const input =
-			row?.querySelector<HTMLInputElement>('input') ??
-			row?.querySelector<HTMLSelectElement>('select[aria-label="Status"]') ??
-			row?.querySelector<HTMLSelectElement>('.filter-operator')
-		if (bar !== null) {
-			bar.scrollTop = bar.scrollHeight
-		}
-
-		input?.focus({ preventScroll: true })
+		await focusLastFilterRule()
 	}
 
 	function sort(id: string | undefined, descending: boolean) {

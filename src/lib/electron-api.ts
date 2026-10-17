@@ -1,5 +1,6 @@
-import type { FilterPresetId } from './filter-presets.js'
+import type { FilterPreset, FilterPresetId } from './filter-presets.js'
 import { isFilterPresetId } from './filter-presets.js'
+import { asRecord } from './record.js'
 
 /**
  * Application menu commands sent from the Electron main process to the
@@ -57,6 +58,7 @@ export type MenuState = {
 	canRun: boolean
 	filterActive: boolean
 	filterPreset: FilterPresetId | undefined
+	filterPresets: Array<Pick<FilterPreset, 'id' | 'label'>>
 	filterShown: boolean
 	hasActiveRuns: boolean
 	hasFinishedRuns: boolean
@@ -162,6 +164,18 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.canRun === 'boolean' &&
 		typeof state.filterActive === 'boolean' &&
 		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
+		Array.isArray(state.filterPresets) &&
+		state.filterPresets.length <= 102 &&
+		state.filterPresets.every((entry: unknown) => {
+			const preset = asRecord(entry)
+			return (
+				preset !== undefined &&
+				isFilterPresetId(preset.id) &&
+				typeof preset.label === 'string' &&
+				preset.label !== '' &&
+				preset.label.length <= 80
+			)
+		}) &&
 		typeof state.filterShown === 'boolean' &&
 		typeof state.hasActiveRuns === 'boolean' &&
 		typeof state.hasFinishedRuns === 'boolean' &&

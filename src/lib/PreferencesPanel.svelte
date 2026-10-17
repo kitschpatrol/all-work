@@ -88,7 +88,13 @@
 			throw new Error('Use at most 100 author names and accounts, each under 200 characters.')
 		}
 
-		await persist({ identity, restoreWorkspace, showRepositoryShortcuts, version: 1 })
+		await persist({
+			...preferences,
+			identity,
+			restoreWorkspace,
+			showRepositoryShortcuts,
+			version: 1,
+		})
 		onClose()
 	}
 

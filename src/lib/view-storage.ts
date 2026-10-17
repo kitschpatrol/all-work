@@ -1,6 +1,8 @@
+import type { FilterPresetId } from './filter-presets.js'
 import type { Preferences } from './preferences.js'
 import type { FilterGroup } from './row-filter.js'
 import { request } from './client-request.js'
+import { isFilterPresetId } from './filter-presets.js'
 import { asRecord, parsePreferences } from './preferences.js'
 import { parseFilter } from './row-filter.js'
 
@@ -16,6 +18,7 @@ export type SavedView = {
 	directory: string
 	filter: FilterGroup
 	filterOpen: boolean
+	filterPreset: FilterPresetId | undefined
 	outputLines: number
 	recursive: boolean
 	resizedColumns: string[]
@@ -77,6 +80,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		directory: typeof record.directory === 'string' ? record.directory : defaultDirectory,
 		filter: parseFilter(record.filter),
 		filterOpen: record.filterOpen === true,
+		filterPreset: isFilterPresetId(record.filterPreset) ? record.filterPreset : undefined,
 		outputLines: integer(record.outputLines, 3, 1),
 		recursive: record.recursive !== false,
 		resizedColumns: strings(record.resizedColumns),

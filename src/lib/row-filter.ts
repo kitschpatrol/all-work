@@ -1,7 +1,7 @@
 import type { ColumnKind } from './metadata-columns.js'
 import type { CommandRun, MetadataGroup, MetadataValue, Repository } from './workspace.js'
 import { repositoryColumns } from './column-variables.js'
-import { asRecord } from './preferences.js'
+import { asRecord } from './record.js'
 
 /** How a group combines its rules: every rule, at least one, or none of them. */
 export type FilterMatch = 'all' | 'any' | 'none'

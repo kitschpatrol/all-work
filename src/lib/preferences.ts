@@ -1,9 +1,16 @@
+import type { FilterPreset } from './filter-presets.js'
+import { parseFilterPresets } from './filter-presets.js'
+import { asRecord } from './record.js'
+
+export { asRecord } from './record.js'
+
 export type ProjectIdentity = {
 	authorNames: string[]
 	githubAccounts: string[]
 }
 
 export type Preferences = {
+	filterPresets: FilterPreset[]
 	identity: ProjectIdentity
 	restoreWorkspace: boolean
 	showRepositoryShortcuts: boolean
@@ -19,6 +26,7 @@ const accountPrefix = /^@/v
  */
 export function defaultPreferences(): Preferences {
 	return {
+		filterPresets: [],
 		identity: {
 			authorNames: ['Eric Mika', 'kitschpatrol', 'scalarstudio'],
 			githubAccounts: ['kitschpatrol', 'scalarstudio'],
@@ -27,13 +35,6 @@ export function defaultPreferences(): Preferences {
 		showRepositoryShortcuts: false,
 		version: 1,
 	}
-}
-
-/** Read a plain JSON object without trusting persisted or incoming data. */
-export function asRecord(value: unknown): Record<string, unknown> | undefined {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
-		? (value as Record<string, unknown>)
-		: undefined
 }
 
 function names(value: unknown): string[] | undefined {
@@ -78,6 +79,7 @@ export function parsePreferences(value: unknown): Preferences {
 	const record = asRecord(value)
 	const defaults = defaultPreferences()
 	return {
+		filterPresets: parseFilterPresets(record?.filterPresets),
 		identity: parseIdentity(record?.identity) ?? defaults.identity,
 		restoreWorkspace: record?.restoreWorkspace !== false,
 		showRepositoryShortcuts: record?.showRepositoryShortcuts === true,

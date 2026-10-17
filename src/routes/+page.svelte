@@ -53,7 +53,7 @@
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
-	import { updatePreferences } from '#lib/preference-actions.js'
+	import { saveFilterPresets, updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
@@ -186,6 +186,10 @@
 		onChange() {
 			scheduleMetadata()
 		},
+		async onPresetsChange(presets) {
+			preferences = await saveFilterPresets(preferences, presets)
+		},
+		presets: () => preferences.filterPresets,
 		repositories: () => workspace?.repositories ?? [],
 		runs: () => runs,
 	})
@@ -263,6 +267,7 @@
 		directory,
 		filter: rowFilter.filter,
 		filterOpen: rowFilter.open,
+		filterPreset: rowFilter.selectedPreset?.id,
 		outputLines,
 		recursive,
 		resizedColumns: [...resizedColumns],
@@ -301,7 +306,7 @@
 		command = view.command
 		commandHistory = view.commandHistory
 		concurrency = view.concurrency
-		rowFilter.restore(view.filter, view.filterOpen)
+		rowFilter.restore(view.filter, view.filterOpen, view.filterPreset)
 		outputLines = view.outputLines
 		recursive = view.recursive
 		rowSelection = Object.fromEntries(
@@ -537,7 +542,7 @@
 				rowSelection = {}
 				selectedOnly = false
 				search = ''
-				rowFilter.set(emptyFilter())
+				rowFilter.clear()
 				resizedColumns.clear()
 				table.resetColumnSizing()
 				table.resetSorting()
@@ -1012,7 +1017,7 @@
 			autoClear = !autoClear
 		},
 		'view.clearFilter'() {
-			rowFilter.set(emptyFilter())
+			rowFilter.clear()
 		},
 		'view.columns'(payload) {
 			if (payload === 'defaults') {
@@ -1080,6 +1085,7 @@
 			command.trim() !== '',
 		filterActive: rowFilter.activeRules > 0,
 		filterPreset: rowFilter.preset,
+		filterPresets: rowFilter.presets.map(({ id, label }) => ({ id, label })),
 		filterShown: rowFilter.shown,
 		hasActiveRuns: activeRuns.length > 0,
 		hasFinishedRuns: runs.some((run) => run.finished),
@@ -1211,15 +1217,7 @@
 							bind:value={search}
 						/>
 					</div>
-					<button
-						class="button subtle filter-toggle"
-						class:filtering={rowFilter.activeRules > 0}
-						aria-pressed={rowFilter.shown}
-						onclick={rowFilter.toggle}
-						title={rowFilter.shown ? 'Hide filter rules' : 'Show filter rules'}
-						type="button"
-						>Filter{rowFilter.activeRules > 0 ? ` (${rowFilter.activeRules})` : ''}</button
-					><label class="selected-filter"
+					<label class="selected-filter"
 						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
 						only</label
 					>
@@ -1278,15 +1276,12 @@
 					/>
 				</div>
 			</div>
-			{#if rowFilter.shown}<FilterBar
-					columns={rowFilter.columns}
-					filter={rowFilter.filter}
-					onChange={rowFilter.set}
-					onPreset={rowFilter.applyPreset}
-					repositories={workspace?.repositories ?? []}
-					{runs}
-					undecided={rowFilter.undecided}
-				/>{/if}
+			<FilterBar
+				repositories={workspace?.repositories ?? []}
+				{rowFilter}
+				{runs}
+				visibleCount={visibleRepositories.length}
+			/>
 			<div
 				bind:this={tableScroll}
 				class="table-scroll"
