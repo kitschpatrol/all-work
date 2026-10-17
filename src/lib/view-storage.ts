@@ -1,6 +1,8 @@
 import type { Preferences } from './preferences.js'
+import type { FilterGroup } from './row-filter.js'
 import { request } from './client-request.js'
 import { asRecord, parsePreferences } from './preferences.js'
+import { parseFilter } from './row-filter.js'
 
 export type SavedView = {
 	autoClear: boolean
@@ -12,6 +14,8 @@ export type SavedView = {
 	commandHistory: string[]
 	concurrency: number
 	directory: string
+	filter: FilterGroup
+	filterOpen: boolean
 	outputLines: number
 	recursive: boolean
 	resizedColumns: string[]
@@ -21,7 +25,6 @@ export type SavedView = {
 	search: string
 	selectedOnly: boolean
 	sorting: Array<{ desc: boolean; id: string }>
-	status: 'all' | 'clean' | 'dirty'
 	version: 1
 	workspaceDirectory?: string
 }
@@ -72,6 +75,8 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		commandHistory: strings(record.commandHistory).slice(-100),
 		concurrency: integer(record.concurrency, 6, 1, 32),
 		directory: typeof record.directory === 'string' ? record.directory : defaultDirectory,
+		filter: parseFilter(record.filter),
+		filterOpen: record.filterOpen === true,
 		outputLines: integer(record.outputLines, 3, 1),
 		recursive: record.recursive !== false,
 		resizedColumns: strings(record.resizedColumns),
@@ -88,7 +93,6 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 						: []
 				})
 			: [{ desc: false, id: 'relativePath' }],
-		status: record.status === 'clean' || record.status === 'dirty' ? record.status : 'all',
 		version: 1,
 		workspaceDirectory:
 			typeof record.workspaceDirectory === 'string' ? record.workspaceDirectory : undefined,

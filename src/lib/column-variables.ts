@@ -1,5 +1,5 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
-import type { ColumnDisplay } from './metadata-columns.js'
+import type { ColumnDisplay, ColumnKind } from './metadata-columns.js'
 import type { CommandRun, MetadataGroup, Repository } from './workspace.js'
 import { metadataColumns, metadataHint, metadataText } from './metadata-columns.js'
 
@@ -10,6 +10,7 @@ type RepositoryColumn = {
 	group: MetadataGroup
 	header: string
 	id: string
+	kind: ColumnKind
 	note?: string
 	sort: 'alphanumeric' | 'basic'
 	value: (repository: Repository) => boolean | number | string | undefined
@@ -86,6 +87,11 @@ export const repositoryColumns: RepositoryColumn[] = [
 		group: ['branch', 'changedFiles', 'lastCommitDate', 'sync'].includes(column.id)
 			? 'git'
 			: 'local',
+		kind: ['changedFiles', 'sync'].includes(column.id)
+			? 'number'
+			: column.id === 'lastCommitDate'
+				? 'date'
+				: 'text',
 		sort: 'alphanumeric',
 		visible: !['packageManager', 'remote', 'sync'].includes(column.id),
 	})),

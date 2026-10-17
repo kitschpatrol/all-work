@@ -37,11 +37,15 @@ function formatUpdatedAt(value: string) {
  */
 export type ColumnDisplay = 'code' | 'number' | 'text'
 
+/** The type of value a column holds, which decides how rules compare it. */
+export type ColumnKind = 'boolean' | 'date' | 'list' | 'number' | 'text'
+
 type MetadataColumn = {
 	category: string
 	display: ColumnDisplay
 	field: string
 	group: MetadataGroup
+	kind: ColumnKind
 	note?: string
 	sort: 'alphanumeric' | 'basic'
 	visible?: boolean
@@ -186,6 +190,27 @@ const booleanFields = new Set([
 	'Published',
 ])
 const numberFields = basicFields.difference(booleanFields)
+const dateFields = new Set([
+	'Created',
+	'First Commit Date',
+	'Latest Commit Date',
+	'Latest Push Date',
+	'Latest Release Date',
+])
+// Metascope reports these as string arrays; cells join them with commas
+const listFields = new Set([
+	'Author',
+	'Contributor',
+	'Dependencies',
+	'Dev Dependencies',
+	'Language',
+	'License',
+	'Maintainer',
+	'Operating System',
+	'Runtime',
+	'Secondary Language',
+	'Tags',
+])
 // Versions, dates, paths, and URLs are compared character by character down a column
 const codeFields = new Set([
 	'CI URL',
@@ -232,6 +257,15 @@ function fields(names: string[], group: MetadataGroup, category: string): Metada
 		display: numberFields.has(field) ? 'number' : codeFields.has(field) ? 'code' : 'text',
 		field,
 		group,
+		kind: booleanFields.has(field)
+			? 'boolean'
+			: numberFields.has(field)
+				? 'number'
+				: dateFields.has(field)
+					? 'date'
+					: listFields.has(field)
+						? 'list'
+						: 'text',
 		note: notes[field],
 		sort: basicFields.has(field) ? 'basic' : 'alphanumeric',
 		visible: defaultFields.has(field),

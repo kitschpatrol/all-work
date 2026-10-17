@@ -2,6 +2,7 @@ import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
 import { commandPresets } from '../src/lib/command-presets.js'
+import { filterPresets } from '../src/lib/filter-presets.js'
 
 const HOMEPAGE = 'https://github.com/kitschpatrol/allwork'
 // Opening more repositories than this at once in an external app is almost certainly a mistake
@@ -11,12 +12,14 @@ export const initialMenuState: MenuState = {
 	autoClear: false,
 	canReload: false,
 	canRun: false,
+	filterActive: false,
+	filterPreset: undefined,
+	filterShown: false,
 	hasActiveRuns: false,
 	hasFinishedRuns: false,
 	loading: false,
 	selectedCount: 0,
 	selectedOnly: false,
-	status: 'all',
 	visibleCount: 0,
 }
 
@@ -170,23 +173,23 @@ function buildTemplate(
 				type: 'checkbox',
 			}),
 			{
-				label: 'Working Tree',
+				label: 'Filter',
 				submenu: [
-					item('All', 'view.status', {
-						checked: state.status === 'all',
-						payload: 'all',
-						type: 'radio',
+					item('Show Filter Rules', 'view.toggleFilter', {
+						accelerator: 'Alt+CmdOrCtrl+F',
+						checked: state.filterShown,
+						type: 'checkbox',
 					}),
-					item('With Changes', 'view.status', {
-						checked: state.status === 'dirty',
-						payload: 'dirty',
-						type: 'radio',
-					}),
-					item('Clean', 'view.status', {
-						checked: state.status === 'clean',
-						payload: 'clean',
-						type: 'radio',
-					}),
+					separator,
+					...filterPresets.map((preset) =>
+						item(preset.label, 'view.filterPreset', {
+							checked: state.filterPreset === preset.id,
+							payload: preset.id,
+							type: 'checkbox',
+						}),
+					),
+					separator,
+					item('Clear Filter', 'view.clearFilter', { enabled: state.filterActive }),
 				],
 			},
 			separator,

@@ -1,4 +1,5 @@
-import type { SavedView } from './view-storage.js'
+import type { FilterPresetId } from './filter-presets.js'
+import { isFilterPresetId } from './filter-presets.js'
 
 /**
  * Application menu commands sent from the Electron main process to the
@@ -19,11 +20,13 @@ export type MenuCommand =
 	| 'repositories.selectChanged'
 	| 'runs.clearFinished'
 	| 'runs.toggleAutoClear'
+	| 'view.clearFilter'
 	| 'view.columns'
+	| 'view.filterPreset'
 	| 'view.fitColumns'
 	| 'view.focusFilter'
 	| 'view.reset'
-	| 'view.status'
+	| 'view.toggleFilter'
 	| 'view.toggleSelectedOnly'
 	| 'workspace.browse'
 	| 'workspace.reload'
@@ -39,8 +42,6 @@ const openTargets = ['finder', 'github', 'terminal', 'tower', 'vscode'] as const
 /** Applications the Repositories menu can open selected repositories in. */
 export type OpenTarget = (typeof openTargets)[number]
 
-const workingTreeStatuses = ['all', 'clean', 'dirty'] as const satisfies Array<SavedView['status']>
-
 /**
  * Renderer state the main process needs to enable, disable, and check menu
  * items.
@@ -49,12 +50,14 @@ export type MenuState = {
 	autoClear: boolean
 	canReload: boolean
 	canRun: boolean
+	filterActive: boolean
+	filterPreset: FilterPresetId | undefined
+	filterShown: boolean
 	hasActiveRuns: boolean
 	hasFinishedRuns: boolean
 	loading: boolean
 	selectedCount: number
 	selectedOnly: boolean
-	status: SavedView['status']
 	visibleCount: number
 }
 
@@ -111,11 +114,6 @@ export function isOpenTarget(value: unknown): value is OpenTarget {
 	return openTargets.includes(value as OpenTarget)
 }
 
-/** Narrow a menu payload to a working tree filter value. */
-export function isWorkingTreeStatus(value: unknown): value is SavedView['status'] {
-	return workingTreeStatuses.includes(value as SavedView['status'])
-}
-
 /** Validate menu state arriving over IPC before the main process acts on it. */
 export function isMenuState(value: unknown): value is MenuState {
 	if (typeof value !== 'object' || value === null) {
@@ -127,12 +125,14 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.autoClear === 'boolean' &&
 		typeof state.canReload === 'boolean' &&
 		typeof state.canRun === 'boolean' &&
+		typeof state.filterActive === 'boolean' &&
+		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
+		typeof state.filterShown === 'boolean' &&
 		typeof state.hasActiveRuns === 'boolean' &&
 		typeof state.hasFinishedRuns === 'boolean' &&
 		typeof state.loading === 'boolean' &&
 		typeof state.selectedCount === 'number' &&
 		typeof state.selectedOnly === 'boolean' &&
-		isWorkingTreeStatus(state.status) &&
 		typeof state.visibleCount === 'number'
 	)
 }

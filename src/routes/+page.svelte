@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ColumnDef, Row, RowSelectionState } from '@tanstack/svelte-table'
+	import type { ColumnDef, RowSelectionState } from '@tanstack/svelte-table'
 	import type { AppWindow } from '#lib/app-windows.js'
 	import type { MenuActions, OpenTarget } from '#lib/electron-api.js'
 	import type { Preferences } from '#lib/preferences.js'
@@ -44,14 +44,18 @@
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import CommandForm from '#lib/CommandForm.svelte'
-	import { isColumnPreset, isOpenTarget, isWorkingTreeStatus } from '#lib/electron-api.js'
+	import { isColumnPreset, isOpenTarget } from '#lib/electron-api.js'
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
+	import { isFilterPresetId } from '#lib/filter-presets.js'
+	import FilterBar from '#lib/FilterBar.svelte'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositoryLink } from '#lib/repository-links.js'
+	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
+	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
 	import { getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
@@ -75,7 +79,6 @@
 	let concurrency = $state(6)
 	let autoClear = $state(false)
 	let search = $state('')
-	let status = $state<SavedView['status']>('all')
 	let selectedOnly = $state(false)
 	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
@@ -106,6 +109,8 @@
 	const repositoryColumnIds = new SvelteSet(repositoryColumns.map((column) => column.id))
 	const autoClearPredecessors = new SvelteMap<string, string>()
 	const resizedColumns = new SvelteSet<string>()
+	// Metadata groups that load for rows on demand; codebase scans and dependency checks run only when requested
+	const lazyGroups: ReadonlySet<MetadataGroup> = new Set(['ci', 'git', 'github', 'registry'])
 
 	const features = tableFeatures({
 		columnFilteringFeature,
@@ -147,7 +152,6 @@
 		...repositoryColumns.map((column): ColumnDef<typeof features, Repository> => ({
 			accessorFn: column.value,
 			enableHiding: column.id !== 'relativePath',
-			filterFn: column.id === 'changedFiles' ? filterWorkingTree : undefined,
 			header: column.header,
 			id: column.id,
 			minSize: column.id === 'relativePath' ? 160 : 24,
@@ -176,9 +180,17 @@
 		),
 	)
 	const columnVariables = $derived(getColumnVariables(runs))
+	const rowFilter = createRowFilter({
+		onChange() {
+			scheduleMetadata()
+		},
+		repositories: () => workspace?.repositories ?? [],
+		runs: () => runs,
+	})
 	const repositories = $derived(
 		(workspace?.repositories ?? []).filter(
-			(repository) => !selectedOnly || rowSelection[repository.id],
+			(repository) =>
+				(!selectedOnly || rowSelection[repository.id]) && rowFilter.matches(repository),
 		),
 	)
 	const table = createTable({
@@ -238,6 +250,8 @@
 		commandHistory,
 		concurrency,
 		directory,
+		filter: rowFilter.filter,
+		filterOpen: rowFilter.open,
 		outputLines,
 		recursive,
 		resizedColumns: [...resizedColumns],
@@ -247,7 +261,6 @@
 		search,
 		selectedOnly,
 		sorting: table.atoms.sorting.get(),
-		status: status === 'clean' || status === 'dirty' ? status : 'all',
 		version: 1,
 		workspaceDirectory: workspace?.directory ?? savedView?.workspaceDirectory,
 	})
@@ -277,6 +290,7 @@
 		command = view.command
 		commandHistory = view.commandHistory
 		concurrency = view.concurrency
+		rowFilter.restore(view.filter, view.filterOpen)
 		outputLines = view.outputLines
 		recursive = view.recursive
 		rowSelection = Object.fromEntries(
@@ -286,7 +300,6 @@
 		)
 		search = view.search
 		selectedOnly = view.selectedOnly
-		status = view.status
 		resizedColumns.clear()
 		for (const id of view.resizedColumns) {
 			resizedColumns.add(id)
@@ -299,7 +312,6 @@
 		table.setColumnSizing(view.columnSizing)
 		table.setSorting(view.sorting.filter((sort) => columns.some((column) => column.id === sort.id)))
 		table.setGlobalFilter(search)
-		table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
 		pendingScroll = view.scroll
 	}
 
@@ -313,6 +325,7 @@
 			await loadDirectory(view)
 			directory = view.directory
 		} else {
+			rowFilter.prune()
 			await tick()
 			if (Object.keys(view.columnSizing).length === 0) {
 				fitColumns()
@@ -367,13 +380,12 @@
 		commandForm.resetRecall()
 		rowSelection = {}
 		search = ''
+		rowFilter.restore(emptyFilter(), false)
 		selectedOnly = false
-		status = 'all'
 		resizedColumns.clear()
 		table.resetColumnVisibility()
 		table.resetColumnSizing()
 		table.resetSorting()
-		table.resetColumnFilters()
 		table.setGlobalFilter('')
 		await tick()
 		fitColumns()
@@ -498,6 +510,7 @@
 					workspaceId: next.id,
 				})
 				applySavedView(restored)
+				rowFilter.prune()
 				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
 				rowSelection = Object.fromEntries(
 					Object.entries(rowSelection).filter(([id]) => repositoryIds.has(id)),
@@ -517,12 +530,11 @@
 				rowSelection = {}
 				selectedOnly = false
 				search = ''
-				status = 'all'
+				rowFilter.set(emptyFilter())
 				resizedColumns.clear()
 				table.resetColumnSizing()
 				table.resetSorting()
 				table.setGlobalFilter('')
-				table.resetColumnFilters()
 			}
 
 			metadataStream?.close()
@@ -573,7 +585,6 @@
 
 					if (
 						search !== '' ||
-						status !== 'all' ||
 						table.atoms.sorting.get().some((entry) => entry.id !== 'relativePath')
 					) {
 						refreshTableData()
@@ -622,22 +633,22 @@
 		}
 
 		const workspaceId = workspace.id
-		const ids = getVisibleRepositoryIds(
+		const visibleIds = getVisibleRepositoryIds(
 			tableScroll,
 			targets.map((row) => row.id),
 		)
-		const groups = [
-			...new Set(
-				table
-					.getVisibleLeafColumns()
-					.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)
-					.filter(
-						(group): group is MetadataGroup =>
-							group !== undefined && !['code', 'files', 'local', 'updates'].includes(group),
-					),
-			),
-		]
+		// Rules decide which rows appear, so the groups they read load for every row
+		const filterGroups = rowFilter.groups.filter((group) => lazyGroups.has(group))
+		const allIds = workspace.repositories.map((repository) => repository.id)
+		const groups = new Set([
+			...filterGroups,
+			...table
+				.getVisibleLeafColumns()
+				.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)
+				.filter((group): group is MetadataGroup => group !== undefined && lazyGroups.has(group)),
+		])
 		for (const group of groups) {
+			const ids = filterGroups.includes(group) ? allIds : visibleIds
 			const pending = ids.filter((id) => !requestedMetadata.has(`${id}:${group}`))
 			if (pending.length === 0) {
 				continue
@@ -806,20 +817,6 @@
 		return getColumnPreviewTooltip(previewRepository, columnId, runs)
 	}
 
-	function filterWorkingTree(
-		row: Row<typeof features, Repository>,
-		_columnId: string,
-		value: unknown,
-	) {
-		if (!row.original.gitStatusAvailable) {
-			return false
-		}
-
-		return value === 'dirty'
-			? row.original.changedFiles > 0
-			: value !== 'clean' || row.original.changedFiles === 0
-	}
-
 	async function stop(runId: string) {
 		try {
 			await request(`/api/runs/${runId}`, {}, 'PATCH')
@@ -833,6 +830,7 @@
 			await request(`/api/runs/${runId}`, {}, 'DELETE')
 			table.setSorting((previous) => previous.filter((entry) => entry.id !== runId))
 			runs = runs.filter((run) => run.id !== runId)
+			rowFilter.prune()
 			resizedColumns.delete(runId)
 			autoClearPredecessors.delete(runId)
 			postWindowMessage({ runId, type: 'run-removed' })
@@ -855,11 +853,6 @@
 				void removeRun(previousRunId)
 			}
 		}
-	}
-
-	function applyWorkingTreeFilter() {
-		table.getColumn('changedFiles')?.setFilterValue(status === 'all' ? undefined : status)
-		scheduleMetadata()
 	}
 
 	function clearFinishedRuns() {
@@ -1016,11 +1009,19 @@
 		'runs.toggleAutoClear'() {
 			autoClear = !autoClear
 		},
+		'view.clearFilter'() {
+			rowFilter.set(emptyFilter())
+		},
 		'view.columns'(payload) {
 			if (payload === 'defaults') {
 				void resetColumnDefaults()
 			} else if (isColumnPreset(payload)) {
 				void setColumnsVisible(optionalColumnIds(), payload === 'all')
+			}
+		},
+		'view.filterPreset'(payload) {
+			if (isFilterPresetId(payload)) {
+				rowFilter.togglePreset(payload)
 			}
 		},
 		'view.fitColumns'() {
@@ -1034,14 +1035,7 @@
 		'view.reset'() {
 			void resetView()
 		},
-		'view.status'(payload) {
-			if (!isWorkingTreeStatus(payload)) {
-				return
-			}
-
-			status = payload
-			applyWorkingTreeFilter()
-		},
+		'view.toggleFilter': rowFilter.toggle,
 		'view.toggleSelectedOnly'() {
 			selectedOnly = !selectedOnly
 			scheduleMetadata()
@@ -1076,12 +1070,14 @@
 			!loading &&
 			targets.length > 0 &&
 			command.trim() !== '',
+		filterActive: rowFilter.activeRules > 0,
+		filterPreset: rowFilter.preset,
+		filterShown: rowFilter.shown,
 		hasActiveRuns: activeRuns.length > 0,
 		hasFinishedRuns: runs.some((run) => run.finished),
 		loading,
 		selectedCount: targets.length,
 		selectedOnly,
-		status,
 		visibleCount: visibleRepositories.length,
 	}}
 />
@@ -1206,13 +1202,14 @@
 							bind:value={search}
 						/>
 					</div>
-					<select
-						aria-label="Working tree filter"
-						onchange={applyWorkingTreeFilter}
-						bind:value={status}
-						><option value="all">All working trees</option><option value="dirty"
-							>With changes</option
-						><option value="clean">Clean</option></select
+					<button
+						class="button subtle filter-toggle"
+						class:filtering={rowFilter.activeRules > 0}
+						aria-pressed={rowFilter.shown}
+						onclick={rowFilter.toggle}
+						title={rowFilter.shown ? 'Hide filter rules' : 'Show filter rules'}
+						type="button"
+						>Filter{rowFilter.activeRules > 0 ? ` (${rowFilter.activeRules})` : ''}</button
 					><label class="selected-filter"
 						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
 						only</label
@@ -1272,6 +1269,15 @@
 					/>
 				</div>
 			</div>
+			{#if rowFilter.shown}<FilterBar
+					columns={rowFilter.columns}
+					filter={rowFilter.filter}
+					onChange={rowFilter.set}
+					onPreset={rowFilter.applyPreset}
+					repositories={workspace?.repositories ?? []}
+					{runs}
+					undecided={rowFilter.undecided}
+				/>{/if}
 			<div
 				bind:this={tableScroll}
 				class="table-scroll"
