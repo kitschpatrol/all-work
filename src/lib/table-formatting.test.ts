@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { MetadataGroup, MetadataState, Repository } from './workspace.js'
-import { pendingMetadata } from './table-formatting.js'
+import type { CommandRun, MetadataGroup, MetadataState, Repository } from './workspace.js'
+import { getColumnCopyLines, pendingMetadata } from './table-formatting.js'
 
 function repository(
 	id: string,
@@ -49,5 +49,34 @@ describe('pending metadata', () => {
 	it('treats repositories without metadata and empty workspaces as idle', () => {
 		expect(pendingMetadata([repository('a')])).toEqual({ groups: 0, repositories: 0 })
 		expect(pendingMetadata([])).toEqual({ groups: 0, repositories: 0 })
+	})
+})
+
+describe('getColumnCopyLines', () => {
+	it('copies one plain-text line per row and leaves missing values empty', () => {
+		const clean = repository('clean')
+		const dirty = { ...repository('dirty'), ahead: 2, changedFiles: 3, version: '1.2.0' }
+		const unknown = { ...repository('unknown'), branch: '', gitStatusAvailable: false }
+		const rows = [clean, dirty, unknown]
+		expect(getColumnCopyLines(rows, 'name', [])).toBe('clean\ndirty\nunknown')
+		expect(getColumnCopyLines(rows, 'branch', [])).toBe('main\nmain\n')
+		expect(getColumnCopyLines(rows, 'changedFiles', [])).toBe('Clean\n3 Changed\n')
+		expect(getColumnCopyLines(rows, 'sync', [])).toBe('↑0 ↓0\n↑2 ↓0\n')
+		expect(getColumnCopyLines(rows, 'version', [])).toBe('\n1.2.0\n')
+		expect(getColumnCopyLines(rows, 'lastCommitDate', [])).toBe('\n\n')
+	})
+
+	it('copies command output for run columns', () => {
+		const run = {
+			id: 'run',
+			results: { clean: { output: 'ok' } },
+		} as unknown as CommandRun
+		expect(getColumnCopyLines([repository('clean'), repository('other')], 'run', [run])).toBe(
+			'ok\n',
+		)
+	})
+
+	it('copies nothing without rows', () => {
+		expect(getColumnCopyLines([], 'name', [])).toBe('')
 	})
 })

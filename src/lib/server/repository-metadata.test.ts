@@ -360,4 +360,52 @@ describe('progressive Metascope metadata', () => {
 		expect(extractMetadata).toHaveBeenCalledTimes(baseline + 8)
 		expect(maximum).toBe(4)
 	})
+
+	it('runs background requests after prioritized ones and promotes rows that come into view', async () => {
+		const workspace = fixture()
+		const original = workspace.repositories[0]
+		if (original === undefined) {
+			throw new Error('Missing fixture')
+		}
+
+		workspace.repositories = Array.from({ length: 12 }, (_, index) => ({
+			...original,
+			id: String(index),
+			metadata: { groups: {}, values: {} },
+			path: `${original.path}-${index}`,
+		}))
+		const controller = begin(workspace)
+		await ready(workspace)
+		const baseline = vi.mocked(extractMetadata).mock.calls.length
+		const pending: Array<() => void> = []
+		vi.mocked(extractMetadata).mockImplementation(
+			async () =>
+				new Promise((resolve) => {
+					pending.push(() => {
+						resolve(context())
+					})
+				}),
+		)
+		const ids = workspace.repositories.map((repository) => repository.id)
+		controller.request(ids.slice(0, 8), ['github'])
+		controller.request(ids.slice(8), ['github'], false, true)
+		controller.request(['7'], ['github'], false, true)
+		await vi.waitFor(() => expect(extractMetadata).toHaveBeenCalledTimes(baseline + 4))
+		while (vi.mocked(extractMetadata).mock.calls.length < baseline + 12) {
+			const count = vi.mocked(extractMetadata).mock.calls.length
+			pending.shift()?.()
+			await vi.waitFor(() =>
+				expect(vi.mocked(extractMetadata).mock.calls.length).toBeGreaterThan(count),
+			)
+		}
+
+		const order = vi
+			.mocked(extractMetadata)
+			.mock.calls.slice(baseline)
+			.map(([options]) => options?.path?.slice(original.path.length + 1))
+		expect(order).toEqual(['0', '1', '2', '3', '8', '9', '10', '11', '7', '4', '5', '6'])
+		for (const resolve of pending.splice(0)) {
+			resolve()
+		}
+	})
 })

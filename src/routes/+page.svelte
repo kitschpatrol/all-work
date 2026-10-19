@@ -2,6 +2,7 @@
 	import type { ColumnDef, RowSelectionState } from '@tanstack/svelte-table'
 	import type { AppWindow } from '#lib/app-windows.js'
 	import type { MenuActions } from '#lib/electron-api.js'
+	import type { RequestedMetadata } from '#lib/metadata-requests.js'
 	import type { Preferences } from '#lib/preferences.js'
 	import type { SavedView } from '#lib/view-storage.js'
 	import type {
@@ -51,6 +52,7 @@
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterBar from '#lib/FilterBar.svelte'
+	import { planMetadataRequests, sendMetadataRequests } from '#lib/metadata-requests.js'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
@@ -109,11 +111,11 @@
 	let metadataStream: undefined | { close: () => void }
 	let metadataTimer: ReturnType<typeof setTimeout> | undefined
 	let sizingTimer: ReturnType<typeof setTimeout> | undefined
-	const requestedMetadata = new SvelteSet<string>()
+	const requestedMetadata: RequestedMetadata = new SvelteMap()
 	const repositoryColumnIds = new SvelteSet(repositoryColumns.map((column) => column.id))
 	const autoClearPredecessors = new SvelteMap<string, string>()
 	const resizedColumns = new SvelteSet<string>()
-	// Metadata groups that load for rows on demand; codebase scans and dependency checks run only when requested
+	// Metadata groups that load for shown columns, rows in view first; codebase scans and dependency checks run only when requested
 	const lazyGroups: ReadonlySet<MetadataGroup> = new Set(['ci', 'git', 'github', 'registry'])
 
 	const features = tableFeatures({
@@ -234,6 +236,8 @@
 	const columnMenu = createColumnMenu({
 		beforeSort: refreshTableData,
 		getColumn: (id) => table.getColumn(id),
+		getRows: (selected) => (selected ? targets : visibleRepositories).map((row) => row.original),
+		getRuns: () => runs,
 		onError: showError,
 		onFilter: rowFilter.addColumnRule,
 		onHide: async (id) => setColumnsVisible([id], false),
@@ -644,11 +648,11 @@
 	function scheduleMetadata() {
 		metadataTimer ??= setTimeout(() => {
 			metadataTimer = undefined
-			void loadVisibleMetadata()
+			void loadMetadata()
 		}, 200)
 	}
 
-	async function loadVisibleMetadata() {
+	async function loadMetadata() {
 		if (workspace === undefined) {
 			return
 		}
@@ -658,9 +662,11 @@
 			tableScroll,
 			targets.map((row) => row.id),
 		)
-		// Rules decide which rows appear, so the groups they read load for every row
+		// Rules decide which rows appear, so the groups they read load first for every row
 		const filterGroups = rowFilter.groups.filter((group) => lazyGroups.has(group))
+		// Background work follows the table order, then reaches rows the filter hides
 		const allIds = workspace.repositories.map((repository) => repository.id)
+		const orderedIds = [...new Set([...visibleRepositories.map((row) => row.id), ...allIds])]
 		const groups = new Set([
 			...filterGroups,
 			...table
@@ -668,36 +674,21 @@
 				.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)
 				.filter((group): group is MetadataGroup => group !== undefined && lazyGroups.has(group)),
 		])
-		for (const group of groups) {
-			const ids = filterGroups.includes(group) ? allIds : visibleIds
-			const pending = ids.filter((id) => !requestedMetadata.has(`${id}:${group}`))
-			if (pending.length === 0) {
-				continue
-			}
-
-			for (const id of pending) {
-				requestedMetadata.add(`${id}:${group}`)
-			}
-
-			try {
-				await request('/api/workspace/metadata', {
-					groups: [group],
-					repositoryIds: pending,
-					workspaceId,
-				})
-				if (workspace.id !== workspaceId) {
-					return
-				}
-			} catch (error) {
-				if (workspace.id !== workspaceId) {
-					return
-				}
-
+		const batches = planMetadataRequests({
+			filterGroups,
+			groups,
+			orderedIds,
+			requested: requestedMetadata,
+			visibleIds,
+		})
+		await sendMetadataRequests(workspaceId, batches, {
+			isCurrent: () => workspace?.id === workspaceId,
+			onError(error) {
 				if (!loading) {
-					errorMessage = error instanceof Error ? error.message : String(error)
+					showError(error)
 				}
-			}
-		}
+			},
+		})
 	}
 
 	async function refreshMetadata(groups: MetadataGroup[]) {

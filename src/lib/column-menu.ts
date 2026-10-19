@@ -1,6 +1,8 @@
 import type { PinnedColumns } from './column-order.js'
 import type { MenuActions } from './electron-api.js'
+import type { CommandRun, Repository } from './workspace.js'
 import { focusLastFilterRule } from './filter-focus.js'
+import { getColumnCopyLines } from './table-formatting.js'
 
 type MenuColumn = {
 	getCanFilter: () => boolean
@@ -13,6 +15,9 @@ type MenuColumn = {
 type ColumnMenuOptions = {
 	beforeSort: () => void
 	getColumn: (id: string) => MenuColumn | undefined
+	/** Rows shown by the table, or only the selected ones, in table order. */
+	getRows: (selected: boolean) => readonly Repository[]
+	getRuns: () => readonly CommandRun[]
 	onError: (error: unknown) => void
 	onFilter: (id: string) => void
 	onHide: (id: string) => Promise<void>
@@ -21,7 +26,8 @@ type ColumnMenuOptions = {
 }
 
 /**
- * Connect a column's native menu to sorting, visibility, and filter rules.
+ * Connect a column's native menu to sorting, visibility, filter rules, and
+ * copying its plain text.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -51,6 +57,21 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		options.onSort()
 	}
 
+	async function copy(id: string | undefined, selected: boolean) {
+		const column = getColumn(id)
+		const rows = options.getRows(selected)
+		if (column === undefined || (selected && rows.length === 0)) {
+			return
+		}
+
+		try {
+			// eslint-disable-next-line node/no-unsupported-features/node-builtins -- The clipboard is written in the browser.
+			await navigator.clipboard.writeText(getColumnCopyLines(rows, column.id, options.getRuns()))
+		} catch (error) {
+			options.onError(error)
+		}
+	}
+
 	async function hide(id: string) {
 		try {
 			await options.onHide(id)
@@ -60,6 +81,12 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 	}
 
 	const actions: Pick<MenuActions, Extract<keyof MenuActions, `column.${string}`>> = {
+		'column.copy'(payload) {
+			void copy(payload, false)
+		},
+		'column.copySelected'(payload) {
+			void copy(payload, true)
+		},
 		'column.filter'(payload) {
 			const column = getColumn(payload)
 			if (column?.getCanFilter()) {
@@ -95,6 +122,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					canHide: canHide(column),
 					canSort: column.getCanSort(),
 					columnId,
+					hasSelection: options.getRows(true).length > 0,
 				})
 			} catch (error) {
 				options.onError(error)

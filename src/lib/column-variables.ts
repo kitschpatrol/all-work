@@ -166,7 +166,7 @@ function findVariable(id: string, runs: readonly CommandRun[]) {
  * Read current row values without retaining a table accessor's older cached
  * value.
  */
-function getColumnValue(
+export function getColumnValue(
 	repository: Repository,
 	columnId: string,
 	runs: readonly CommandRun[] = [],

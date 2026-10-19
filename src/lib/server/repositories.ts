@@ -261,8 +261,9 @@ export function requestWorkspaceMetadata(
 	repositoryIds: string[],
 	groups: Parameters<ReturnType<typeof startWorkspaceMetadata>['request']>[1],
 	force = false,
+	prioritize = true,
 ) {
-	metadataControllers.get(id)?.request(repositoryIds, groups, force, true)
+	metadataControllers.get(id)?.request(repositoryIds, groups, force, prioritize)
 }
 
 /**

@@ -329,6 +329,18 @@ function needsRefresh(state: MetadataState | undefined, group: MetadataGroup, fo
 
 type Job = { group: MetadataGroup; priority: number; repository: Repository }
 
+// Background work runs local scans first and network sources last
+const backgroundPriorities: Record<MetadataGroup, number> = {
+	ci: 5,
+	code: 4,
+	files: 4,
+	git: 3,
+	github: 5,
+	local: 2,
+	registry: 5,
+	updates: 5,
+}
+
 function normalizeContext(extracted: unknown): MetadataContext {
 	// Metascope returns undefined when none of the selected sources produce data.
 	return Object.assign(
@@ -494,13 +506,7 @@ export function startWorkspaceMetadata(
 				repository.metadata.groups[group] = { ...state, status: 'queued' }
 				queue.push({
 					group,
-					priority: prioritize
-						? 1
-						: group === 'local'
-							? 2
-							: ['code', 'files'].includes(group)
-								? 4
-								: 3,
+					priority: prioritize ? 1 : backgroundPriorities[group],
 					repository,
 				})
 				notify(repository)

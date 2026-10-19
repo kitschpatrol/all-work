@@ -9,6 +9,8 @@ import { asRecord } from './record.js'
  * renderer.
  */
 export type MenuCommand =
+	| 'column.copy'
+	| 'column.copySelected'
 	| 'column.filter'
 	| 'column.hide'
 	| 'column.sortAscending'
@@ -85,6 +87,7 @@ export type ColumnMenuRequest = {
 	canHide: boolean
 	canSort: boolean
 	columnId: string
+	hasSelection: boolean
 }
 
 /** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
@@ -138,7 +141,8 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 		request.columnId !== '' &&
 		typeof request.canFilter === 'boolean' &&
 		typeof request.canHide === 'boolean' &&
-		typeof request.canSort === 'boolean'
+		typeof request.canSort === 'boolean' &&
+		typeof request.hasSelection === 'boolean'
 	)
 }
 

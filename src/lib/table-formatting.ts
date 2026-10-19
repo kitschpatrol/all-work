@@ -1,5 +1,5 @@
 import type { CommandRun, Repository } from './workspace.js'
-import { formatColumnCellValue } from './column-variables.js'
+import { formatColumnCellValue, getColumnValue } from './column-variables.js'
 
 /** Format the latest commit date for a compact table cell. */
 export function formatDate(value: string) {
@@ -66,4 +66,43 @@ export function getColumnSizingValue(
 	return columnId === 'branch'
 		? `⑂ ${repository.branch}`
 		: formatColumnCellValue(repository, columnId, runs).slice(0, 8000)
+}
+
+/** Format a cell as plain text for copying, leaving missing values empty. */
+function getColumnCopyText(
+	repository: Repository,
+	columnId: string,
+	runs: readonly CommandRun[],
+): string {
+	const value = getColumnValue(repository, columnId, runs)
+	if (value === undefined || value === '') {
+		return ''
+	}
+
+	switch (columnId) {
+		case 'changedFiles': {
+			return repository.changedFiles === 0 ? 'Clean' : `${repository.changedFiles} Changed`
+		}
+
+		case 'lastCommitDate': {
+			return formatDate(repository.lastCommitDate)
+		}
+
+		case 'sync': {
+			return `↑${repository.ahead} ↓${repository.behind}`
+		}
+
+		default: {
+			return formatColumnCellValue(repository, columnId, runs)
+		}
+	}
+}
+
+/** Join one column's plain text for each row, one row per line. */
+export function getColumnCopyLines(
+	repositories: readonly Repository[],
+	columnId: string,
+	runs: readonly CommandRun[],
+): string {
+	return repositories.map((repository) => getColumnCopyText(repository, columnId, runs)).join('\n')
 }

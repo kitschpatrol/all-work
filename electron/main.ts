@@ -224,20 +224,30 @@ async function main(): Promise<void> {
 				return
 			}
 
-			const items: Array<[string, MenuCommand, boolean]> = [
+			const items: Array<'separator' | [string, MenuCommand, boolean]> = [
 				['Sort Ascending', 'column.sortAscending', request.canSort],
 				['Sort Descending', 'column.sortDescending', request.canSort],
 				['Hide Column', 'column.hide', request.canHide],
 				['Filter By…', 'column.filter', request.canFilter],
+				'separator',
+				['Copy', 'column.copy', true],
+				['Copy Selected', 'column.copySelected', request.hasSelection],
 			]
 			Menu.buildFromTemplate(
-				items.map(([label, command, enabled]) => ({
-					click() {
-						event.sender.send('allwork:menu-command', command, request.columnId)
-					},
-					enabled,
-					label,
-				})),
+				items.map((item) => {
+					if (item === 'separator') {
+						return { type: 'separator' } as const
+					}
+
+					const [label, command, enabled] = item
+					return {
+						click() {
+							event.sender.send('allwork:menu-command', command, request.columnId)
+						},
+						enabled,
+						label,
+					}
+				}),
 			).popup({ window })
 		})
 

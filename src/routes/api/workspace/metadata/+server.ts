@@ -30,7 +30,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		body.groups.some(
 			(group: unknown) => typeof group !== 'string' || !Object.hasOwn(metadataGroups, group),
 		) ||
-		(body.force !== undefined && typeof body.force !== 'boolean')
+		(body.force !== undefined && typeof body.force !== 'boolean') ||
+		(body.background !== undefined && typeof body.background !== 'boolean')
 	) {
 		error(400, 'Choose valid metadata sources.')
 	}
@@ -49,6 +50,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		body.repositoryIds as string[],
 		body.groups as MetadataGroup[],
 		body.force === true,
+		body.background !== true,
 	)
 	return Response.json({ queued: true })
 }
