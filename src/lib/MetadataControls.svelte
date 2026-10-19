@@ -1,5 +1,8 @@
 <script lang="ts">
+	import type { createColumnPresets } from './column-preset-state.svelte.js'
 	import type { MetadataGroup } from './workspace.js'
+	import ColumnPresetPicker from './ColumnPresetPicker.svelte'
+
 	type MenuColumn = {
 		category: string
 		header: string
@@ -9,21 +12,21 @@
 		visible: boolean
 	}
 	const {
+		columnPresets,
 		columns,
 		disabled,
 		onRefresh,
 		onVisibility,
 		onVisibilityAll,
-		onVisibilityDefaults,
 		onVisibilityMany,
 		selectedCount,
 	}: {
+		columnPresets: ReturnType<typeof createColumnPresets>
 		columns: MenuColumn[]
 		disabled: boolean
 		onRefresh: (groups: MetadataGroup[]) => Promise<void>
 		onVisibility: (id: string, visible: boolean) => Promise<void>
 		onVisibilityAll: (visible: boolean) => Promise<void>
-		onVisibilityDefaults: () => Promise<void>
 		onVisibilityMany: (ids: string[], visible: boolean) => Promise<void>
 		selectedCount: number
 	} = $props()
@@ -80,6 +83,7 @@
 			{/each}
 		</div>
 		<div class="column-search">
+			<ColumnPresetPicker {columnPresets} />
 			<div class="column-search-field">
 				<input
 					aria-label="Find a column"
@@ -102,12 +106,6 @@
 					onclick={async () => onVisibilityAll(false)}
 					title="Hide all optional columns"
 					type="button">Deselect all</button
-				>
-				<button
-					class="button subtle"
-					onclick={onVisibilityDefaults}
-					title="Restore the starter columns"
-					type="button">Defaults</button
 				>
 			</div>
 		</div>

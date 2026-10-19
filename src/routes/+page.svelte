@@ -36,6 +36,8 @@
 	import { startColumnDrag } from '#lib/column-drag.js'
 	import { createColumnMenu } from '#lib/column-menu.js'
 	import { resolveColumnOrder } from '#lib/column-order.js'
+	import { createColumnPresets } from '#lib/column-preset-state.svelte.js'
+	import { defaultColumnPreset, isColumnPresetId } from '#lib/column-presets.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
 		getColumnDisplay,
@@ -45,7 +47,7 @@
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import CommandForm from '#lib/CommandForm.svelte'
-	import { isColumnPreset, isOpenTarget } from '#lib/electron-api.js'
+	import { isOpenTarget } from '#lib/electron-api.js'
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterBar from '#lib/FilterBar.svelte'
@@ -53,7 +55,7 @@
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
-	import { saveFilterPresets, updatePreferences } from '#lib/preference-actions.js'
+	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
@@ -128,17 +130,7 @@
 		sortedRowModel: createSortedRowModel(),
 		sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
 	})
-	const defaultColumnIds = new Set([
-		'branch',
-		'changedFiles',
-		'description',
-		'lastCommitDate',
-		'name',
-		'relativePath',
-		'repoName',
-		'repoOwner',
-		'version',
-	])
+	const defaultColumnIds = new Set(['relativePath', ...defaultColumnPreset.columns])
 
 	const columns = $derived<Array<ColumnDef<typeof features, Repository>>>([
 		{
@@ -187,7 +179,7 @@
 			scheduleMetadata()
 		},
 		async onPresetsChange(presets) {
-			preferences = await saveFilterPresets(preferences, presets)
+			preferences = await savePreferenceChanges(preferences, { filterPresets: presets })
 		},
 		presets: () => preferences.filterPresets,
 		repositories: () => workspace?.repositories ?? [],
@@ -226,6 +218,19 @@
 			},
 		},
 	})
+	// Optional repository columns; presets leave command run columns alone
+	const presetColumnIds = $derived(optionalColumnIds().filter((id) => repositoryColumnIds.has(id)))
+	const columnPresets = createColumnPresets({
+		apply(changes) {
+			void changeVisibility(changes)
+		},
+		available: () => presetColumnIds,
+		async onPresetsChange(presets) {
+			preferences = await savePreferenceChanges(preferences, { columnPresets: presets })
+		},
+		presets: () => preferences.columnPresets,
+		visibility: () => table.atoms.columnVisibility.get(),
+	})
 	const columnMenu = createColumnMenu({
 		beforeSort: refreshTableData,
 		getColumn: (id) => table.getColumn(id),
@@ -259,6 +264,7 @@
 		autoClear,
 		autoClearPredecessors: Object.fromEntries(autoClearPredecessors),
 		columnOrder,
+		columnPreset: columnPresets.selected?.id,
 		columnSizing: table.atoms.columnSizing.get(),
 		columnVisibility: table.atoms.columnVisibility.get(),
 		command,
@@ -324,6 +330,8 @@
 		if (Object.keys(view.columnVisibility).length > 0) {
 			table.setColumnVisibility(view.columnVisibility)
 		}
+
+		columnPresets.restore(view.columnPreset)
 
 		table.setColumnSizing(view.columnSizing)
 		table.setSorting(view.sorting.filter((sort) => columns.some((column) => column.id === sort.id)))
@@ -396,6 +404,7 @@
 		selectedOnly = false
 		resizedColumns.clear()
 		table.resetColumnVisibility()
+		columnPresets.restore()
 		table.resetColumnSizing()
 		table.resetSorting()
 		table.setGlobalFilter('')
@@ -711,15 +720,20 @@
 	}
 
 	async function setColumnsVisible(ids: string[], visible: boolean) {
-		table.setColumnVisibility((previous) => ({
-			...previous,
-			...Object.fromEntries(ids.map((id) => [id, visible])),
-		}))
-		await tick()
-		if (visible) {
-			fitColumns(ids.filter((id) => !resizedColumns.has(id)))
-		}
+		columnPresets.edit()
+		await changeVisibility(Object.fromEntries(ids.map((id) => [id, visible])))
+	}
 
+	// Show and hide columns, fitting the ones that appear
+	async function changeVisibility(changes: Record<string, boolean>) {
+		const previous = table.atoms.columnVisibility.get()
+		table.setColumnVisibility({ ...previous, ...changes })
+		await tick()
+		fitColumns(
+			Object.keys(changes).filter(
+				(id) => changes[id] === true && previous[id] === false && !resizedColumns.has(id),
+			),
+		)
 		scheduleMetadata()
 	}
 
@@ -875,18 +889,6 @@
 		}
 	}
 
-	async function resetColumnDefaults() {
-		table.resetColumnVisibility()
-		await tick()
-		fitColumns(
-			table
-				.getVisibleLeafColumns()
-				.filter((column) => !resizedColumns.has(column.id))
-				.map((column) => column.id),
-		)
-		scheduleMetadata()
-	}
-
 	function optionalColumnIds() {
 		return table
 			.getAllLeafColumns()
@@ -1019,10 +1021,13 @@
 		'view.clearFilter'() {
 			rowFilter.clear()
 		},
+		'view.columnPreset'(payload) {
+			if (isColumnPresetId(payload)) {
+				columnPresets.applyPreset(payload)
+			}
+		},
 		'view.columns'(payload) {
-			if (payload === 'defaults') {
-				void resetColumnDefaults()
-			} else if (isColumnPreset(payload)) {
+			if (payload === 'all' || payload === 'none') {
 				void setColumnsVisible(optionalColumnIds(), payload === 'all')
 			}
 		},
@@ -1083,6 +1088,8 @@
 			!loading &&
 			targets.length > 0 &&
 			command.trim() !== '',
+		columnPreset: columnPresets.matched,
+		columnPresets: columnPresets.presets.map(({ id, label }) => ({ id, label })),
 		filterActive: rowFilter.activeRules > 0,
 		filterPreset: rowFilter.preset,
 		filterPresets: rowFilter.presets.map(({ id, label }) => ({ id, label })),
@@ -1251,6 +1258,7 @@
 							type="button">Clear finished runs</button
 						>{/if}
 					<MetadataControls
+						{columnPresets}
 						columns={table
 							.getAllFlatColumns()
 							.filter((column) => column.getCanHide())
@@ -1270,7 +1278,6 @@
 						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
 						onVisibilityAll={async (visible: boolean) =>
 							setColumnsVisible(optionalColumnIds(), visible)}
-						onVisibilityDefaults={resetColumnDefaults}
 						onVisibilityMany={setColumnsVisible}
 						{selectedCount}
 					/>

@@ -1,7 +1,9 @@
+import type { ColumnPresetId } from './column-presets.js'
 import type { FilterPresetId } from './filter-presets.js'
 import type { Preferences } from './preferences.js'
 import type { FilterGroup } from './row-filter.js'
 import { request } from './client-request.js'
+import { isColumnPresetId } from './column-presets.js'
 import { isFilterPresetId } from './filter-presets.js'
 import { asRecord, parsePreferences } from './preferences.js'
 import { parseFilter } from './row-filter.js'
@@ -10,6 +12,7 @@ export type SavedView = {
 	autoClear: boolean
 	autoClearPredecessors: Record<string, string>
 	columnOrder: string[]
+	columnPreset: ColumnPresetId | undefined
 	columnSizing: Record<string, number>
 	columnVisibility: Record<string, boolean>
 	command: string
@@ -64,6 +67,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 			),
 		),
 		columnOrder: strings(record.columnOrder),
+		columnPreset: isColumnPresetId(record.columnPreset) ? record.columnPreset : undefined,
 		columnSizing: Object.fromEntries(
 			Object.entries(asRecord(record.columnSizing) ?? {}).filter(
 				(entry): entry is [string, number] =>

@@ -1,4 +1,3 @@
-import type { FilterPreset } from './filter-presets.js'
 import type { Preferences } from './preferences.js'
 import type { Workspace } from './workspace.js'
 import { request } from './client-request.js'
@@ -38,12 +37,15 @@ export async function updatePreferences(
 	}
 }
 
-/** Persist named filters independently of edits to the current filter draft. */
-export async function saveFilterPresets(
+/**
+ * Persist changed preferences, such as saved filter or column presets, without
+ * touching the rest.
+ */
+export async function savePreferenceChanges(
 	previous: Preferences,
-	filterPresets: readonly FilterPreset[],
+	changes: Partial<Omit<Preferences, 'version'>>,
 ): Promise<Preferences> {
-	const next = parsePreferences({ ...previous, filterPresets })
+	const next = parsePreferences({ ...previous, ...changes })
 	await updatePreferences(previous, next, undefined, true)
 	return next
 }

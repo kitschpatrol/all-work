@@ -20,6 +20,15 @@ describe('shared JSON view persistence', () => {
 		expect(parseSavedView(undefined, '/projects').filterPreset).toBeUndefined()
 	})
 
+	it('restores the column preset being shown and ignores invalid preset IDs', () => {
+		expect(parseSavedView({ columnPreset: 'defaults' }, '/projects').columnPreset).toBe('defaults')
+		expect(parseSavedView({ columnPreset: 'custom:fixture' }, '/projects').columnPreset).toBe(
+			'custom:fixture',
+		)
+		expect(parseSavedView({ columnPreset: 'changed' }, '/projects').columnPreset).toBeUndefined()
+		expect(parseSavedView(undefined, '/projects').columnPreset).toBeUndefined()
+	})
+
 	it('loads identity and view data from the server without accessing browser storage', async () => {
 		const preferences = {
 			...defaultPreferences(),

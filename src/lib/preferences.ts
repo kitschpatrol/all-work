@@ -1,4 +1,6 @@
+import type { ColumnPreset } from './column-presets.js'
 import type { FilterPreset } from './filter-presets.js'
+import { parseColumnPresets } from './column-presets.js'
 import { parseFilterPresets } from './filter-presets.js'
 import { asRecord } from './record.js'
 
@@ -10,6 +12,7 @@ export type ProjectIdentity = {
 }
 
 export type Preferences = {
+	columnPresets: ColumnPreset[]
 	filterPresets: FilterPreset[]
 	identity: ProjectIdentity
 	restoreWorkspace: boolean
@@ -26,6 +29,7 @@ const accountPrefix = /^@/v
  */
 export function defaultPreferences(): Preferences {
 	return {
+		columnPresets: [],
 		filterPresets: [],
 		identity: {
 			authorNames: ['Eric Mika', 'kitschpatrol', 'scalarstudio'],
@@ -79,6 +83,7 @@ export function parsePreferences(value: unknown): Preferences {
 	const record = asRecord(value)
 	const defaults = defaultPreferences()
 	return {
+		columnPresets: parseColumnPresets(record?.columnPresets),
 		filterPresets: parseFilterPresets(record?.filterPresets),
 		identity: parseIdentity(record?.identity) ?? defaults.identity,
 		restoreWorkspace: record?.restoreWorkspace !== false,

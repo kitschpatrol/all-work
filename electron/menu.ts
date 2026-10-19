@@ -1,6 +1,7 @@
 import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
+import { defaultColumnPreset } from '../src/lib/column-presets.js'
 import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
@@ -10,6 +11,8 @@ export const initialMenuState: MenuState = {
 	autoClear: false,
 	canReload: false,
 	canRun: false,
+	columnPreset: defaultColumnPreset.id,
+	columnPresets: [{ id: defaultColumnPreset.id, label: defaultColumnPreset.label }],
 	filterActive: false,
 	filterPreset: undefined,
 	filterPresets: filterPresets.map(({ id, label }) => ({ id, label })),
@@ -205,7 +208,14 @@ function buildTemplate(
 				submenu: [
 					item('Show All', 'view.columns', { payload: 'all' }),
 					item('Hide All Optional', 'view.columns', { payload: 'none' }),
-					item('Defaults', 'view.columns', { payload: 'defaults' }),
+					separator,
+					...state.columnPresets.map((preset) =>
+						item(preset.label, 'view.columnPreset', {
+							checked: state.columnPreset === preset.id,
+							payload: preset.id,
+							type: 'checkbox',
+						}),
+					),
 				],
 			},
 			item('Fit Columns to Contents', 'view.fitColumns'),

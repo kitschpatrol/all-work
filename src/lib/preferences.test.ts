@@ -8,12 +8,17 @@ import {
 } from './preferences.js'
 
 describe('saved project identity', () => {
-	it('keeps saved filters alongside appearance and identity preferences', () => {
+	it('keeps saved filter and column presets alongside appearance and identity preferences', () => {
 		const filterPresets = [
 			{ filter: getPresetFilter('clean'), id: 'custom:fixture', label: 'Fixture' },
 		]
+		const columnPresets = [{ columns: ['name'], id: 'custom:fixture', label: 'Fixture' }]
 		expect(defaultPreferences().filterPresets).toEqual([])
-		expect(parsePreferences({ filterPresets, showRepositoryShortcuts: true })).toMatchObject({
+		expect(defaultPreferences().columnPresets).toEqual([])
+		expect(
+			parsePreferences({ columnPresets, filterPresets, showRepositoryShortcuts: true }),
+		).toMatchObject({
+			columnPresets,
 			filterPresets,
 			showRepositoryShortcuts: true,
 		})

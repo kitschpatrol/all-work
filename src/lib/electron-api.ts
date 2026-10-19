@@ -1,4 +1,6 @@
+import type { ColumnPreset, ColumnPresetId } from './column-presets.js'
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
+import { isColumnPresetId } from './column-presets.js'
 import { isFilterPresetId } from './filter-presets.js'
 import { asRecord } from './record.js'
 
@@ -26,6 +28,7 @@ export type MenuCommand =
 	| 'runs.clearFinished'
 	| 'runs.toggleAutoClear'
 	| 'view.clearFilter'
+	| 'view.columnPreset'
 	| 'view.columns'
 	| 'view.filterPreset'
 	| 'view.fitColumns'
@@ -40,10 +43,6 @@ export type MenuCommand =
 /** Renderer-side handlers for each menu command. */
 export type MenuActions = Record<MenuCommand, (payload?: string) => void>
 
-const columnPresets = ['all', 'defaults', 'none'] as const
-/** Column visibility presets available from the View menu. */
-export type ColumnPreset = (typeof columnPresets)[number]
-
 const openTargets = ['finder', 'github', 'terminal', 'tower', 'vscode'] as const
 /** Applications the Repositories menu can open selected repositories in. */
 export type OpenTarget = (typeof openTargets)[number]
@@ -56,6 +55,8 @@ export type MenuState = {
 	autoClear: boolean
 	canReload: boolean
 	canRun: boolean
+	columnPreset: ColumnPresetId | undefined
+	columnPresets: Array<Pick<ColumnPreset, 'id' | 'label'>>
 	filterActive: boolean
 	filterPreset: FilterPresetId | undefined
 	filterPresets: Array<Pick<FilterPreset, 'id' | 'label'>>
@@ -122,11 +123,6 @@ export function isAppWindowRequest(value: unknown): value is AppWindowRequest {
 	)
 }
 
-/** Narrow a menu payload to a column visibility preset. */
-export function isColumnPreset(value: unknown): value is ColumnPreset {
-	return columnPresets.includes(value as ColumnPreset)
-}
-
 /**
  * Validate column actions requested by the renderer before opening a native
  * menu.
@@ -151,6 +147,24 @@ export function isOpenTarget(value: unknown): value is OpenTarget {
 	return openTargets.includes(value as OpenTarget)
 }
 
+// Built-in presets plus up to 100 saved ones, each with a short visible label
+function isPresetList(value: unknown, isId: (id: unknown) => boolean): boolean {
+	return (
+		Array.isArray(value) &&
+		value.length <= 102 &&
+		value.every((entry: unknown) => {
+			const preset = asRecord(entry)
+			return (
+				preset !== undefined &&
+				isId(preset.id) &&
+				typeof preset.label === 'string' &&
+				preset.label !== '' &&
+				preset.label.length <= 80
+			)
+		})
+	)
+}
+
 /** Validate menu state arriving over IPC before the main process acts on it. */
 export function isMenuState(value: unknown): value is MenuState {
 	if (typeof value !== 'object' || value === null) {
@@ -162,20 +176,11 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.autoClear === 'boolean' &&
 		typeof state.canReload === 'boolean' &&
 		typeof state.canRun === 'boolean' &&
+		(state.columnPreset === undefined || isColumnPresetId(state.columnPreset)) &&
+		isPresetList(state.columnPresets, isColumnPresetId) &&
 		typeof state.filterActive === 'boolean' &&
 		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
-		Array.isArray(state.filterPresets) &&
-		state.filterPresets.length <= 102 &&
-		state.filterPresets.every((entry: unknown) => {
-			const preset = asRecord(entry)
-			return (
-				preset !== undefined &&
-				isFilterPresetId(preset.id) &&
-				typeof preset.label === 'string' &&
-				preset.label !== '' &&
-				preset.label.length <= 80
-			)
-		}) &&
+		isPresetList(state.filterPresets, isFilterPresetId) &&
 		typeof state.filterShown === 'boolean' &&
 		typeof state.hasActiveRuns === 'boolean' &&
 		typeof state.hasFinishedRuns === 'boolean' &&

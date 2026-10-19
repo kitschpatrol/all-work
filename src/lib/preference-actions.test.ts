@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getPresetFilter } from './filter-presets.js'
-import { saveFilterPresets, updatePreferences } from './preference-actions.js'
+import { savePreferenceChanges, updatePreferences } from './preference-actions.js'
 import { defaultPreferences } from './preferences.js'
 import { savePreferences } from './view-storage.js'
 import { postWindowMessage } from './window-messages.js'
@@ -15,9 +15,16 @@ vi.mock('./window-messages.js', () => ({
 describe('preference actions', () => {
 	it('persists preset edits while retaining other settings and broadcasting plain data', async () => {
 		const previous = { ...defaultPreferences(), showRepositoryShortcuts: true }
-		const next = await saveFilterPresets(previous, [
-			{ filter: new Proxy(getPresetFilter('clean'), {}), id: 'custom:fixture', label: 'Fixture' },
+		const next = await savePreferenceChanges(previous, {
+			columnPresets: [{ columns: new Proxy(['name'], {}), id: 'custom:fixture', label: 'Fixture' }],
+			filterPresets: [
+				{ filter: new Proxy(getPresetFilter('clean'), {}), id: 'custom:fixture', label: 'Fixture' },
+			],
+		})
+		expect(next.columnPresets).toEqual([
+			{ columns: ['name'], id: 'custom:fixture', label: 'Fixture' },
 		])
+		expect(next.filterPresets).toHaveLength(1)
 		expect(next.showRepositoryShortcuts).toBe(true)
 		expect(next.identity).toEqual(previous.identity)
 		expect(savePreferences).toHaveBeenCalledWith(next)

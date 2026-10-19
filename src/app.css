@@ -657,6 +657,47 @@ h2 {
 	margin-top: 8px;
 }
 
+.column-menu-actions .button {
+	flex: 1;
+}
+
+.column-presets {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 6px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.column-preset-picker,
+.column-preset-name {
+	flex: 1;
+	width: 0;
+	min-width: 0;
+}
+
+.column-preset-picker {
+	overflow: hidden;
+	justify-content: flex-start;
+	text-overflow: ellipsis;
+}
+
+.column-preset-name {
+	height: 22px;
+	padding: 2px 6px;
+	border: 1px solid #ababab;
+	border-top-color: #969696;
+	border-radius: 5px;
+	background: #fff;
+	box-shadow: var(--field-shadow);
+}
+
+.column-preset-error {
+	margin: -2px 0 8px;
+	font-size: 11px;
+	color: #b82b20;
+}
+
 .column-list {
 	overflow: auto;
 	min-height: 0;
