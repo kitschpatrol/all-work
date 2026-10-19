@@ -4,6 +4,7 @@
 	import type { MenuActions } from '#lib/electron-api.js'
 	import type { RequestedMetadata } from '#lib/metadata-requests.js'
 	import type { Preferences } from '#lib/preferences.js'
+	import type { NativeOpenTarget } from '#lib/repository-links.js'
 	import type { SavedView } from '#lib/view-storage.js'
 	import type {
 		CommandRun,
@@ -52,6 +53,7 @@
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterBar from '#lib/FilterBar.svelte'
+	import { refreshGroups } from '#lib/metadata-columns.js'
 	import { planMetadataRequests, sendMetadataRequests } from '#lib/metadata-requests.js'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
@@ -691,8 +693,13 @@
 		})
 	}
 
-	async function refreshMetadata(groups: MetadataGroup[]) {
-		if (workspace === undefined || selectedCount === 0) {
+	async function refreshMetadata(
+		groups: MetadataGroup[],
+		repositoryIds = workspace?.repositories
+			.filter((repository) => rowSelection[repository.id])
+			.map((repository) => repository.id) ?? [],
+	) {
+		if (workspace === undefined || repositoryIds.length === 0) {
 			return
 		}
 
@@ -700,14 +707,16 @@
 			await request('/api/workspace/metadata', {
 				force: true,
 				groups,
-				repositoryIds: workspace.repositories
-					.filter((repository) => rowSelection[repository.id])
-					.map((repository) => repository.id),
+				repositoryIds,
 				workspaceId: workspace.id,
 			})
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		}
+	}
+
+	async function refreshRepository(repository: Repository) {
+		await refreshMetadata(refreshGroups, [repository.id])
 	}
 
 	async function setColumnsVisible(ids: string[], visible: boolean) {
@@ -941,7 +950,7 @@
 		})
 	}
 
-	async function openInApp(repository: Repository, app: 'finder' | 'terminal' | 'tower') {
+	async function openInApp(repository: Repository, app: NativeOpenTarget) {
 		if (workspace === undefined) {
 			return
 		}
@@ -979,7 +988,7 @@
 			void refreshMetadata(['updates'])
 		},
 		'metadata.refresh'() {
-			void refreshMetadata(['local', 'git', 'github', 'registry', 'ci', 'code', 'files'])
+			void refreshMetadata(refreshGroups)
 		},
 		'preferences.open'() {
 			void appWindows.open({ kind: 'preferences' })
@@ -1442,6 +1451,7 @@
 												columnId={cell.column.id}
 												onInspect={inspect}
 												onOpen={openInApp}
+												onRefresh={refreshRepository}
 												{outputLines}
 												{repository}
 												{runs}

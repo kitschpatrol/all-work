@@ -1,6 +1,6 @@
 import type { MetadataContext } from 'metascope'
 import { sourceNames } from 'metascope'
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,6 +36,7 @@ function fixture(): Workspace {
 		name: 'fixture',
 		packageManager: '',
 		path: path.join(temporaryDirectory, 'fixture'),
+		readme: '',
 		relativePath: 'fixture',
 		remote: '',
 		repoName: 'fixture',
@@ -182,6 +183,20 @@ describe('progressive Metascope metadata', () => {
 			expect(reloaded.repositories[0]?.metadata?.groups.files?.status).toBe('error'),
 		)
 		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(84)
+	})
+
+	it('rechecks the readme whenever local metadata refreshes', async () => {
+		const workspace = fixture()
+		const repository = workspace.repositories[0]
+		const readme = path.join(repository?.path ?? '', 'README.md')
+		await mkdir(repository?.path ?? '')
+		await writeFile(readme, '# Fixture\n')
+		const controller = begin(workspace)
+		await ready(workspace)
+		expect(repository?.readme).toBe('README.md')
+		await rm(readme)
+		controller.request(['fixture'], ['local'], true)
+		await vi.waitFor(() => expect(repository?.readme).toBe(''))
 	})
 
 	it('loads real zero update counts only after an explicit dependency check', async () => {

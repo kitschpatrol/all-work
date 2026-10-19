@@ -22,6 +22,7 @@ const repository: Repository = {
 	name: '@example/project',
 	packageManager: 'pnpm@12.11.2',
 	path: '/workspace/project with spaces',
+	readme: '',
 	relativePath: 'project with spaces',
 	remote: 'git@github.com:example/project.git',
 	repoName: 'project',

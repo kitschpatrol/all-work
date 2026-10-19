@@ -11,10 +11,11 @@ import { metadataColumns, metadataGroups } from '#lib/metadata-columns.js'
 import { defaultPreferences } from '#lib/preferences.js'
 import { sourceNames } from 'metascope'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { cacheDirectory } from './cache.js'
 import { extractMetadata } from './metascope-process.js'
+import { findReadme } from './readme.js'
 import { repositoryTemplate } from './repository-template.js'
 
 const remoteSources = new Set<SourceName>([
@@ -287,6 +288,15 @@ async function detectMonorepo(repository: Repository, context: MetadataContext) 
 	}
 }
 
+async function detectReadme(repository: Repository) {
+	try {
+		repository.readme = findReadme(await readdir(repository.path, { withFileTypes: true }))
+	} catch {
+		// An unreadable root has no readme the shortcut button could open.
+		repository.readme = ''
+	}
+}
+
 async function applyGitSupplement(
 	repository: Repository,
 	available: boolean,
@@ -403,7 +413,7 @@ export function startWorkspaceMetadata(
 			applyContext(repository, combined, group, workspace.identity)
 			const { available } = repositoryTemplate(context, {})
 			if (group === 'local') {
-				await detectMonorepo(repository, context)
+				await Promise.all([detectMonorepo(repository, context), detectReadme(repository)])
 			} else if (group === 'git') {
 				await applyGitSupplement(repository, available.git, supplementGit)
 			}

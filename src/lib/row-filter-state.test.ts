@@ -19,6 +19,7 @@ function repository(id: string, changedFiles: number): Repository {
 		name: id,
 		packageManager: '',
 		path: `/workspace/${id}`,
+		readme: '',
 		relativePath: id,
 		remote: '',
 		repoName: id,

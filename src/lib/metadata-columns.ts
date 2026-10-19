@@ -300,6 +300,17 @@ export const metadataGroups: Record<MetadataGroup, string> = {
 	updates: 'Dependency updates',
 }
 
+/** Every metadata group except the slower, on-demand dependency update check. */
+export const refreshGroups: MetadataGroup[] = [
+	'local',
+	'git',
+	'github',
+	'registry',
+	'ci',
+	'code',
+	'files',
+]
+
 /** Format raw values consistently in table cells, hovers, and shell variables. */
 export function metadataText(value: MetadataValue | undefined): string {
 	return value === undefined ? '' : Array.isArray(value) ? value.join(', ') : String(value)

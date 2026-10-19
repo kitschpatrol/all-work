@@ -1,21 +1,25 @@
 <script lang="ts">
+	import type { NativeOpenTarget } from './repository-links.js'
 	import type { Repository } from './workspace.js'
 	import FolderIcon from './FolderIcon.svelte'
 	import GithubIcon from './GithubIcon.svelte'
 	import { getGithubUrl, openRepositoryLink } from './repository-links.js'
-	import { vscodeUrl } from './table-formatting.js'
+	import { pendingMetadata, vscodeUrl } from './table-formatting.js'
 	const {
 		onOpen,
+		onRefresh,
 		repository,
 		showShortcuts,
 		tooltip,
 	}: {
-		onOpen: (repository: Repository, app: 'finder' | 'terminal' | 'tower') => Promise<void>
+		onOpen: (repository: Repository, app: NativeOpenTarget) => Promise<void>
+		onRefresh: (repository: Repository) => Promise<void>
 		repository: Repository
 		showShortcuts: boolean
 		tooltip: string
 	} = $props()
 	const githubUrl = $derived(getGithubUrl(repository.remote))
+	const refreshing = $derived(pendingMetadata([repository]).groups > 0)
 	let menuError = $state('')
 
 	async function showMenu(event: MouseEvent) {
@@ -54,6 +58,28 @@
 			title={repository.error}>!</span
 		>{/if}
 	{#if showShortcuts}<div class="repository-actions">
+			<button
+				class="repository-action"
+				aria-label={repository.readme === ''
+					? `No readme in ${repository.name}`
+					: `Open ${repository.readme} for ${repository.name}`}
+				disabled={repository.readme === ''}
+				onclick={async () => onOpen(repository, 'readme')}
+				title={repository.readme === '' ? 'No readme' : `Open ${repository.readme}`}
+				type="button"
+			>
+				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"
+					><path
+						d="M3.5 2.5a1 1 0 0 1 1-1h5l3 3v9a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-11Z"
+						stroke="currentColor"
+						stroke-linejoin="round"
+					/><path
+						d="M9.5 1.5v3h3M5.5 7.5h5M5.5 9.5h5M5.5 11.5h3"
+						stroke="currentColor"
+						stroke-linejoin="round"
+					/></svg
+				>
+			</button>
 			<button
 				class="repository-action"
 				aria-label="Open {repository.name} in Tower"
@@ -127,6 +153,27 @@
 				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"
 					><rect height="11" rx="1" stroke="currentColor" width="13" x="1.5" y="2.5" /><path
 						d="m4 6 2 2-2 2m4 0h3"
+						stroke="currentColor"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/></svg
+				>
+			</button>
+			<button
+				class="repository-action"
+				class:refreshing
+				aria-label="Refresh metadata for {repository.name}"
+				onclick={async () => onRefresh(repository)}
+				title={refreshing ? 'Loading metadata…' : 'Refresh metadata'}
+				type="button"
+			>
+				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"
+					><path
+						d="M13.5 8A5.5 5.5 0 1 1 11.89 4.11"
+						stroke="currentColor"
+						stroke-linecap="round"
+					/><path
+						d="M12.5 1.5v3h-3"
 						stroke="currentColor"
 						stroke-linecap="round"
 						stroke-linejoin="round"

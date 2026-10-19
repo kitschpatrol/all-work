@@ -1,7 +1,12 @@
 import type { Repository, Workspace } from '#lib/workspace.js'
 import { getWorkspace, verifyRepository } from '#lib/server/repositories.js'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { openRepository as openRepositoryInApp } from './open-repository.js'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listReadmeApps, openRepository as openRepositoryInApp } from './open-repository.js'
+import { readSettings } from './settings.js'
 
 const { launch } = vi.hoisted(() => ({ launch: vi.fn() }))
 
@@ -9,6 +14,7 @@ vi.mock('#lib/server/repositories.js', () => ({
 	getWorkspace: vi.fn(),
 	verifyRepository: vi.fn(),
 }))
+vi.mock('./settings.js', () => ({ readSettings: vi.fn() }))
 vi.mock('node:child_process', () => ({
 	execFile(
 		command: string,
@@ -38,6 +44,7 @@ const repository: Repository = {
 	name: 'right repo',
 	packageManager: '',
 	path: '/Users/example/Code/right repo #1 & café',
+	readme: '',
 	relativePath: 'right repo #1 & café',
 	remote: '',
 	repoName: 'right repo',
@@ -55,21 +62,55 @@ const workspace: Workspace = {
 	warnings: [],
 }
 
+let temporaryDirectory: string
+
+beforeAll(async () => {
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-open-'))
+	for (const [name, files] of [
+		['with readme', ['readme.txt', 'Readme.md']],
+		['without readme', ['notes.md']],
+	] as const) {
+		const directory = path.join(temporaryDirectory, name)
+		await mkdir(directory)
+		for (const file of files) {
+			await writeFile(path.join(directory, file), '# Fixture\n')
+		}
+
+		workspace.repositories.push({ ...repository, id: name, name, path: directory })
+	}
+})
+
+afterAll(async () => {
+	await rm(temporaryDirectory, { force: true, recursive: true })
+})
+
 beforeEach(() => {
 	vi.resetAllMocks()
 	vi.mocked(getWorkspace).mockReturnValue(workspace)
 	vi.mocked(verifyRepository).mockResolvedValue()
+	vi.mocked(readSettings).mockResolvedValue({ preferences: undefined, view: undefined })
 	launch.mockImplementation((command: string) =>
 		command === '/usr/bin/osascript' ? '/Applications/Ghostty.app\n' : '',
 	)
 })
 
-async function openRepository(repositoryId: string, app: 'Finder' | 'Terminal' | 'Tower') {
-	const url = new URL(`http://127.0.0.1:5173/api/repositories/${app.toLowerCase()}`)
+function localRequest(route: string, body: Record<string, unknown>) {
+	const url = new URL(`http://127.0.0.1:5173/api/${route}`)
 	const request = new Request(url, {
-		body: JSON.stringify({ repositoryId, workspaceId: workspace.id }),
+		body: JSON.stringify(body),
 		headers: { 'Content-Type': 'application/json', origin: url.origin, 'X-Allwork-Request': '1' },
 		method: 'POST',
+	})
+	return { request, url }
+}
+
+async function openRepository(
+	repositoryId: string,
+	app: 'Finder' | 'Readme' | 'Terminal' | 'Tower',
+) {
+	const { request, url } = localRequest(`repositories/${app.toLowerCase()}`, {
+		repositoryId,
+		workspaceId: workspace.id,
 	})
 	return openRepositoryInApp(request, url, app)
 }
@@ -143,5 +184,83 @@ describe.skipIf(process.platform !== 'darwin')('the system default terminal', ()
 			status: 400,
 		})
 		expect(launch).not.toHaveBeenCalledWith('/usr/bin/open', expect.anything(), expect.anything())
+	})
+})
+
+describe.skipIf(process.platform !== 'darwin')('opening a repository readme', () => {
+	it.each([
+		['the system default', undefined, []],
+		['the chosen application', 'com.example.Editor', ['-b', 'com.example.Editor']],
+		['the system default instead of an invalid saved app', '-a Terminal', []],
+	])('opens the Markdown readme in %s', async (_label, readmeApp, appArguments) => {
+		vi.mocked(readSettings).mockResolvedValue({ preferences: { readmeApp }, view: undefined })
+		const response = await openRepository('with readme', 'Readme')
+		expect(response.status).toBe(200)
+		expect(launch).toHaveBeenCalledExactlyOnceWith(
+			'/usr/bin/open',
+			[...appArguments, '--', path.join(temporaryDirectory, 'with readme', 'Readme.md')],
+			{ timeout: 15_000 },
+		)
+	})
+
+	it('reports a repository without a readme instead of launching an app', async () => {
+		await expect(openRepository('without readme', 'Readme')).rejects.toMatchObject({
+			body: { message: 'No readme found in without readme.' },
+			status: 400,
+		})
+		expect(launch).not.toHaveBeenCalled()
+	})
+})
+
+describe.skipIf(process.platform !== 'darwin')('listing applications for readmes', () => {
+	async function listApps() {
+		const { request, url } = localRequest('readme-apps', {})
+		return listReadmeApps(request, url)
+	}
+
+	it('names apps as Finder does, sorted, with one entry per bundle identifier', async () => {
+		let sample = ''
+		let sampleExisted = false
+		launch.mockImplementation((_command: string, args: string[]) => {
+			sample = args.at(-1) ?? ''
+			sampleExisted = existsSync(sample)
+			return JSON.stringify({
+				apps: [
+					{ id: 'com.example.Writer', path: '/Applications/Markdown Writer.app' },
+					{ id: 'com.example.Editor', path: '/Applications/Editor.app' },
+					{ id: 'com.example.Writer', path: '/Volumes/Backup/Writer Copy.app' },
+					{ id: '', path: '/Applications/Unidentified.app' },
+					{ id: 'com.example.Pathless' },
+				],
+				defaultApp: { id: 'com.example.Writer', path: '/Applications/Markdown Writer.app' },
+			})
+		})
+		const response = await listApps()
+		await expect(response.json()).resolves.toEqual({
+			apps: [
+				{ id: 'com.example.Editor', name: 'Editor' },
+				{ id: 'com.example.Writer', name: 'Markdown Writer' },
+			],
+			defaultName: 'Markdown Writer',
+		})
+		expect(path.basename(sample)).toBe('readme.md')
+		expect(sampleExisted).toBe(true)
+		expect(existsSync(sample)).toBe(false)
+	})
+
+	it('reports an empty default when no app is registered for Markdown', async () => {
+		launch.mockReturnValue(JSON.stringify({ apps: [] }))
+		const response = await listApps()
+		await expect(response.json()).resolves.toEqual({ apps: [], defaultName: '' })
+	})
+
+	it('reports why Launch Services could not be queried', async () => {
+		launch.mockImplementation(() => {
+			throw new Error('osascript timed out')
+		})
+		await expect(listApps()).rejects.toMatchObject({
+			body: { message: 'Could not list applications for readmes: osascript timed out' },
+			status: 500,
+		})
 	})
 })

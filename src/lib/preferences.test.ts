@@ -33,6 +33,16 @@ describe('saved project identity', () => {
 		expect(parsePreferences({ showRepositoryShortcuts: true }).showRepositoryShortcuts).toBe(true)
 	})
 
+	it('keeps a saved readme app only when it is a bundle identifier', () => {
+		expect(defaultPreferences().readmeApp).toBe('')
+		expect(parsePreferences({ readmeApp: 'com.example.Editor-2' }).readmeApp).toBe(
+			'com.example.Editor-2',
+		)
+		for (const readmeApp of ['-a Terminal', '../Editor.app', 'com example', 42, 'a'.repeat(256)]) {
+			expect(parsePreferences({ readmeApp }).readmeApp).toBe('')
+		}
+	})
+
 	it('normalizes aliases without changing author casing', () => {
 		expect(
 			parseIdentity({

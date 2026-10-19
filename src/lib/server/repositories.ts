@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { access, readdir, realpath, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { findReadme } from './readme.js'
 import { startWorkspaceMetadata } from './repository-metadata.js'
 
 const branchCounts = /\+(\d+) -(\d+)/v
@@ -112,7 +113,11 @@ async function supplementGitMetadata(repository: Repository) {
 	repository.lastCommit = subject.join('\n')
 }
 
-async function createRepository(directory: string, root: string): Promise<Repository> {
+async function createRepository(
+	directory: string,
+	root: string,
+	readme: string,
+): Promise<Repository> {
 	const repository: Repository = {
 		ahead: 0,
 		behind: 0,
@@ -127,6 +132,7 @@ async function createRepository(directory: string, root: string): Promise<Reposi
 		name: path.basename(directory),
 		packageManager: '',
 		path: directory,
+		readme,
 		relativePath: directory === root ? '.' : path.relative(root, directory),
 		remote: '',
 		repoName: path.basename(directory),
@@ -169,7 +175,7 @@ export async function scanWorkspace(
 		warnings: [],
 	}
 	const directories = [directory]
-	const repositories: string[] = []
+	const repositories: Array<{ directory: string; readme: string }> = []
 	while (directories.length > 0) {
 		const current = directories.pop()
 		if (current === undefined) {
@@ -181,7 +187,7 @@ export async function scanWorkspace(
 			if (
 				entries.some((entry) => entry.name === '.git' && (entry.isDirectory() || entry.isFile()))
 			) {
-				repositories.push(current)
+				repositories.push({ directory: current, readme: findReadme(entries) })
 			}
 
 			if (!recursive && current !== directory) {
@@ -202,9 +208,11 @@ export async function scanWorkspace(
 	await Promise.all(
 		Array.from({ length: Math.min(4, repositories.length) }, async () => {
 			while (next < repositories.length) {
-				const repositoryPath = repositories[next++]
-				if (repositoryPath !== undefined) {
-					workspace.repositories.push(await createRepository(repositoryPath, directory))
+				const found = repositories[next++]
+				if (found !== undefined) {
+					workspace.repositories.push(
+						await createRepository(found.directory, directory, found.readme),
+					)
 				}
 			}
 		}),

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { NativeOpenTarget } from './repository-links.js'
 	import type { CommandRun, Repository } from './workspace.js'
 	import {
 		formatColumnCellValue,
@@ -13,6 +14,7 @@
 		columnId,
 		onInspect,
 		onOpen,
+		onRefresh,
 		outputLines,
 		repository,
 		runs,
@@ -21,7 +23,8 @@
 	}: {
 		columnId: string
 		onInspect: (run: CommandRun, repository: Repository) => void
-		onOpen: (repository: Repository, app: 'finder' | 'terminal' | 'tower') => Promise<void>
+		onOpen: (repository: Repository, app: NativeOpenTarget) => Promise<void>
+		onRefresh: (repository: Repository) => Promise<void>
 		outputLines: number
 		repository: Repository
 		runs: CommandRun[]
@@ -33,7 +36,13 @@
 	const display = $derived(getColumnDisplay(columnId))
 </script>
 
-{#if columnId === 'relativePath'}<RepositoryCell {onOpen} {repository} {showShortcuts} {tooltip} />
+{#if columnId === 'relativePath'}<RepositoryCell
+		{onOpen}
+		{onRefresh}
+		{repository}
+		{showShortcuts}
+		{tooltip}
+	/>
 {:else if columnId === 'name'}<span
 		class="project-name"
 		title={repository.description === '' ? tooltip : `${tooltip}\n${repository.description}`}

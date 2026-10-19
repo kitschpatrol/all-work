@@ -26,6 +26,11 @@ export type Repository = {
 	name: string
 	packageManager: string
 	path: string
+	/**
+	 * File name of the readme in the repository root, or empty when there is
+	 * none.
+	 */
+	readme: string
 	relativePath: string
 	remote: string
 	repoName: string

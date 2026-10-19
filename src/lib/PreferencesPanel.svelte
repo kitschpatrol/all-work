@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import type { Preferences } from './preferences.js'
+	import type { Preferences, ReadmeApps } from './preferences.js'
 	import { request } from './client-request.js'
 	import { defaultPreferences, parseIdentity, parseIdentityNames } from './preferences.js'
 	import { loadSettings, savePreferences } from './view-storage.js'
@@ -23,14 +23,23 @@
 	let preferences = $state(defaultPreferences())
 	let authorNames = $state('')
 	let githubAccounts = $state('')
+	let readmeApp = $state('')
+	let readmeApps: ReadmeApps = $state({ apps: [], defaultName: '' })
 	let restoreWorkspace = $state(true)
 	let showRepositoryShortcuts = $state(false)
 	let busy = $state(true)
 	let message = $state('')
+	// Keep a saved choice selectable after its app is uninstalled or the list fails to load
+	const readmeAppOptions = $derived(
+		readmeApp === '' || readmeApps.apps.some((app) => app.id === readmeApp)
+			? readmeApps.apps
+			: [...readmeApps.apps, { id: readmeApp, name: readmeApp }],
+	)
 
 	function readDraft() {
 		authorNames = preferences.identity.authorNames.join('\n')
 		githubAccounts = preferences.identity.githubAccounts.join('\n')
+		readmeApp = preferences.readmeApp
 		restoreWorkspace = preferences.restoreWorkspace
 		showRepositoryShortcuts = preferences.showRepositoryShortcuts
 	}
@@ -53,6 +62,14 @@
 				message = 'Saved preferences could not be loaded from disk.'
 			} finally {
 				busy = false
+			}
+		})()
+
+		void (async () => {
+			try {
+				readmeApps = await request<ReadmeApps>('/api/readme-apps', {})
+			} catch (error) {
+				message = error instanceof Error ? error.message : 'Applications could not be listed.'
 			}
 		})()
 
@@ -91,6 +108,7 @@
 		await persist({
 			...preferences,
 			identity,
+			readmeApp,
 			restoreWorkspace,
 			showRepositoryShortcuts,
 			version: 1,
@@ -138,6 +156,25 @@
 			<label class="preference-checkbox"
 				><input type="checkbox" bind:checked={showRepositoryShortcuts} /> Show repo shortcut buttons</label
 			>
+		</fieldset>
+		<fieldset disabled={busy}>
+			<legend>Readmes</legend>
+			<div class="preference-field">
+				<label for="preference-readme-app">Open with</label><select
+					id="preference-readme-app"
+					bind:value={readmeApp}
+				>
+					<option value=""
+						>{readmeApps.defaultName === ''
+							? 'System default'
+							: `System default (${readmeApps.defaultName})`}</option
+					>
+					{#each readmeAppOptions as app (app.id)}<option value={app.id}>{app.name}</option>{/each}
+				</select>
+			</div>
+			<p class="preference-help">
+				Used by the readme shortcut button. Lists the applications macOS offers for Markdown files.
+			</p>
 		</fieldset>
 		<fieldset disabled={busy}>
 			<legend>Storage</legend>

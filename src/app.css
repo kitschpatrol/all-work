@@ -1246,6 +1246,18 @@ th[aria-sort='descending'] {
 	height: 14px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+	.repository-action.refreshing svg {
+		animation: refresh-spin 1s linear infinite;
+	}
+}
+
+@keyframes refresh-spin {
+	to {
+		transform: rotate(1turn);
+	}
+}
+
 .repository-name {
 	overflow: hidden;
 	display: flex;
@@ -1766,6 +1778,19 @@ tr.selected
 
 .preference-field label {
 	padding-top: 5px;
+}
+
+.preference-field select {
+	justify-self: start;
+	max-width: 100%;
+}
+
+.preference-field:has(> select) {
+	align-items: center;
+}
+
+.preference-field:has(> select) label {
+	padding-top: 0;
 }
 
 .preference-field textarea {

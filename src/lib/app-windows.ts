@@ -8,7 +8,7 @@ export type AppWindow =
 function describeWindow(target: AppWindow): AppWindowRequest {
 	if (target.kind === 'preferences') {
 		return {
-			height: 600,
+			height: 720,
 			name: 'allwork-preferences',
 			resizable: false,
 			url: '/preferences',

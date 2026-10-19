@@ -27,6 +27,7 @@ function repository(
 		name: id,
 		packageManager: '',
 		path: `/workspace/${id}`,
+		readme: '',
 		relativePath: id,
 		remote: '',
 		repoName: id,

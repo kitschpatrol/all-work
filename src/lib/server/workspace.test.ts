@@ -227,6 +227,17 @@ describe('repository discovery and Metascope metadata', () => {
 		).toMatchObject({ repoName: 'plain-git', repoOwner: 'team/subgroup' })
 	})
 
+	it('records each repository readme from the discovery listing', () => {
+		const readmes = Object.fromEntries(
+			workspace.repositories.map((repository) => [repository.relativePath, repository.readme]),
+		)
+		expect(readmes).toMatchObject({
+			'empty-repository': '',
+			'group/plain-git': 'readme.txt',
+			'project with spaces': 'readme.txt',
+		})
+	})
+
 	it('uses Metascope totals across cached remotes, including without a configured upstream', () => {
 		const repository = workspace.repositories.find(
 			(candidate) => candidate.relativePath === 'group/plain-git',

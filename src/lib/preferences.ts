@@ -15,13 +15,30 @@ export type Preferences = {
 	columnPresets: ColumnPreset[]
 	filterPresets: FilterPreset[]
 	identity: ProjectIdentity
+	/**
+	 * Bundle identifier of the app that opens readmes, or empty for the system
+	 * default.
+	 */
+	readmeApp: string
 	restoreWorkspace: boolean
 	showRepositoryShortcuts: boolean
 	version: 1
 }
 
+/** An installed application that can open Markdown readmes. */
+export type ReadmeApp = { id: string; name: string }
+
+/** Applications that can open readmes, and the name of the system default. */
+export type ReadmeApps = { apps: ReadmeApp[]; defaultName: string }
+
 const separator = /[,\n]/v
 const accountPrefix = /^@/v
+const bundleIdPattern = /^[\dA-Za-z][\w.\-]*$/v
+
+/** Accept a macOS bundle identifier such as `com.apple.TextEdit`. */
+export function isBundleId(value: unknown): value is string {
+	return typeof value === 'string' && value.length <= 255 && bundleIdPattern.test(value)
+}
 
 /**
  * Provide the initial identity, appearance, and workspace restoration
@@ -35,6 +52,7 @@ export function defaultPreferences(): Preferences {
 			authorNames: ['Eric Mika', 'kitschpatrol', 'scalarstudio'],
 			githubAccounts: ['kitschpatrol', 'scalarstudio'],
 		},
+		readmeApp: '',
 		restoreWorkspace: true,
 		showRepositoryShortcuts: false,
 		version: 1,
@@ -86,6 +104,7 @@ export function parsePreferences(value: unknown): Preferences {
 		columnPresets: parseColumnPresets(record?.columnPresets),
 		filterPresets: parseFilterPresets(record?.filterPresets),
 		identity: parseIdentity(record?.identity) ?? defaults.identity,
+		readmeApp: isBundleId(record?.readmeApp) ? record.readmeApp : defaults.readmeApp,
 		restoreWorkspace: record?.restoreWorkspace !== false,
 		showRepositoryShortcuts: record?.showRepositoryShortcuts === true,
 		version: 1,

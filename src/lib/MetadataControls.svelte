@@ -2,6 +2,7 @@
 	import type { createColumnPresets } from './column-preset-state.svelte.js'
 	import type { MetadataGroup } from './workspace.js'
 	import ColumnPresetPicker from './ColumnPresetPicker.svelte'
+	import { refreshGroups } from './metadata-columns.js'
 
 	type MenuColumn = {
 		category: string
@@ -59,7 +60,7 @@
 <button
 	class="button subtle"
 	{disabled}
-	onclick={async () => onRefresh(['local', 'git', 'github', 'registry', 'ci', 'code', 'files'])}
+	onclick={async () => onRefresh(refreshGroups)}
 	title={selectedCount === 0
 		? 'Select repositories to refresh metadata'
 		: `Refresh metadata for ${scope}`}
