@@ -716,10 +716,6 @@
 		}
 	}
 
-	async function refreshRepository(repository: Repository) {
-		await refreshMetadata(refreshGroups, [repository.id])
-	}
-
 	async function setColumnsVisible(ids: string[], visible: boolean) {
 		columnPresets.edit()
 		await changeVisibility(Object.fromEntries(ids.map((id) => [id, visible])))
@@ -1222,6 +1218,7 @@
 								scheduleMetadata()
 							}}
 							placeholder="Search repositories…"
+							type="search"
 							bind:value={search}
 						/>
 					</div>
@@ -1452,7 +1449,8 @@
 												columnId={cell.column.id}
 												onInspect={inspect}
 												onOpen={openInApp}
-												onRefresh={refreshRepository}
+												onRefresh={async (target: Repository) =>
+													refreshMetadata(refreshGroups, [target.id])}
 												{outputLines}
 												{repository}
 												{runs}
