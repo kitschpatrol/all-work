@@ -113,8 +113,13 @@ async function supplementGitMetadata(repository: Repository) {
 	repository.lastCommit = subject.join('\n')
 }
 
+/**
+ * Name and list a repository by the path it was found at, which may pass
+ * through a symlink, while running Git in its resolved directory.
+ */
 async function createRepository(
 	directory: string,
+	realPath: string,
 	root: string,
 	readme: string,
 ): Promise<Repository> {
@@ -125,13 +130,13 @@ async function createRepository(
 		changedFiles: 0,
 		description: '',
 		gitStatusAvailable: false,
-		id: createHash('sha256').update(directory).digest('hex'),
+		id: createHash('sha256').update(realPath).digest('hex'),
 		lastCommit: '',
 		lastCommitDate: '',
 		metadata: { groups: {}, values: {} },
 		name: path.basename(directory),
 		packageManager: '',
-		path: directory,
+		path: realPath,
 		readme,
 		relativePath: directory === root ? '.' : path.relative(root, directory),
 		remote: '',
@@ -140,15 +145,39 @@ async function createRepository(
 		version: '',
 	}
 	// Linked worktrees keep their effective config outside the repository directory.
-	const gitEntry = await stat(path.join(directory, '.git'))
+	const gitEntry = await stat(path.join(realPath, '.git'))
 	if (gitEntry.isFile()) {
-		repository.remote = await optionalGit(directory, ['config', '--get', 'remote.origin.url'])
+		repository.remote = await optionalGit(realPath, ['config', '--get', 'remote.origin.url'])
 	}
 
 	return repository
 }
 
-/** Find Git roots and worktrees at the chosen depth, without following symlinks. */
+/**
+ * Whether a symlink resolves to a Git repository rather than a file or other
+ * folder.
+ */
+async function linksToRepository(link: string): Promise<boolean> {
+	try {
+		await stat(path.join(link, '.git'))
+		return true
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			'code' in error &&
+			(error.code === 'ENOENT' || error.code === 'ENOTDIR')
+		) {
+			return false
+		}
+
+		throw error
+	}
+}
+
+/**
+ * Find Git roots and worktrees at the chosen depth. Symlinks are followed only
+ * when they point to a repository, and each repository is listed once.
+ */
 export async function scanWorkspace(
 	input: string,
 	recursive = true,
@@ -175,19 +204,35 @@ export async function scanWorkspace(
 		warnings: [],
 	}
 	const directories = [directory]
-	const repositories: Array<{ directory: string; readme: string }> = []
-	while (directories.length > 0) {
-		const current = directories.pop()
+	const links: string[] = []
+	const repositories: Array<{ directory: string; readme: string; realPath: string }> = []
+	const repositoryPaths = new Set<string>()
+	while (directories.length > 0 || links.length > 0) {
+		// Links wait until every direct path is scanned, so a repository
+		// reachable both ways keeps its direct path.
+		const isLink = directories.length === 0
+		const current = isLink ? links.shift() : directories.pop()
 		if (current === undefined) {
 			break
 		}
 
 		try {
+			if (isLink && !(await linksToRepository(current))) {
+				continue
+			}
+
 			const entries = await readdir(current, { withFileTypes: true })
 			if (
 				entries.some((entry) => entry.name === '.git' && (entry.isDirectory() || entry.isFile()))
 			) {
-				repositories.push({ directory: current, readme: findReadme(entries) })
+				const realPath = await realpath(current)
+				// Skipping a repository already seen also ends symlink cycles.
+				if (repositoryPaths.has(realPath)) {
+					continue
+				}
+
+				repositoryPaths.add(realPath)
+				repositories.push({ directory: current, readme: findReadme(entries), realPath })
 			}
 
 			if (!recursive && current !== directory) {
@@ -197,6 +242,8 @@ export async function scanWorkspace(
 			for (const entry of entries) {
 				if (entry.isDirectory() && !ignoredDirectories.has(entry.name)) {
 					directories.push(path.join(current, entry.name))
+				} else if (entry.isSymbolicLink()) {
+					links.push(path.join(current, entry.name))
 				}
 			}
 		} catch {
@@ -211,7 +258,7 @@ export async function scanWorkspace(
 				const found = repositories[next++]
 				if (found !== undefined) {
 					workspace.repositories.push(
-						await createRepository(found.directory, directory, found.readme),
+						await createRepository(found.directory, found.realPath, directory, found.readme),
 					)
 				}
 			}

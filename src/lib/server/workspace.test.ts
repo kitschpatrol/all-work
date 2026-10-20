@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -164,7 +164,7 @@ afterAll(async () => {
 })
 
 describe('repository discovery and Metascope metadata', () => {
-	it('discovers nested Git roots, empty repositories, and worktrees without following symlinks or dependencies', () => {
+	it('discovers nested Git roots, empty repositories, and worktrees without symlinked duplicates or dependencies', () => {
 		expect(workspace.repositories.map((repository) => repository.relativePath).toSorted()).toEqual([
 			'empty-repository',
 			'group/plain-git',
@@ -184,6 +184,66 @@ describe('repository discovery and Metascope metadata', () => {
 			'project with spaces',
 		])
 		forgetWorkspace(shallow.id)
+	})
+
+	it('follows symlinks only to repositories, listing them by link name and running in the target', async () => {
+		const root = await mkdtemp(path.join(os.tmpdir(), 'allwork-links-'))
+		const elsewhere = await mkdtemp(path.join(os.tmpdir(), 'allwork-elsewhere-'))
+		try {
+			const target = path.join(elsewhere, 'target')
+			await mkdir(path.join(target, 'nested'), { recursive: true })
+			await git(target, ['init', '--initial-branch=main'])
+			await git(path.join(target, 'nested'), ['init', '--initial-branch=main'])
+			await symlink(target, path.join(target, 'cycle'))
+			await mkdir(path.join(elsewhere, 'plain/hidden'), { recursive: true })
+			await git(path.join(elsewhere, 'plain/hidden'), ['init', '--initial-branch=main'])
+			await writeFile(path.join(elsewhere, 'notes.txt'), 'not a repository\n')
+
+			const direct = path.join(root, 'direct')
+			await mkdir(direct)
+			await git(direct, ['init', '--initial-branch=main'])
+			await symlink(direct, path.join(root, 'alias'))
+			await symlink(target, path.join(root, 'linked'))
+			await symlink(path.join(elsewhere, 'plain'), path.join(root, 'plain-folder'))
+			await symlink(path.join(elsewhere, 'notes.txt'), path.join(root, 'notes'))
+			await symlink(path.join(elsewhere, 'missing'), path.join(root, 'broken'))
+
+			const realTarget = await realpath(target)
+			const scanned = await scanWorkspace(root)
+			expect(scanned.warnings).toEqual([])
+			expect(
+				scanned.repositories.map(({ name, path: directory, relativePath }) => ({
+					directory,
+					name,
+					relativePath,
+				})),
+			).toEqual([
+				{ directory: await realpath(direct), name: 'direct', relativePath: 'direct' },
+				{ directory: realTarget, name: 'linked', relativePath: 'linked' },
+				{
+					directory: path.join(realTarget, 'nested'),
+					name: 'nested',
+					relativePath: 'linked/nested',
+				},
+			])
+			const linked = scanned.repositories[1]
+			if (linked === undefined) {
+				throw new Error('Missing linked repository.')
+			}
+
+			await expect(verifyRepository(linked)).resolves.toBeUndefined()
+			forgetWorkspace(scanned.id)
+
+			const shallow = await scanWorkspace(root, false)
+			expect(shallow.repositories.map((repository) => repository.relativePath)).toEqual([
+				'direct',
+				'linked',
+			])
+			forgetWorkspace(shallow.id)
+		} finally {
+			await rm(root, { force: true, recursive: true })
+			await rm(elsewhere, { force: true, recursive: true })
+		}
 	})
 
 	it('includes the chosen repository itself when recursion is disabled', async () => {
