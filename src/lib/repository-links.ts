@@ -2,7 +2,7 @@ import type { OpenTarget } from './electron-api.js'
 import type { Repository } from './workspace.js'
 import { vscodeUrl } from './table-formatting.js'
 /** Targets the server opens with native macOS applications. */
-export type NativeOpenTarget = 'finder' | 'readme' | 'terminal' | 'tower'
+export type NativeOpenTarget = Exclude<OpenTarget, 'github' | 'vscode'>
 
 const githubScpRemote = /^(?:[^\/@:\s]+@)?github\.com:(.+)$/iv
 const trailingSlashes = /\/+$/v
@@ -56,7 +56,7 @@ export function openRepositoryLink(
 
 /**
  * Open the chosen repositories in order using the matching browser or native
- * action.
+ * action, skipping those without a GitHub remote or readme to open.
  */
 export async function openRepositories(
 	repositories: readonly Repository[],
@@ -66,7 +66,7 @@ export async function openRepositories(
 	for (const repository of repositories) {
 		if (target === 'github' || target === 'vscode') {
 			openRepositoryLink(repository, target)
-		} else {
+		} else if (target !== 'readme' || repository.readme !== '') {
 			await openInApp(repository, target)
 		}
 	}

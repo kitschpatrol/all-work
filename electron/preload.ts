@@ -5,9 +5,10 @@ import type {
 	ColumnMenuRequest,
 	MenuCommand,
 	MenuState,
-	OpenTarget,
+	RepositoryMenuChoice,
+	RepositoryMenuRequest,
 } from '../src/lib/electron-api.js'
-import { isOpenTarget } from '../src/lib/electron-api.js'
+import { isRepositoryMenuChoice } from '../src/lib/electron-api.js'
 
 const api: AllWorkApi = {
 	async chooseDirectory(): Promise<string | undefined> {
@@ -36,9 +37,11 @@ const api: AllWorkApi = {
 	async showColumnMenu(request: ColumnMenuRequest): Promise<void> {
 		await ipcRenderer.invoke('allwork:column-menu', request)
 	},
-	async showRepositoryMenu(hasGithubRemote: boolean): Promise<OpenTarget | undefined> {
-		const result: unknown = await ipcRenderer.invoke('allwork:repository-menu', hasGithubRemote)
-		return isOpenTarget(result) ? result : undefined
+	async showRepositoryMenu(
+		request: RepositoryMenuRequest,
+	): Promise<RepositoryMenuChoice | undefined> {
+		const result: unknown = await ipcRenderer.invoke('allwork:repository-menu', request)
+		return isRepositoryMenuChoice(result) ? result : undefined
 	},
 	updateMenuState(state: MenuState): void {
 		ipcRenderer.send('allwork:menu-state', state)

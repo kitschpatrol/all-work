@@ -30,11 +30,16 @@
 		event.preventDefault()
 		menuError = ''
 		try {
-			const target = await globalThis._allwork.showRepositoryMenu(githubUrl !== undefined)
-			if (target === 'github' || target === 'vscode') {
-				openRepositoryLink(repository, target)
-			} else if (target !== undefined) {
-				await onOpen(repository, target)
+			const choice = await globalThis._allwork.showRepositoryMenu({
+				hasGithubRemote: githubUrl !== undefined,
+				hasReadme: repository.readme !== '',
+			})
+			if (choice === 'github' || choice === 'vscode') {
+				openRepositoryLink(repository, choice)
+			} else if (choice === 'refresh') {
+				await onRefresh(repository)
+			} else if (choice !== undefined) {
+				await onOpen(repository, choice)
 			}
 		} catch (error) {
 			menuError = error instanceof Error ? error.message : String(error)

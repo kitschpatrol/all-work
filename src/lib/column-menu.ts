@@ -1,6 +1,7 @@
 import type { PinnedColumns } from './column-order.js'
 import type { MenuActions } from './electron-api.js'
 import type { CommandRun, Repository } from './workspace.js'
+import { getColumnVariableName } from './column-variables.js'
 import { focusLastFilterRule } from './filter-focus.js'
 import { getColumnCopyLines } from './table-formatting.js'
 
@@ -27,7 +28,7 @@ type ColumnMenuOptions = {
 
 /**
  * Connect a column's native menu to sorting, visibility, filter rules, and
- * copying its plain text.
+ * copying its plain text or shell variable.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -72,6 +73,20 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		}
 	}
 
+	async function copyVariable(id: string | undefined) {
+		const name = id === undefined ? undefined : getColumnVariableName(id, options.getRuns())
+		if (name === undefined) {
+			return
+		}
+
+		try {
+			// eslint-disable-next-line node/no-unsupported-features/node-builtins -- The clipboard is written in the browser.
+			await navigator.clipboard.writeText(`$${name}`)
+		} catch (error) {
+			options.onError(error)
+		}
+	}
+
 	async function hide(id: string) {
 		try {
 			await options.onHide(id)
@@ -86,6 +101,9 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		},
 		'column.copySelected'(payload) {
 			void copy(payload, true)
+		},
+		'column.copyVariable'(payload) {
+			void copyVariable(payload)
 		},
 		'column.filter'(payload) {
 			const column = getColumn(payload)
@@ -123,6 +141,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					canSort: column.getCanSort(),
 					columnId,
 					hasSelection: options.getRows(true).length > 0,
+					hasVariable: getColumnVariableName(columnId, options.getRuns()) !== undefined,
 				})
 			} catch (error) {
 				options.onError(error)

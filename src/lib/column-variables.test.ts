@@ -5,8 +5,11 @@ import {
 	formatColumnCellValue,
 	getColumnDisplay,
 	getColumnEnvironment,
+	getColumnPreviewTooltip,
+	getColumnVariableName,
 	getColumnVariables,
 	getPendingCommandColumns,
+	getVariablePreviewTooltip,
 } from './column-variables.js'
 
 const repository: Repository = {
@@ -172,5 +175,32 @@ describe('column variables', () => {
 			},
 		])
 		expect(getColumnEnvironment(repository, runs.slice(1)).ALLWORK_COLUMN_RUN_1).toBe('three\n')
+	})
+
+	it('names the variable for repository and run columns, and none for other columns', () => {
+		const runs = [outputRun('first', 'one'), outputRun('second', 'two')]
+		expect(getColumnVariableName('branch')).toBe('ALLWORK_COLUMN_BRANCH')
+		expect(getColumnVariableName('metadata:Git Remotes Ahead')).toBe('ALLWORK_COLUMN_AHEAD')
+		expect(getColumnVariableName('second', runs)).toBe('ALLWORK_COLUMN_RUN_2')
+		expect(getColumnVariableName('select', runs)).toBeUndefined()
+		expect(getColumnVariableName('removed-run', runs)).toBeUndefined()
+	})
+
+	it('previews header values without the variable, which the variable picker still shows', () => {
+		const runs = [outputRun('first', 'clean')]
+		expect(getColumnPreviewTooltip(repository, 'branch').split('\n', 1)[0]).toBe('feature/example')
+		expect(getColumnPreviewTooltip(repository, 'first', runs)).toBe(
+			'clean\nRepository: project with spaces',
+		)
+		expect(getColumnPreviewTooltip(repository, 'description')).not.toContain('ALLWORK_COLUMN')
+		expect(getColumnPreviewTooltip(undefined, 'branch')).toBe('')
+		expect(getColumnPreviewTooltip(repository, 'select')).toBe('')
+		expect(getVariablePreviewTooltip(repository, 'branch').split('\n', 1)[0]).toBe(
+			'$ALLWORK_COLUMN_BRANCH = feature/example',
+		)
+		expect(getVariablePreviewTooltip(repository, 'metadata:Stars').split('\n', 1)[0]).toBe(
+			'$ALLWORK_COLUMN_STARS = ""',
+		)
+		expect(getVariablePreviewTooltip(undefined, 'branch')).toBe('$ALLWORK_COLUMN_BRANCH')
 	})
 })

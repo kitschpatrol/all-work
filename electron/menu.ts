@@ -158,6 +158,7 @@ function buildTemplate(
 				enabled: canOpenSelected,
 				label: 'Open Selected In',
 				submenu: [
+					item('Readme', 'repositories.open', { payload: 'readme' }),
 					item('Tower', 'repositories.open', { payload: 'tower' }),
 					item('VS Code', 'repositories.open', { payload: 'vscode' }),
 					item('GitHub', 'repositories.open', { payload: 'github' }),

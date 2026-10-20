@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { getGithubUrl } from './repository-links.js'
+import { describe, expect, it, vi } from 'vitest'
+import type { NativeOpenTarget } from './repository-links.js'
+import type { Repository } from './workspace.js'
+import { getGithubUrl, openRepositories } from './repository-links.js'
 
 describe('GitHub repository links', () => {
 	it.each([
@@ -19,5 +21,43 @@ describe('GitHub repository links', () => {
 		'https://github.com/team',
 	])('does not offer a GitHub link for %s', (remote) => {
 		expect(getGithubUrl(remote)).toBeUndefined()
+	})
+})
+
+describe('opening selected repositories', () => {
+	const base: Repository = {
+		ahead: 0,
+		behind: 0,
+		branch: 'main',
+		changedFiles: 0,
+		description: '',
+		gitStatusAvailable: true,
+		id: '',
+		lastCommit: '',
+		lastCommitDate: '',
+		name: '',
+		packageManager: '',
+		path: '',
+		readme: '',
+		relativePath: '',
+		remote: '',
+		repoName: '',
+		repoOwner: '',
+		version: '',
+	}
+
+	it('opens readmes in order and skips repositories without one', async () => {
+		const openInApp = vi.fn<(repository: Repository, app: NativeOpenTarget) => Promise<void>>()
+		openInApp.mockResolvedValue()
+		const repositories = [
+			{ ...base, id: 'a', readme: 'readme.md' },
+			{ ...base, id: 'b' },
+			{ ...base, id: 'c', readme: 'README' },
+		]
+		await openRepositories(repositories, 'readme', openInApp)
+		expect(openInApp.mock.calls.map(([repository]) => repository.id)).toEqual(['a', 'c'])
+		openInApp.mockClear()
+		await openRepositories(repositories, 'finder', openInApp)
+		expect(openInApp).toHaveBeenCalledTimes(3)
 	})
 })

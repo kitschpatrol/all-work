@@ -46,6 +46,7 @@
 		getColumnPreviewTooltip,
 		getColumnTooltip,
 		getColumnVariables,
+		getVariablePreviewTooltip,
 		repositoryColumns,
 	} from '#lib/column-variables.js'
 	import CommandForm from '#lib/CommandForm.svelte'
@@ -1181,7 +1182,7 @@
 			targetCount={targets.length}
 			variables={columnVariables.map((variable) => ({
 				...variable,
-				preview: previewColumn(variable.id),
+				preview: getVariablePreviewTooltip(previewRepository, variable.id, runs),
 			}))}
 			bind:command
 			bind:concurrency

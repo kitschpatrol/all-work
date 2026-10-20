@@ -2,8 +2,17 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } from
 import { getJsonFileTransportDestinations, log, setDefaultLogOptions } from 'lognow'
 import net from 'node:net'
 import path from 'node:path'
-import type { AppWindowRequest, MenuCommand, OpenTarget } from '../src/lib/electron-api.js'
-import { isAppWindowRequest, isColumnMenuRequest, isMenuState } from '../src/lib/electron-api.js'
+import type {
+	AppWindowRequest,
+	MenuCommand,
+	RepositoryMenuChoice,
+} from '../src/lib/electron-api.js'
+import {
+	isAppWindowRequest,
+	isColumnMenuRequest,
+	isMenuState,
+	isRepositoryMenuRequest,
+} from '../src/lib/electron-api.js'
 import { initialMenuState, syncMenu } from './menu.js'
 
 // The packaged app serves the adapter-node build from a fixed loopback origin.
@@ -232,6 +241,7 @@ async function main(): Promise<void> {
 				'separator',
 				['Copy', 'column.copy', true],
 				['Copy Selected', 'column.copySelected', request.hasSelection],
+				['Copy Variable', 'column.copyVariable', request.hasVariable],
 			]
 			Menu.buildFromTemplate(
 				items.map((item) => {
@@ -251,12 +261,12 @@ async function main(): Promise<void> {
 			).popup({ window })
 		})
 
-		ipcMain.handle('allwork:repository-menu', async (event, hasGithubRemote: unknown) => {
+		ipcMain.handle('allwork:repository-menu', async (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
 				throw new Error('Repository menus are only available inside AllWork.')
 			}
 
-			if (typeof hasGithubRemote !== 'boolean') {
+			if (!isRepositoryMenuRequest(request)) {
 				throw new TypeError('Invalid repository menu request.')
 			}
 
@@ -265,22 +275,32 @@ async function main(): Promise<void> {
 				return
 			}
 
-			return new Promise<OpenTarget | undefined>((resolve) => {
-				const items: Array<[string, OpenTarget]> = [
-					['Open in Tower', 'tower'],
-					['Open in GitHub', 'github'],
-					['Open in VS Code', 'vscode'],
-					['Open in Terminal', 'terminal'],
-					['Reveal in Finder', 'finder'],
+			return new Promise<RepositoryMenuChoice | undefined>((resolve) => {
+				const items: Array<'separator' | [string, RepositoryMenuChoice, boolean]> = [
+					['Open Readme', 'readme', request.hasReadme],
+					['Open in Tower', 'tower', true],
+					['Open in GitHub', 'github', request.hasGithubRemote],
+					['Open in VS Code', 'vscode', true],
+					['Open in Terminal', 'terminal', true],
+					['Reveal in Finder', 'finder', true],
+					'separator',
+					['Refresh Metadata', 'refresh', true],
 				]
 				Menu.buildFromTemplate(
-					items.map(([label, target]) => ({
-						click() {
-							resolve(target)
-						},
-						enabled: target !== 'github' || hasGithubRemote,
-						label,
-					})),
+					items.map((item) => {
+						if (item === 'separator') {
+							return { type: 'separator' } as const
+						}
+
+						const [label, choice, enabled] = item
+						return {
+							click() {
+								resolve(choice)
+							},
+							enabled,
+							label,
+						}
+					}),
 				).popup({
 					callback() {
 						resolve(undefined)

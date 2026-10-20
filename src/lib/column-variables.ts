@@ -151,7 +151,7 @@ function runVariable(run: Pick<CommandRun, 'command' | 'id'>, index: number) {
 	}
 }
 
-function findVariable(id: string, runs: readonly CommandRun[]) {
+function findVariable(id: string, runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id'>>) {
 	const variable = repositoryVariables.get(id)
 	if (variable !== undefined) {
 		return variable
@@ -238,31 +238,70 @@ export function getColumnTooltip(repository: Repository, columnId: string): stri
 		.join('\n')
 }
 
-/** Preview a column and identify its source repository. */
-export function getColumnPreviewTooltip(
-	repository: Repository | undefined,
+/**
+ * The shell variable name, such as `ALLWORK_COLUMN_BRANCH`, for a repository or
+ * run column.
+ */
+export function getColumnVariableName(
 	columnId: string,
-	runs: readonly CommandRun[] = [],
-): string {
-	const variable = findVariable(columnId, runs)
-	if (variable === undefined) {
-		return ''
-	}
+	runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id'>> = [],
+): string | undefined {
+	return findVariable(columnId, runs)?.name
+}
 
-	if (repository === undefined) {
-		return `$${variable.name}`
-	}
-
+function previewLines(
+	repository: Repository,
+	columnId: string,
+	runs: readonly CommandRun[],
+	label: (value: string) => string,
+) {
 	const column = columnsById.get(columnId)
-	const value = String(getColumnValue(repository, columnId, runs) ?? '')
 	return [
-		`$${variable.name} = ${value === '' ? '""' : value}`,
+		label(String(getColumnValue(repository, columnId, runs) ?? '')),
 		column === undefined ? '' : metadataHint(repository, column.group),
 		column?.note ?? '',
 		`Repository: ${repository.relativePath}`,
 	]
 		.filter(Boolean)
 		.join('\n')
+}
+
+/**
+ * Preview a column header with one repository's value, availability, and
+ * meaning.
+ */
+export function getColumnPreviewTooltip(
+	repository: Repository | undefined,
+	columnId: string,
+	runs: readonly CommandRun[] = [],
+): string {
+	return repository === undefined || findVariable(columnId, runs) === undefined
+		? ''
+		: previewLines(repository, columnId, runs, (value) => value)
+}
+
+/**
+ * Preview the shell variable a column provides and the value a command
+ * receives.
+ */
+export function getVariablePreviewTooltip(
+	repository: Repository | undefined,
+	columnId: string,
+	runs: readonly CommandRun[] = [],
+): string {
+	const name = getColumnVariableName(columnId, runs)
+	if (name === undefined) {
+		return ''
+	}
+
+	return repository === undefined
+		? `$${name}`
+		: previewLines(
+				repository,
+				columnId,
+				runs,
+				(value) => `$${name} = ${value === '' ? '""' : value}`,
+			)
 }
 
 /**

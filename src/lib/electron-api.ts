@@ -11,6 +11,7 @@ import { asRecord } from './record.js'
 export type MenuCommand =
 	| 'column.copy'
 	| 'column.copySelected'
+	| 'column.copyVariable'
 	| 'column.filter'
 	| 'column.hide'
 	| 'column.sortAscending'
@@ -45,9 +46,15 @@ export type MenuCommand =
 /** Renderer-side handlers for each menu command. */
 export type MenuActions = Record<MenuCommand, (payload?: string) => void>
 
-const openTargets = ['finder', 'github', 'terminal', 'tower', 'vscode'] as const
+const openTargets = ['finder', 'github', 'readme', 'terminal', 'tower', 'vscode'] as const
 /** Applications the Repositories menu can open selected repositories in. */
 export type OpenTarget = (typeof openTargets)[number]
+
+/** An item chosen from a repository's context menu. */
+export type RepositoryMenuChoice = 'refresh' | OpenTarget
+
+/** Which of a repository's context menu items can be used. */
+export type RepositoryMenuRequest = { hasGithubRemote: boolean; hasReadme: boolean }
 
 /**
  * Renderer state the main process needs to enable, disable, and check menu
@@ -88,6 +95,7 @@ export type ColumnMenuRequest = {
 	canSort: boolean
 	columnId: string
 	hasSelection: boolean
+	hasVariable: boolean
 }
 
 /** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
@@ -96,7 +104,7 @@ export type AllWorkApi = {
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
 	openWindow: (request: AppWindowRequest) => Promise<void>
 	showColumnMenu: (request: ColumnMenuRequest) => Promise<void>
-	showRepositoryMenu: (hasGithubRemote: boolean) => Promise<OpenTarget | undefined>
+	showRepositoryMenu: (request: RepositoryMenuRequest) => Promise<RepositoryMenuChoice | undefined>
 	updateMenuState: (state: MenuState) => void
 }
 
@@ -142,13 +150,25 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 		typeof request.canFilter === 'boolean' &&
 		typeof request.canHide === 'boolean' &&
 		typeof request.canSort === 'boolean' &&
-		typeof request.hasSelection === 'boolean'
+		typeof request.hasSelection === 'boolean' &&
+		typeof request.hasVariable === 'boolean'
 	)
 }
 
 /** Narrow a menu payload to an application the selection can be opened in. */
 export function isOpenTarget(value: unknown): value is OpenTarget {
 	return openTargets.includes(value as OpenTarget)
+}
+
+/** Narrow the item returned by a repository's context menu. */
+export function isRepositoryMenuChoice(value: unknown): value is RepositoryMenuChoice {
+	return value === 'refresh' || isOpenTarget(value)
+}
+
+/** Validate a repository context menu request arriving over IPC. */
+export function isRepositoryMenuRequest(value: unknown): value is RepositoryMenuRequest {
+	const request = asRecord(value)
+	return typeof request?.hasGithubRemote === 'boolean' && typeof request.hasReadme === 'boolean'
 }
 
 // Built-in presets plus up to 100 saved ones, each with a short visible label
