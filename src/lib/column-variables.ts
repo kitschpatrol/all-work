@@ -163,6 +163,22 @@ function findVariable(id: string, runs: ReadonlyArray<Pick<CommandRun, 'command'
 }
 
 /**
+ * Describe a column for the menus that show and hide it. Command run columns
+ * share the Runs category.
+ */
+export function describeOptionalColumn(id: string, header: string, visible: boolean) {
+	const column = columnsById.get(id)
+	return {
+		category: column?.category ?? 'Runs',
+		header,
+		id,
+		note: column?.note,
+		onDemand: column?.group === 'updates',
+		visible,
+	}
+}
+
+/**
  * Read current row values without retaining a table accessor's older cached
  * value.
  */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
 	isColumnMenuRequest,
+	isHiddenColumnsMenuRequest,
 	isRepositoryMenuChoice,
 	isRepositoryMenuRequest,
 } from './electron-api.js'
@@ -18,6 +19,26 @@ describe('menu requests arriving over IPC', () => {
 		expect(isColumnMenuRequest(request)).toBe(true)
 		expect(isColumnMenuRequest({ ...request, hasVariable: undefined })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, hasVariable: 'true' })).toBe(false)
+	})
+
+	it('accepts hidden columns grouped under a category, and an empty list', () => {
+		const request = {
+			groups: [{ category: 'Git', columns: [{ id: 'sync', label: 'Sync' }] }],
+		}
+		expect(isHiddenColumnsMenuRequest(request)).toBe(true)
+		expect(isHiddenColumnsMenuRequest({ groups: [] })).toBe(true)
+		for (const invalid of [
+			undefined,
+			[],
+			{ groups: {} },
+			{ groups: [{ category: '', columns: [{ id: 'sync', label: 'Sync' }] }] },
+			{ groups: [{ category: 'Git', columns: [] }] },
+			{ groups: [{ category: 'Git', columns: [{ id: 'sync' }] }] },
+			{ groups: [{ category: 'Git', columns: [{ id: '', label: 'Sync' }] }] },
+			{ groups: [{ category: 'Git', columns: ['sync'] }] },
+		]) {
+			expect(isHiddenColumnsMenuRequest(invalid)).toBe(false)
+		}
 	})
 
 	it('accepts a repository menu request with both availability flags', () => {

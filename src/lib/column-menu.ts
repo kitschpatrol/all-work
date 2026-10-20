@@ -13,22 +13,35 @@ type MenuColumn = {
 	toggleSorting: (descending: boolean, multiple: boolean) => void
 }
 
+type OptionalColumn = {
+	category: string
+	header: string
+	id: string
+	onDemand: boolean
+	visible: boolean
+}
+
 type ColumnMenuOptions = {
 	beforeSort: () => void
 	getColumn: (id: string) => MenuColumn | undefined
+	/** Columns that can be shown and hidden, in column order. */
+	getOptionalColumns: () => readonly OptionalColumn[]
 	/** Rows shown by the table, or only the selected ones, in table order. */
 	getRows: (selected: boolean) => readonly Repository[]
 	getRuns: () => readonly CommandRun[]
 	onError: (error: unknown) => void
 	onFilter: (id: string) => void
 	onHide: (id: string) => Promise<void>
+	/** Show a hidden column at the end of the table, where its menu opened. */
+	onShow: (id: string) => Promise<void>
 	onSort: () => void
 	pinned: () => PinnedColumns
 }
 
 /**
  * Connect a column's native menu to sorting, visibility, filter rules, and
- * copying its plain text or shell variable.
+ * copying its plain text or shell variable, and the empty header space's menu
+ * to showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -87,9 +100,9 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		}
 	}
 
-	async function hide(id: string) {
+	async function changeVisibility(change: (id: string) => Promise<void>, id: string) {
 		try {
-			await options.onHide(id)
+			await change(id)
 		} catch (error) {
 			options.onError(error)
 		}
@@ -114,7 +127,13 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		'column.hide'(payload) {
 			const column = getColumn(payload)
 			if (column !== undefined && canHide(column)) {
-				void hide(column.id)
+				void changeVisibility(options.onHide, column.id)
+			}
+		},
+		'column.show'(payload) {
+			const column = getColumn(payload)
+			if (column?.getCanHide()) {
+				void changeVisibility(options.onShow, column.id)
 			}
 		},
 		'column.sortAscending'(payload) {
@@ -142,6 +161,28 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					columnId,
 					hasSelection: options.getRows(true).length > 0,
 					hasVariable: getColumnVariableName(columnId, options.getRuns()) !== undefined,
+				})
+			} catch (error) {
+				options.onError(error)
+			}
+		},
+		async showHidden(event: MouseEvent) {
+			if (globalThis._allwork === undefined) {
+				return
+			}
+
+			event.preventDefault()
+			const hidden = options.getOptionalColumns().filter((column) => !column.visible)
+			const groups = Map.groupBy(hidden, (column) => column.category)
+			try {
+				await globalThis._allwork.showHiddenColumnsMenu({
+					groups: Array.from(groups, ([category, columns]) => ({
+						category,
+						columns: columns.map(({ header, id, onDemand }) => ({
+							id,
+							label: onDemand ? `${header} · on demand` : header,
+						})),
+					})),
 				})
 			} catch (error) {
 				options.onError(error)

@@ -14,6 +14,7 @@ export type MenuCommand =
 	| 'column.copyVariable'
 	| 'column.filter'
 	| 'column.hide'
+	| 'column.show'
 	| 'column.sortAscending'
 	| 'column.sortDescending'
 	| 'command.focus'
@@ -98,12 +99,18 @@ export type ColumnMenuRequest = {
 	hasVariable: boolean
 }
 
+/** Hidden columns offered to show again, grouped by category in column order. */
+export type HiddenColumnsMenuRequest = {
+	groups: Array<{ category: string; columns: Array<{ id: string; label: string }> }>
+}
+
 /** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
 export type AllWorkApi = {
 	chooseDirectory: () => Promise<string | undefined>
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
 	openWindow: (request: AppWindowRequest) => Promise<void>
 	showColumnMenu: (request: ColumnMenuRequest) => Promise<void>
+	showHiddenColumnsMenu: (request: HiddenColumnsMenuRequest) => Promise<void>
 	showRepositoryMenu: (request: RepositoryMenuRequest) => Promise<RepositoryMenuChoice | undefined>
 	updateMenuState: (state: MenuState) => void
 }
@@ -152,6 +159,30 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 		typeof request.canSort === 'boolean' &&
 		typeof request.hasSelection === 'boolean' &&
 		typeof request.hasVariable === 'boolean'
+	)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+	return typeof value === 'string' && value !== ''
+}
+
+/** Validate the hidden columns listed in a menu request arriving over IPC. */
+export function isHiddenColumnsMenuRequest(value: unknown): value is HiddenColumnsMenuRequest {
+	const groups = asRecord(value)?.groups
+	return (
+		Array.isArray(groups) &&
+		groups.every((entry: unknown) => {
+			const group = asRecord(entry)
+			return (
+				isNonEmptyString(group?.category) &&
+				Array.isArray(group.columns) &&
+				group.columns.length > 0 &&
+				group.columns.every((item: unknown) => {
+					const column = asRecord(item)
+					return isNonEmptyString(column?.id) && isNonEmptyString(column.label)
+				})
+			)
+		})
 	)
 }
 

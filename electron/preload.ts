@@ -3,6 +3,7 @@ import type {
 	AllWorkApi,
 	AppWindowRequest,
 	ColumnMenuRequest,
+	HiddenColumnsMenuRequest,
 	MenuCommand,
 	MenuState,
 	RepositoryMenuChoice,
@@ -36,6 +37,9 @@ const api: AllWorkApi = {
 	},
 	async showColumnMenu(request: ColumnMenuRequest): Promise<void> {
 		await ipcRenderer.invoke('allwork:column-menu', request)
+	},
+	async showHiddenColumnsMenu(request: HiddenColumnsMenuRequest): Promise<void> {
+		await ipcRenderer.invoke('allwork:hidden-columns-menu', request)
 	},
 	async showRepositoryMenu(
 		request: RepositoryMenuRequest,

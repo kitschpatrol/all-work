@@ -52,6 +52,15 @@ export function moveColumn(
 }
 
 /**
+ * Move `id` after every movable column in `order`, hidden ones included. Like a
+ * drag, the result leaves out pinned ids, which keep their edges.
+ */
+export function moveColumnToEnd(order: string[], id: string, pinned: PinnedColumns): string[] {
+	const fixed = new Set([...pinned.start, ...pinned.end])
+	return [...order.filter((entry) => entry !== id), id].filter((entry) => !fixed.has(entry))
+}
+
+/**
  * Choose the slot for a dragged column whose left edge sits `offset` pixels
  * into the movable region. `widths` are the other visible movable columns in
  * order, so slot `n` rests after the first `n` of them. The closest resting

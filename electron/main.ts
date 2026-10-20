@@ -1,3 +1,4 @@
+import type { MenuItemConstructorOptions } from 'electron'
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } from 'electron'
 import { getJsonFileTransportDestinations, log, setDefaultLogOptions } from 'lognow'
 import net from 'node:net'
@@ -10,6 +11,7 @@ import type {
 import {
 	isAppWindowRequest,
 	isColumnMenuRequest,
+	isHiddenColumnsMenuRequest,
 	isMenuState,
 	isRepositoryMenuRequest,
 } from '../src/lib/electron-api.js'
@@ -258,6 +260,38 @@ async function main(): Promise<void> {
 						label,
 					}
 				}),
+			).popup({ window })
+		})
+
+		ipcMain.handle('allwork:hidden-columns-menu', (event, request: unknown) => {
+			if (!isTrustedSender(event, appUrl)) {
+				throw new Error('Column menus are only available inside AllWork.')
+			}
+
+			if (!isHiddenColumnsMenuRequest(request)) {
+				throw new TypeError('Invalid hidden columns menu request.')
+			}
+
+			const window = BrowserWindow.fromWebContents(event.sender)
+			if (window === null) {
+				return
+			}
+
+			// Section headers need macOS 14; elsewhere a disabled item labels each category
+			const items = request.groups.flatMap(({ category, columns }, index) => [
+				...(index > 0 ? [{ type: 'separator' } as const] : []),
+				process.platform === 'darwin'
+					? ({ label: category, type: 'header' } as const)
+					: { enabled: false, label: category },
+				...columns.map(({ id, label }): MenuItemConstructorOptions => ({
+					click() {
+						event.sender.send('allwork:menu-command', 'column.show' satisfies MenuCommand, id)
+					},
+					label,
+				})),
+			])
+			Menu.buildFromTemplate(
+				items.length > 0 ? items : [{ enabled: false, label: 'All Columns Shown' }],
 			).popup({ window })
 		})
 

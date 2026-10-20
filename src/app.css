@@ -1089,7 +1089,10 @@ th.last-output-cell {
 	border-right: 0;
 }
 
+/* The empty header space opens a menu of hidden columns, beneath the last column's resize handle */
 .table-scroll th.table-filler {
+	pointer-events: auto;
+	z-index: 2;
 	background: linear-gradient(#f8f8f8, #ebebeb);
 }
 

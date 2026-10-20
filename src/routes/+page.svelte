@@ -37,11 +37,12 @@
 	import { request } from '#lib/client-request.js'
 	import { startColumnDrag } from '#lib/column-drag.js'
 	import { createColumnMenu } from '#lib/column-menu.js'
-	import { resolveColumnOrder } from '#lib/column-order.js'
+	import { moveColumnToEnd, resolveColumnOrder } from '#lib/column-order.js'
 	import { createColumnPresets } from '#lib/column-preset-state.svelte.js'
 	import { defaultColumnPreset, isColumnPresetId } from '#lib/column-presets.js'
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
+		describeOptionalColumn,
 		getColumnDisplay,
 		getColumnPreviewTooltip,
 		getColumnTooltip,
@@ -223,8 +224,18 @@
 			},
 		},
 	})
+	// Columns that can be shown and hidden, in column order
+	const optionalColumns = $derived(
+		table
+			.getAllFlatColumns()
+			.filter((column) => column.getCanHide())
+			.map((column) =>
+				describeOptionalColumn(column.id, String(column.columnDef.header), column.getIsVisible()),
+			),
+	)
+	const optionalColumnIds = $derived(optionalColumns.map((column) => column.id))
 	// Optional repository columns; presets leave command run columns alone
-	const presetColumnIds = $derived(optionalColumnIds().filter((id) => repositoryColumnIds.has(id)))
+	const presetColumnIds = $derived(optionalColumnIds.filter((id) => repositoryColumnIds.has(id)))
 	const columnPresets = createColumnPresets({
 		apply(changes) {
 			void changeVisibility(changes)
@@ -239,11 +250,18 @@
 	const columnMenu = createColumnMenu({
 		beforeSort: refreshTableData,
 		getColumn: (id) => table.getColumn(id),
+		getOptionalColumns: () => optionalColumns,
 		getRows: (selected) => (selected ? targets : visibleRepositories).map((row) => row.original),
 		getRuns: () => runs,
 		onError: showError,
 		onFilter: rowFilter.addColumnRule,
 		onHide: async (id) => setColumnsVisible([id], false),
+		async onShow(id) {
+			columnOrder = moveColumnToEnd(resolvedColumnOrder, id, pinnedColumns)
+			await setColumnsVisible([id], true)
+			await tick()
+			tableScroll.scrollLeft = tableScroll.scrollWidth
+		},
 		onSort: scheduleMetadata,
 		pinned: () => pinnedColumns,
 	})
@@ -886,13 +904,6 @@
 		}
 	}
 
-	function optionalColumnIds() {
-		return table
-			.getAllLeafColumns()
-			.filter((column) => column.getCanHide())
-			.map((column) => column.id)
-	}
-
 	function startResize(
 		event: MouseEvent | TouchEvent,
 		header: Parameters<typeof startColumnResize>[1],
@@ -1025,7 +1036,7 @@
 		},
 		'view.columns'(payload) {
 			if (payload === 'all' || payload === 'none') {
-				void setColumnsVisible(optionalColumnIds(), payload === 'all')
+				void setColumnsVisible(optionalColumnIds, payload === 'all')
 			}
 		},
 		'view.filterPreset'(payload) {
@@ -1257,25 +1268,12 @@
 						>{/if}
 					<MetadataControls
 						{columnPresets}
-						columns={table
-							.getAllFlatColumns()
-							.filter((column) => column.getCanHide())
-							.map((column) => {
-								const definition = repositoryColumns.find((entry) => entry.id === column.id)
-								return {
-									category: definition?.category ?? 'Runs',
-									header: String(column.columnDef.header),
-									id: column.id,
-									note: definition?.note,
-									onDemand: definition?.group === 'updates',
-									visible: column.getIsVisible(),
-								}
-							})}
+						columns={optionalColumns}
 						disabled={loading || selectedCount === 0}
 						onRefresh={refreshMetadata}
 						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
 						onVisibilityAll={async (visible: boolean) =>
-							setColumnsVisible(optionalColumnIds(), visible)}
+							setColumnsVisible(optionalColumnIds, visible)}
 						onVisibilityMany={setColumnsVisible}
 						{selectedCount}
 					/>
@@ -1414,7 +1412,11 @@
 												ontouchstart={(event) => startResize(event, header, pinned)}
 												type="button"
 											></button>{/if}
-									</th>{/each}<th class="table-filler" aria-hidden="true"></th></tr
+									</th>{/each}<th
+									class="table-filler"
+									aria-hidden="true"
+									oncontextmenu={async (event) => columnMenu.showHidden(event)}
+								></th></tr
 							>{/each}</thead
 					>
 					<tbody

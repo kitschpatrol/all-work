@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveColumn, nearestSlot, resolveColumnOrder } from './column-order.js'
+import { moveColumn, moveColumnToEnd, nearestSlot, resolveColumnOrder } from './column-order.js'
 
 const pinned = { start: ['select', 'path'], end: ['run2'] }
 const ids = ['select', 'path', 'name', 'branch', 'version', 'run1', 'run2']
@@ -39,6 +39,24 @@ describe('resolveColumnOrder', () => {
 
 	it('ignores pinned ids that are not present', () => {
 		expect(resolveColumnOrder(['name', 'branch'], ['branch'], pinned)).toEqual(['branch', 'name'])
+	})
+})
+
+describe('moveColumnToEnd', () => {
+	it('moves a column after the other movable columns, hidden ones included', () => {
+		expect(moveColumnToEnd(ids, 'name', pinned)).toEqual(['branch', 'version', 'run1', 'name'])
+	})
+
+	it('appends a column missing from the order', () => {
+		expect(moveColumnToEnd(['name', 'branch'], 'version', pinned)).toEqual([
+			'name',
+			'branch',
+			'version',
+		])
+	})
+
+	it('leaves a pinned column at its edge', () => {
+		expect(moveColumnToEnd(ids, 'run2', pinned)).toEqual(['name', 'branch', 'version', 'run1'])
 	})
 })
 
