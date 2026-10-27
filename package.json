@@ -34,7 +34,7 @@
 		"fix": "ksc fix",
 		"lint": "ksc lint",
 		"move": "shx rm -rf /Applications/AllWork.app && shx mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
-		"prepare": "svelte-kit sync && skills experimental_sync -y -f",
+		"prepare": "svelte-kit sync",
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm build",
 		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && electron-builder build --publish always",
@@ -49,7 +49,7 @@
 	},
 	"devDependencies": {
 		"@kitschpatrol/electron-vite": "6.0.0-beta.4",
-		"@kitschpatrol/shared-config": "^8.13.1",
+		"@kitschpatrol/shared-config": "^8.14.0",
 		"@sveltejs/adapter-node": "^6.0.0",
 		"@sveltejs/kit": "^3.0.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
@@ -62,7 +62,6 @@
 		"electron-builder": "^26.15.3",
 		"poptab": "^1.2.2",
 		"shx": "^0.4.0",
-		"skills": "^1.7.2",
 		"svelte": "^5.57.2",
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
@@ -70,7 +69,7 @@
 		"vite": "^8.3.4",
 		"vitest": "^5.0.3"
 	},
-	"packageManager": "pnpm@12.11.2",
+	"packageManager": "pnpm@12.15.0",
 	"engines": {
 		"node": "^24.16.0 || >=26.3.0",
 		"pnpm": ">=10.0.0"
