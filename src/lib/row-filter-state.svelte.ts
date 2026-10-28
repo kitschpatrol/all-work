@@ -173,10 +173,12 @@ export function createRowFilter(options: RowFilterOptions) {
 		}
 	}
 
-	// Undecided rows stay hidden until their metadata loads
-	function matches(repository: Repository) {
-		return predicate === undefined || predicate(repository) === true
-	}
+	// Undecided rows stay hidden until their metadata loads. A new function
+	// whenever the rules change, so reading it tracks the rules but not the rows.
+	const matches = $derived.by(() => {
+		const current = predicate
+		return (repository: Repository) => current === undefined || current(repository) === true
+	})
 
 	return {
 		get activeRules() {
@@ -195,7 +197,9 @@ export function createRowFilter(options: RowFilterOptions) {
 		get groups() {
 			return groups
 		},
-		matches,
+		get matches() {
+			return matches
+		},
 		get modified() {
 			return modified
 		},

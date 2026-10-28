@@ -70,6 +70,7 @@
 	import { createRunHistory } from '#lib/run-history.svelte.js'
 	import RunHeader from '#lib/RunHeader.svelte'
 	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
+	import { createTableRows } from '#lib/table-rows.svelte.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
@@ -196,19 +197,23 @@
 		runs: () => runs,
 	})
 	const runHistory = createRunHistory((runId) => rowFilter.references(runId))
-	const repositories = $derived(
-		(workspace?.repositories ?? []).filter(
-			(repository) =>
-				(!selectedOnly || rowSelection[repository.id]) && rowFilter.matches(repository),
-		),
-	)
+	const tableRows = createTableRows({
+		matches: () => rowFilter.matches,
+		// Filter rules, search, and sorting by anything but the path read row values
+		readsValues: () =>
+			search !== '' ||
+			rowFilter.activeRules > 0 ||
+			table.atoms.sorting.get().some((entry) => entry.id !== 'relativePath'),
+		repositories: () => workspace?.repositories ?? [],
+		selection: () => (selectedOnly ? rowSelection : undefined),
+	})
 	const table = createTable({
 		columnResizeMode: 'onChange',
 		get columns() {
 			return columns
 		},
 		get data() {
-			return repositories
+			return tableRows.rows
 		},
 		defaultColumn: { maxSize: 4000, minSize: 24, size: 80, sortFn: 'alphanumeric' },
 		features,
@@ -253,7 +258,7 @@
 		visibility: () => table.atoms.columnVisibility.get(),
 	})
 	const columnMenu = createColumnMenu({
-		beforeSort: refreshTableData,
+		beforeSort: tableRows.refresh,
 		getColumn: (id) => table.getColumn(id),
 		getColumnOrder: () => table.getVisibleLeafColumns().map((column) => column.id),
 		getOptionalColumns: () => optionalColumns,
@@ -462,6 +467,7 @@
 	function disposeStreams() {
 		closeStreams()
 		metadataStream?.close()
+		tableRows.dispose()
 		clearTimeout(metadataTimer)
 		clearTimeout(sizingTimer)
 	}
@@ -529,18 +535,8 @@
 		}
 	}
 
-	function refreshOutputSorting(runId: string) {
-		const column = table.getColumn(runId)
-		if (workspace !== undefined && column !== undefined && column.getIsSorted() !== false) {
-			workspace.repositories = [...workspace.repositories]
-		}
-	}
-
 	function sortOutput(runId: string, multiple: boolean) {
-		if (workspace !== undefined) {
-			workspace.repositories = [...workspace.repositories]
-		}
-
+		tableRows.refresh()
 		table.getColumn(runId)?.toggleSorting(undefined, multiple)
 		scheduleMetadata()
 	}
@@ -649,12 +645,7 @@
 						}
 					}
 
-					if (
-						search !== '' ||
-						table.atoms.sorting.get().some((entry) => entry.id !== 'relativePath')
-					) {
-						refreshTableData()
-					}
+					tableRows.changed()
 				}
 
 				scheduleMetadata()
@@ -678,12 +669,6 @@
 				errorMessage = 'Metadata stream disconnected. Reload the folder to reconnect.'
 			},
 		)
-	}
-
-	function refreshTableData() {
-		if (workspace !== undefined) {
-			workspace.repositories = [...workspace.repositories]
-		}
 	}
 
 	function scheduleMetadata() {
@@ -811,7 +796,7 @@
 				run.finished = true
 			}
 
-			refreshOutputSorting(run.id)
+			tableRows.changed()
 
 			if (run.finished) {
 				clearPreviousOutputs()
@@ -1246,7 +1231,7 @@
 							bind:this={searchInput}
 							aria-label="Search repositories"
 							oninput={() => {
-								refreshTableData()
+								tableRows.refresh()
 								table.setGlobalFilter(search)
 								scheduleMetadata()
 							}}
@@ -1386,7 +1371,7 @@
 												class="sort-button"
 												disabled={!header.column.getCanSort()}
 												onclick={(event) => {
-													refreshTableData()
+													tableRows.refresh()
 													header.column.toggleSorting(undefined, event.shiftKey)
 													scheduleMetadata()
 												}}
