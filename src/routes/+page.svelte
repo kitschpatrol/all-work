@@ -277,6 +277,10 @@
 		pinned: () => pinnedColumns,
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
+	// Spare width opens up before the pinned run column, which keeps it at the table's right edge
+	const fillerAfterColumnId = $derived(
+		table.getVisibleLeafColumns().findLast((column) => !pinnedColumns.end.includes(column.id))?.id,
+	)
 	const selection = createRowSelection({
 		ids: () => visibleRepositories.map((row) => row.id),
 		onChange(next) {
@@ -1326,8 +1330,8 @@
 					<colgroup>
 						{#each table.getVisibleLeafColumns() as column (column.id)}
 							<col style:width="{column.getSize()}px" />
+							{#if column.id === fillerAfterColumnId}<col />{/if}
 						{/each}
-						<col />
 					</colgroup>
 					<thead
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
@@ -1405,11 +1409,11 @@
 												ontouchstart={(event) => startResize(event, header, pinned)}
 												type="button"
 											></button>{/if}
-									</th>{/each}<th
-									class="table-filler"
-									aria-hidden="true"
-									oncontextmenu={async (event) => columnMenu.showHidden(event)}
-								></th></tr
+									</th>{#if header.column.id === fillerAfterColumnId}<th
+											class="table-filler"
+											aria-hidden="true"
+											oncontextmenu={async (event) => columnMenu.showHidden(event)}
+										></th>{/if}{/each}</tr
 							>{/each}</thead
 					>
 					<tbody
@@ -1455,7 +1459,10 @@
 												showShortcuts={preferences.showRepositoryShortcuts}
 												{tooltip}
 											/>{/if}
-									</td>{/each}<td class="table-filler" aria-hidden="true"></td></tr
+									</td>{#if cell.column.id === fillerAfterColumnId}<td
+											class="table-filler"
+											aria-hidden="true"
+										></td>{/if}{/each}</tr
 							>{/each}</tbody
 					>
 				</table>

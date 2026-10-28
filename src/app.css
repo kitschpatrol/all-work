@@ -1125,7 +1125,7 @@ th.last-output-cell {
 	border-right: 0;
 }
 
-/* The empty header space opens a menu of hidden columns, beneath the last column's resize handle */
+/* The empty header space opens a menu of hidden columns, beneath its neighbors' resize handles */
 .table-scroll th.table-filler {
 	pointer-events: auto;
 	z-index: 2;
@@ -1284,7 +1284,10 @@ th[aria-sort='descending'] {
 	left: -3px;
 }
 
+/* Shortcuts can't shrink, so a narrow column clips them; the margin spares focus rings within the cell's padding */
 .repository-heading {
+	overflow: clip;
+	overflow-clip-margin: 4px;
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 4px;
@@ -1383,7 +1386,6 @@ th[aria-sort='descending'] {
 	align-items: center;
 	font-size: 11px;
 	color: #2c7a3b;
-	white-space: nowrap;
 }
 
 .status-badge.dirty {
@@ -1392,6 +1394,14 @@ th[aria-sort='descending'] {
 
 :where(.status-badge.dirty) .status-dot {
 	background-color: #eea224;
+}
+
+/* Narrow columns wrap these values between words and truncate any word that still doesn't fit */
+.status-label,
+.sync-value,
+.date-value {
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .sync-value,

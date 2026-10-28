@@ -56,11 +56,13 @@
 {:else if columnId === 'changedFiles'}<span
 		class="status-badge"
 		class:dirty={repository.changedFiles > 0}
-		><span class="status-dot"></span>{repository.gitStatusAvailable
-			? repository.changedFiles > 0
-				? `${repository.changedFiles} Changed`
-				: 'Clean'
-			: getMetadataPlaceholder(repository, 'changedFiles')}</span
+		><span class="status-dot"></span><span class="status-label"
+			>{repository.gitStatusAvailable
+				? repository.changedFiles > 0
+					? `${repository.changedFiles} Changed`
+					: 'Clean'
+				: getMetadataPlaceholder(repository, 'changedFiles')}</span
+		></span
 	>
 {:else if columnId === 'sync'}<span class="sync-value" title={tooltip}
 		>{repository.ahead > 0 || repository.behind > 0
