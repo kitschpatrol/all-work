@@ -1317,6 +1317,7 @@ th[aria-sort='descending'] {
 
 .repository-action:disabled {
 	cursor: default;
+	opacity: 0.25;
 }
 
 .repository-action svg {
