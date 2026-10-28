@@ -43,9 +43,9 @@
 	import { startColumnResize } from '#lib/column-resize.js'
 	import {
 		describeOptionalColumn,
+		getCellTooltip,
 		getColumnDisplay,
 		getColumnPreviewTooltip,
-		getColumnTooltip,
 		getColumnVariables,
 		getVariablePreviewTooltip,
 		repositoryColumns,
@@ -55,6 +55,7 @@
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterBar from '#lib/FilterBar.svelte'
+	import { titleOnHover } from '#lib/hover-titles.js'
 	import { refreshGroups } from '#lib/metadata-columns.js'
 	import { planMetadataRequests, sendMetadataRequests } from '#lib/metadata-requests.js'
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
@@ -859,8 +860,16 @@
 		}
 	}
 
-	function previewColumn(columnId: string) {
-		return getColumnPreviewTooltip(previewRepository, columnId, runs)
+	// Headers preview the first selected or visible repository
+	function describeCell(cell: HTMLElement) {
+		const columnId = cell.dataset.columnId ?? ''
+		const repositoryId = cell.closest<HTMLElement>('tr')?.dataset.repositoryId
+		if (repositoryId === undefined) {
+			return getColumnPreviewTooltip(previewRepository, columnId, runs)
+		}
+
+		const repository = workspace?.repositories.find((entry) => entry.id === repositoryId)
+		return repository === undefined ? '' : getCellTooltip(repository, columnId)
 	}
 
 	async function stop(runId: string) {
@@ -1295,6 +1304,7 @@
 			<div
 				bind:this={tableScroll}
 				class="table-scroll"
+				{@attach titleOnHover(describeCell)}
 				aria-label="Repository table"
 				onpointerdown={() => {
 					pendingScroll = undefined
@@ -1340,7 +1350,6 @@
 										onpointerdown={(event) => {
 											startDrag(event, header.column.id)
 										}}
-										title={previewColumn(header.column.id)}
 									>
 										{#if header.column.id === 'select'}<label class="selection-hit-area"
 												><input
@@ -1363,7 +1372,6 @@
 													sortOutput(run.id, multiple)
 												}}
 												onStop={async () => stop(run.id)}
-												preview={previewColumn(run.id)}
 												{run}
 												sorted={header.column.getIsSorted()}
 											/>
@@ -1408,8 +1416,7 @@
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
-									)}{@const tooltip = getColumnTooltip(repository, cell.column.id)}{@const display =
-										getColumnDisplay(cell.column.id)}<td
+									)}{@const display = getColumnDisplay(cell.column.id)}<td
 										style:width="{cell.column.getSize()}px"
 										class:column-dragged={draggingColumnId === cell.column.id}
 										class:last-output-cell={run !== undefined && run === runs.at(-1)}
@@ -1421,7 +1428,6 @@
 										data-run-status={run === undefined
 											? undefined
 											: runCellStatus(run, repository.id)}
-										title={tooltip}
 									>
 										{#if cell.column.id === 'select'}<label
 												class="selection-hit-area"
@@ -1442,7 +1448,6 @@
 												{repository}
 												{runs}
 												showShortcuts={preferences.showRepositoryShortcuts}
-												{tooltip}
 											/>{/if}
 									</td>{#if cell.column.id === fillerAfterColumnId}<td
 											class="table-filler"

@@ -11,7 +11,6 @@
 		onRemove,
 		onSort,
 		onStop,
-		preview,
 		run,
 		sorted,
 	}: {
@@ -19,7 +18,6 @@
 		onRemove: () => Promise<void>
 		onSort: (multiple: boolean) => void
 		onStop: () => Promise<void>
-		preview: string
 		run: CommandRun
 		sorted: 'asc' | 'desc' | false
 	} = $props()
@@ -46,7 +44,7 @@
 						class="run-outcome failed"
 						title="{outcomes.failed} failed">✕ {outcomes.failed}</span
 					>{/if}</span
-			><code title={preview}>$ {run.command}</code>
+			><code>$ {run.command}</code>
 		</span>
 		{#if sorted !== false}<span
 				class="sort-indicator"

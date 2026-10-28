@@ -19,7 +19,6 @@
 		repository,
 		runs,
 		showShortcuts,
-		tooltip,
 	}: {
 		columnId: string
 		onInspect: (run: CommandRun, repository: Repository) => void
@@ -29,7 +28,6 @@
 		repository: Repository
 		runs: CommandRun[]
 		showShortcuts: boolean
-		tooltip: string
 	} = $props()
 	const run = $derived(runs.find((item) => item.id === columnId))
 	const result = $derived(run?.results[repository.id])
@@ -41,14 +39,9 @@
 		{onRefresh}
 		{repository}
 		{showShortcuts}
-		{tooltip}
 	/>
-{:else if columnId === 'name'}<span
-		class="project-name"
-		title={repository.description === '' ? tooltip : `${tooltip}\n${repository.description}`}
-		>{repository.name}</span
-	>
-{:else if columnId === 'branch'}<span class="branch" title={tooltip}
+{:else if columnId === 'name'}<span class="project-name">{repository.name}</span>
+{:else if columnId === 'branch'}<span class="branch"
 		>⑂ {repository.branch === ''
 			? getMetadataPlaceholder(repository, 'branch')
 			: repository.branch}</span
@@ -64,14 +57,12 @@
 				: getMetadataPlaceholder(repository, 'changedFiles')}</span
 		></span
 	>
-{:else if columnId === 'sync'}<span class="sync-value" title={tooltip}
+{:else if columnId === 'sync'}<span class="sync-value"
 		>{repository.ahead > 0 || repository.behind > 0
 			? `↑${repository.ahead} ↓${repository.behind}`
 			: '—'}</span
 	>
-{:else if columnId === 'lastCommitDate'}<span
-		class="date-value"
-		title={repository.lastCommit === '' ? tooltip : `${tooltip}\n${repository.lastCommit}`}
+{:else if columnId === 'lastCommitDate'}<span class="date-value"
 		>{repository.lastCommitDate === '' && repository.metadata?.groups.git?.status !== 'ready'
 			? getMetadataPlaceholder(repository, 'lastCommitDate')
 			: formatDate(repository.lastCommitDate)}</span
@@ -84,6 +75,6 @@
 			}}
 			{result}
 		/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
-{:else}<span class="cell-text" class:monospace={display !== 'text'} title={tooltip}
+{:else}<span class="cell-text" class:monospace={display !== 'text'}
 		>{formatColumnCellValue(repository, columnId, runs)}</span
 	>{/if}

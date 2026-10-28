@@ -283,6 +283,22 @@ export function getColumnTooltip(repository: Repository, columnId: string): stri
 }
 
 /**
+ * Describe a table cell on hover: the column's tooltip, then the repository's
+ * path, description, or latest commit subject for the columns that show them.
+ */
+export function getCellTooltip(repository: Repository, columnId: string): string {
+	const detail =
+		columnId === 'relativePath'
+			? repository.path
+			: columnId === 'name'
+				? repository.description
+				: columnId === 'lastCommitDate'
+					? repository.lastCommit
+					: ''
+	return [getColumnTooltip(repository, columnId), detail].filter(Boolean).join('\n')
+}
+
+/**
  * The shell variable name, such as `ALL_WORK_COLUMN_BRANCH`, for a repository
  * or run column.
  */

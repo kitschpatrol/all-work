@@ -10,13 +10,11 @@
 		onRefresh,
 		repository,
 		showShortcuts,
-		tooltip,
 	}: {
 		onOpen: (repository: Repository, app: NativeOpenTarget) => Promise<void>
 		onRefresh: (repository: Repository) => Promise<void>
 		repository: Repository
 		showShortcuts: boolean
-		tooltip: string
 	} = $props()
 	const githubUrl = $derived(getGithubUrl(repository.remote))
 	const activity = $derived(metadataActivity(repository))
@@ -75,7 +73,7 @@
 	oncontextmenu={showMenu}
 	role="group"
 >
-	<div class="repository-name" title={`${tooltip}\n${repository.path}`}>
+	<div class="repository-name">
 		<FolderIcon /><strong>{repository.relativePath}</strong>
 	</div>
 	{#if menuError !== ''}<span class="metadata-error" role="alert" title={menuError}>!</span>{/if}

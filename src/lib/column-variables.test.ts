@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { CommandRun, Repository } from './workspace.js'
 import {
 	formatColumnCellValue,
+	getCellTooltip,
 	getColumnDisplay,
 	getColumnEnvironment,
 	getColumnPreviewTooltip,
@@ -181,6 +182,28 @@ describe('column variables', () => {
 			'Upstream origin/main is missing locally',
 		)
 		expect(getColumnTooltip(repository, 'branch')).not.toContain('Upstream')
+	})
+
+	it('adds the path, description, or commit subject to the cells that show them', () => {
+		expect(getCellTooltip(repository, 'relativePath')).toBe(
+			`${getColumnTooltip(repository, 'relativePath')}\n/workspace/project with spaces`,
+		)
+		expect(getCellTooltip(repository, 'name').split('\n').at(-1)).toBe(
+			'Example project description',
+		)
+		expect(getCellTooltip(repository, 'lastCommitDate').split('\n').at(-1)).toBe('Example commit')
+		expect(getCellTooltip(repository, 'branch')).toBe(getColumnTooltip(repository, 'branch'))
+	})
+
+	it('leaves out empty details and describes run and selection cells as empty', () => {
+		expect(getCellTooltip({ ...repository, description: '' }, 'name')).toBe(
+			getColumnTooltip(repository, 'name'),
+		)
+		expect(getCellTooltip({ ...repository, lastCommit: '' }, 'lastCommitDate')).toBe(
+			getColumnTooltip(repository, 'lastCommitDate'),
+		)
+		expect(getCellTooltip(repository, 'select')).toBe('')
+		expect(getCellTooltip(repository, 'run-id')).toBe('')
 	})
 
 	it('distinguishes repeated commands by current run number and includes exact multiline output', () => {
