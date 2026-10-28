@@ -1333,7 +1333,6 @@
 								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
 										(item) => item.id === header.column.id,
 									)}{@const pinned = run !== undefined && run === runs.at(-1)}<th
-										style:width="{header.getSize()}px"
 										class:column-dragged={draggingColumnId === header.column.id}
 										class:last-output-cell={pinned}
 										class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
@@ -1417,7 +1416,6 @@
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
 									)}{@const display = getColumnDisplay(cell.column.id)}<td
-										style:width="{cell.column.getSize()}px"
 										class:column-dragged={draggingColumnId === cell.column.id}
 										class:last-output-cell={run !== undefined && run === runs.at(-1)}
 										class:numeric-cell={display === 'number'}
