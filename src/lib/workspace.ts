@@ -69,6 +69,11 @@ export type CommandRun = {
 	createdAt: string
 	finished: boolean
 	id: string
+	/**
+	 * Counts up from 1 per saved view and is never reused, so it always names the
+	 * same run.
+	 */
+	number: number
 	results: Record<string, CommandResult>
 }
 

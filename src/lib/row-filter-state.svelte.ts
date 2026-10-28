@@ -9,12 +9,15 @@ import {
 	emptyFilter,
 	getFilterColumns,
 	getFilterMetadataGroups,
+	getRuleColumns,
 	parseFilter,
 	pruneFilter,
 	starterFilter,
 } from './row-filter.js'
 
 type RowFilterOptions = {
+	/** Runs whose columns were cleared but whose output rules still filter by. */
+	clearedRuns: () => CommandRun[]
 	/** Called after the rules change so newly shown rows can load metadata. */
 	onChange: () => void
 	onPresetsChange?: (presets: FilterPreset[]) => Promise<void>
@@ -35,19 +38,21 @@ export function createRowFilter(options: RowFilterOptions) {
 	let filter = $state.raw<FilterGroup>(emptyFilter())
 	let open = $state(false)
 	let selectedId = $state<FilterPresetId>()
-	const columns = $derived(getFilterColumns(options.runs()))
+	const columns = $derived(getFilterColumns(options.runs(), options.clearedRuns()))
+	const ruleRuns = $derived([...options.runs(), ...options.clearedRuns()])
+	const ruleColumns = $derived(getRuleColumns(filter))
 	const savedPresets = $derived(options.presets?.() ?? [])
 	const presets = $derived(resolveFilterPresets(savedPresets))
-	const predicate = $derived(compileFilter(filter, options.runs()))
+	const predicate = $derived(compileFilter(filter, ruleRuns))
 	// Blank or invalid rules take no part in filtering
-	const activeRules = $derived(countActiveRules(filter, options.runs()))
+	const activeRules = $derived(countActiveRules(filter, ruleRuns))
 	const preset = $derived(findFilterPreset(filter, presets))
 	const selectedPreset = $derived(presets.find((entry) => entry.id === (selectedId ?? preset)))
 	const modified = $derived(
 		selectedPreset !== undefined &&
 			JSON.stringify(parseFilter(filter)) !== JSON.stringify(parseFilter(selectedPreset.filter)),
 	)
-	const groups = $derived(getFilterMetadataGroups(filter, options.runs()))
+	const groups = $derived(getFilterMetadataGroups(filter, ruleRuns))
 	// Rows hidden only because metadata a rule reads has not loaded
 	const undecided = $derived(
 		predicate === undefined
@@ -134,6 +139,11 @@ export function createRowFilter(options: RowFilterOptions) {
 		open = true
 	}
 
+	// Whether any rule, even a blank one, reads the column
+	function references(columnId: string) {
+		return ruleColumns.has(columnId)
+	}
+
 	// Drop rules on columns that no longer exist, such as deleted runs
 	function prune() {
 		filter = pruneFilter(
@@ -200,6 +210,7 @@ export function createRowFilter(options: RowFilterOptions) {
 			return presets
 		},
 		prune,
+		references,
 		restore,
 		savePreset,
 		get selectedPreset() {

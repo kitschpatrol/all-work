@@ -30,7 +30,11 @@ function repository(id: string, changedFiles: number): Repository {
 	}
 }
 
-function setup(runs: CommandRun[] = [], savedPresets: FilterPreset[] = []) {
+function setup(
+	runs: CommandRun[] = [],
+	savedPresets: FilterPreset[] = [],
+	clearedRuns: CommandRun[] = [],
+) {
 	const onChange = vi.fn<() => void>()
 	const onPresetsChange = vi.fn<(presets: FilterPreset[]) => Promise<void>>(async (presets) => {
 		await Promise.resolve()
@@ -38,6 +42,7 @@ function setup(runs: CommandRun[] = [], savedPresets: FilterPreset[] = []) {
 	})
 	const rows = [repository('dirty', 2), repository('clean', 0)]
 	const state = createRowFilter({
+		clearedRuns: () => clearedRuns,
 		onChange,
 		onPresetsChange,
 		presets: () => savedPresets,
@@ -110,11 +115,63 @@ describe('row filter state', () => {
 		{ column: 'run-1', operator: 'statusIs', value: 'failed' },
 	])('starts a rule with the appropriate controls for $column', (rule) => {
 		const { state } = setup([
-			{ command: 'pwd', concurrency: 1, createdAt: '', finished: true, id: 'run-1', results: {} },
+			{
+				command: 'pwd',
+				concurrency: 1,
+				createdAt: '',
+				finished: true,
+				id: 'run-1',
+				number: 1,
+				results: {},
+			},
 		])
 		state.addColumnRule(rule.column)
 		expect(state.open).toBe(true)
 		expect(state.filter.rules).toEqual([rule])
+	})
+
+	it("keeps filtering by a cleared run's output and lists it with the cleared runs", () => {
+		const cleared: CommandRun = {
+			command: 'git pull',
+			concurrency: 1,
+			createdAt: '',
+			finished: true,
+			id: 'run-3',
+			number: 3,
+			results: {
+				clean: { output: '', repositoryId: 'clean', status: 'success', truncated: false },
+				dirty: { output: 'conflict', repositoryId: 'dirty', status: 'failed', truncated: false },
+			},
+		}
+		const { rows, state } = setup([], [], [cleared])
+		state.set({ match: 'all', rules: [{ column: 'run-3', operator: 'statusIs', value: 'failed' }] })
+		state.prune()
+		expect(state.filter.rules).toHaveLength(1)
+		expect(rows.map((row) => state.matches(row))).toEqual([true, false])
+		expect(state.references('run-3')).toBe(true)
+		expect(state.references('run-4')).toBe(false)
+		expect(state.columns.at(-1)).toEqual({
+			category: 'Cleared runs',
+			header: 'Run 3: git pull',
+			id: 'run-3',
+			kind: 'output',
+		})
+	})
+
+	it('lists a run that is both a column and being cleared only once', () => {
+		const run: CommandRun = {
+			command: 'pwd',
+			concurrency: 1,
+			createdAt: '',
+			finished: true,
+			id: 'run-1',
+			number: 1,
+			results: {},
+		}
+		const { state } = setup([run], [], [run])
+		expect(state.columns.filter((column) => column.id === 'run-1')).toEqual([
+			{ category: 'Runs', header: 'Run 1: pwd', id: 'run-1', kind: 'output' },
+		])
 	})
 
 	it('ignores columns that no longer exist', () => {
@@ -290,7 +347,15 @@ describe('row filter state', () => {
 
 	it('drops rules on runs that are gone', () => {
 		const runs: CommandRun[] = [
-			{ command: 'pwd', concurrency: 1, createdAt: '', finished: true, id: 'run-1', results: {} },
+			{
+				command: 'pwd',
+				concurrency: 1,
+				createdAt: '',
+				finished: true,
+				id: 'run-1',
+				number: 1,
+				results: {},
+			},
 		]
 		const { state } = setup(runs)
 		state.restore(

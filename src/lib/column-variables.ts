@@ -161,28 +161,32 @@ const repositoryVariables = new Map(
  * List the shell variables for repository columns and the current output
  * columns.
  */
-export function getColumnVariables(runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id'>> = []) {
-	return [...repositoryVariables.values(), ...runs.map((run, index) => runVariable(run, index))]
+export function getColumnVariables(
+	runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id' | 'number'>> = [],
+) {
+	return [...repositoryVariables.values(), ...runs.map((run) => runVariable(run))]
 }
 
-function runVariable(run: Pick<CommandRun, 'command' | 'id'>, index: number) {
+function runVariable(run: Pick<CommandRun, 'command' | 'id' | 'number'>) {
 	return {
 		category: 'Runs',
 		id: run.id,
-		label: `Run ${index + 1}: ${run.command}`,
-		name: `ALLWORK_COLUMN_RUN_${index + 1}`,
+		label: `Run ${run.number}: ${run.command}`,
+		name: `ALLWORK_COLUMN_RUN_${run.number}`,
 	}
 }
 
-function findVariable(id: string, runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id'>>) {
+function findVariable(
+	id: string,
+	runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id' | 'number'>>,
+) {
 	const variable = repositoryVariables.get(id)
 	if (variable !== undefined) {
 		return variable
 	}
 
-	const index = runs.findIndex((run) => run.id === id)
-	const run = runs[index]
-	return run === undefined ? undefined : runVariable(run, index)
+	const run = runs.find((entry) => entry.id === id)
+	return run === undefined ? undefined : runVariable(run)
 }
 
 /**
@@ -284,7 +288,7 @@ export function getColumnTooltip(repository: Repository, columnId: string): stri
  */
 export function getColumnVariableName(
 	columnId: string,
-	runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id'>> = [],
+	runs: ReadonlyArray<Pick<CommandRun, 'command' | 'id' | 'number'>> = [],
 ): string | undefined {
 	return findVariable(columnId, runs)?.name
 }

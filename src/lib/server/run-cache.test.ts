@@ -20,6 +20,7 @@ function fixture(finished = true): CommandRun {
 		createdAt: new Date().toISOString(),
 		finished,
 		id,
+		number: 1,
 		results: {
 			fixture: {
 				output: 'cached output',
@@ -82,6 +83,14 @@ describe('persistent command output', () => {
 		await deleteRunCache(run.id)
 		await pending
 		expect(await readRunCache(run.id)).toBeUndefined()
+	})
+
+	it('ignores cached runs without a run number', async () => {
+		const run = fixture()
+		for (const number of [undefined, 0, 1.5]) {
+			await saveRunCache({ ...run, number } as unknown as CommandRun)
+			expect(await readRunCache(run.id)).toBeUndefined()
+		}
 	})
 
 	it('clears metadata separately from command outputs and unrelated files', async () => {

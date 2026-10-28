@@ -276,16 +276,26 @@ export function changeOperator(
 	}
 }
 
-/** List the filterable columns: repository metadata, then each command run. */
-export function getFilterColumns(runs: readonly CommandRun[]): FilterColumn[] {
+/**
+ * List the filterable columns: repository metadata, each command run, then the
+ * cleared runs that rules still read.
+ */
+export function getFilterColumns(
+	runs: readonly CommandRun[],
+	clearedRuns: readonly CommandRun[] = [],
+): FilterColumn[] {
+	const runColumn = (category: string) => (run: CommandRun) => ({
+		category,
+		header: `Run ${run.number}: ${run.command}`,
+		id: run.id,
+		kind: 'output' as const,
+	})
+	// A run being cleared can briefly be in both lists, and is listed once, as a column
+	const columnIds = new Set(runs.map((run) => run.id))
 	return [
 		...repositoryColumns.map(({ category, header, id, kind }) => ({ category, header, id, kind })),
-		...runs.map((run, index) => ({
-			category: 'Runs',
-			header: `Run ${index + 1}: ${run.command}`,
-			id: run.id,
-			kind: 'output' as const,
-		})),
+		...runs.map(runColumn('Runs')),
+		...clearedRuns.filter((run) => !columnIds.has(run.id)).map(runColumn('Cleared runs')),
 	]
 }
 
@@ -652,6 +662,13 @@ export function isRuleActive(rule: FilterRule, runs: readonly CommandRun[]): boo
 function activeRules(group: FilterGroup, runs: readonly CommandRun[]): FilterRule[] {
 	return group.rules.flatMap((node) =>
 		isFilterGroup(node) ? activeRules(node, runs) : isRuleActive(node, runs) ? [node] : [],
+	)
+}
+
+/** List the columns that rules reference, including blank and invalid rules. */
+export function getRuleColumns(filter: FilterGroup): Set<string> {
+	return new Set(
+		filter.rules.flatMap((node) => (isFilterGroup(node) ? [...getRuleColumns(node)] : node.column)),
 	)
 }
 

@@ -119,6 +119,7 @@ export function startRun(
 	command: string,
 	repositories: Repository[],
 	concurrency: number,
+	number: number,
 	sourceRuns: readonly CommandRun[] = [],
 ): CommandRun {
 	const run: CommandRun = {
@@ -127,6 +128,7 @@ export function startRun(
 		createdAt: new Date().toISOString(),
 		finished: false,
 		id: randomUUID(),
+		number,
 		results: Object.fromEntries(
 			repositories.map((repository) => [
 				repository.id,

@@ -23,6 +23,7 @@ const runs: CommandRun[] = [
 		createdAt: '',
 		finished: true,
 		id: 'run-id',
+		number: 1,
 		results: {},
 	},
 ]
@@ -102,7 +103,7 @@ describe('copying a column variable', () => {
 
 describe('clearing finished runs beside a run column', () => {
 	function run(id: string, finished: boolean): CommandRun {
-		return { command: id, concurrency: 1, createdAt: '', finished, id, results: {} }
+		return { command: id, concurrency: 1, createdAt: '', finished, id, number: 1, results: {} }
 	}
 
 	const besideRuns = [run('a', true), run('b', false), run('c', true), run('d', true)]

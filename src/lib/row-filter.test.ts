@@ -100,6 +100,7 @@ function run(results: CommandRun['results']): CommandRun {
 		createdAt: '2026-10-16T12:00:00.000Z',
 		finished: false,
 		id: 'run-1',
+		number: 1,
 		results,
 	}
 }

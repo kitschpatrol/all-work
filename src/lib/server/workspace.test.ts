@@ -370,6 +370,7 @@ describe('parallel command runs', () => {
 				`'${process.execPath}' -e 'process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("ALLWORK_COLUMN_")))))'`,
 				selected,
 				2,
+				1,
 			)
 			runIds.push(run.id)
 			await waitForRun(run)
@@ -405,10 +406,15 @@ describe('parallel command runs', () => {
 	})
 
 	it('snapshots output variables before queueing and preserves them after the source run is deleted', async () => {
-		const source = startRun(String.raw`printf '%s\n' "$ALLWORK_COLUMN_REPOSITORY"`, repositories, 2)
+		const source = startRun(
+			String.raw`printf '%s\n' "$ALLWORK_COLUMN_REPOSITORY"`,
+			repositories,
+			2,
+			1,
+		)
 		runIds.push(source.id)
 		await waitForRun(source)
-		const run = startRun('printf \'%s\' "$ALLWORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, [
+		const run = startRun('printf \'%s\' "$ALLWORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, 2, [
 			source,
 		])
 		runIds.push(run.id)
@@ -433,6 +439,7 @@ describe('parallel command runs', () => {
 				String.raw`allwork_fixture_alias; allwork_fixture_function; allwork-fixture-tool; printf '%s\n' "$ALLWORK_SHELL_PROFILE"; pwd`,
 				repositories,
 				2,
+				1,
 			)
 			runIds.push(run.id)
 			await waitForRun(run)
@@ -451,7 +458,7 @@ describe('parallel command runs', () => {
 		async () => {
 			vi.stubEnv('SHELL', undefined)
 			try {
-				const run = startRun('allwork_fixture_alias', repositories.slice(0, 1), 1)
+				const run = startRun('allwork_fixture_alias', repositories.slice(0, 1), 1, 1)
 				runIds.push(run.id)
 				await waitForRun(run)
 				expect(Object.values(run.results)[0]).toMatchObject({
@@ -469,6 +476,7 @@ describe('parallel command runs', () => {
 			String.raw`pwd; printf "standard output\n"; printf "standard error\n" >&2; exit 7`,
 			repositories,
 			2,
+			1,
 		)
 		runIds.push(run.id)
 		await waitForRun(run)
@@ -488,6 +496,7 @@ describe('parallel command runs', () => {
 			String.raw`printf '%s\n' 'café $HOME "quotes"' | cat && printf '%s\n' '日本語' >&2`,
 			repositories.slice(0, 1),
 			1,
+			1,
 		)
 		runIds.push(run.id)
 		await waitForRun(run)
@@ -498,7 +507,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('reports command syntax errors in the output', async () => {
-		const run = startRun('if then', repositories.slice(0, 1), 1)
+		const run = startRun('if then', repositories.slice(0, 1), 1, 1)
 		runIds.push(run.id)
 		await waitForRun(run)
 		const result = Object.values(run.results)[0]
@@ -507,7 +516,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('keeps internal runner arguments out of the command positional parameters', async () => {
-		const run = startRun(String.raw`printf '%s\n' "$#:$1:$2"`, repositories.slice(0, 1), 1)
+		const run = startRun(String.raw`printf '%s\n' "$#:$1:$2"`, repositories.slice(0, 1), 1, 1)
 		runIds.push(run.id)
 		await waitForRun(run)
 		expect(Object.values(run.results)[0]).toMatchObject({
@@ -519,7 +528,7 @@ describe('parallel command runs', () => {
 	it('reports an unavailable user shell and finishes the run', async () => {
 		vi.stubEnv('SHELL', path.join(temporaryDirectory, 'missing-shell'))
 		try {
-			const run = startRun('pwd', repositories.slice(0, 1), 1)
+			const run = startRun('pwd', repositories.slice(0, 1), 1, 1)
 			runIds.push(run.id)
 			await waitForRun(run)
 			const result = Object.values(run.results)[0]
@@ -531,7 +540,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('streams before completion and obeys the concurrency limit', async () => {
-		const run = startRun('printf ready; sleep 0.3', repositories, 1)
+		const run = startRun('printf ready; sleep 0.3', repositories, 1, 1)
 		runIds.push(run.id)
 		let observedLiveOutput = false
 		const unsubscribe = subscribeRun(run.id, (event) => {
@@ -554,7 +563,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('stops running commands and cancels commands that have not started', async () => {
-		const run = startRun('printf started; sleep 30', repositories, 1)
+		const run = startRun('printf started; sleep 30', repositories, 1, 1)
 		runIds.push(run.id)
 		await vi.waitFor(() =>
 			expect(Object.values(run.results).some((result) => result.output.includes('started'))).toBe(
@@ -574,6 +583,7 @@ describe('parallel command runs', () => {
 			`'${process.execPath}' -e 'process.on("SIGTERM", () => {}); process.on("SIGHUP", () => {}); console.log("stubborn=" + process.pid); setInterval(() => {}, 1000)' & wait`,
 			repositories.slice(0, 1),
 			1,
+			1,
 		)
 		runIds.push(run.id)
 		await vi.waitFor(() =>
@@ -591,6 +601,7 @@ describe('parallel command runs', () => {
 			`'${process.execPath}' -e 'process.stdout.write("x".repeat(150000))'`,
 			repositories.slice(0, 1),
 			1,
+			1,
 		)
 		runIds.push(run.id)
 		await waitForRun(run)
@@ -600,7 +611,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('deletes retained output and leaves repository files untouched', async () => {
-		const run = startRun('printf complete', repositories.slice(0, 1), 1)
+		const run = startRun('printf complete', repositories.slice(0, 1), 1, 1)
 		await waitForRun(run)
 		deleteRun(run.id)
 		expect(getRun(run.id)).toBeUndefined()

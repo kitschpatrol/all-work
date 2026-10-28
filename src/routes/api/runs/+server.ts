@@ -3,6 +3,7 @@ import { getPendingCommandColumns } from '#lib/column-variables.js'
 import { getRun, startRun } from '#lib/server/commands.js'
 import { getWorkspace } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
+import { isRunNumber } from '#lib/server/run-cache.js'
 import type { RequestHandler } from './$types'
 
 export const POST: RequestHandler = async ({ request, url }) => {
@@ -44,6 +45,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		error(400, 'Parallel jobs must be between 1 and 32.')
 	}
 
+	const { number } = body
+	if (!isRunNumber(number)) {
+		error(400, 'Invalid run number.')
+	}
+
 	const sourceRunIds = body.sourceRunIds ?? []
 	if (!Array.isArray(sourceRunIds)) {
 		error(400, 'Invalid output columns.')
@@ -65,7 +71,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		)
 	}
 
-	return Response.json(startRun(body.command.trim(), repositories, concurrency, sourceRuns), {
-		status: 201,
-	})
+	return Response.json(
+		startRun(body.command.trim(), repositories, concurrency, number, sourceRuns),
+		{
+			status: 201,
+		},
+	)
 }

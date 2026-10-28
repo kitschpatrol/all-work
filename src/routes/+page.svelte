@@ -67,6 +67,7 @@
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
+	import { createRunHistory } from '#lib/run-history.svelte.js'
 	import RunHeader from '#lib/RunHeader.svelte'
 	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
@@ -182,8 +183,10 @@
 	)
 	const columnVariables = $derived(getColumnVariables(runs))
 	const rowFilter = createRowFilter({
+		clearedRuns: () => runHistory.cleared,
 		onChange() {
 			scheduleMetadata()
+			void runHistory.release().catch(showError)
 		},
 		async onPresetsChange(presets) {
 			preferences = await savePreferenceChanges(preferences, { filterPresets: presets })
@@ -192,6 +195,7 @@
 		repositories: () => workspace?.repositories ?? [],
 		runs: () => runs,
 	})
+	const runHistory = createRunHistory((runId) => rowFilter.references(runId))
 	const repositories = $derived(
 		(workspace?.repositories ?? []).filter(
 			(repository) =>
@@ -292,6 +296,10 @@
 	const viewSnapshot = $derived<SavedView>({
 		autoClear,
 		autoClearPredecessors: Object.fromEntries(autoClearPredecessors),
+		clearedRunIds:
+			workspace === undefined
+				? (savedView?.clearedRunIds ?? [])
+				: runHistory.cleared.map((run) => run.id),
 		columnOrder,
 		columnPreset: columnPresets.selected?.id,
 		columnSizing: table.atoms.columnSizing.get(),
@@ -303,6 +311,8 @@
 		filter: rowFilter.filter,
 		filterOpen: rowFilter.open,
 		filterPreset: rowFilter.selectedPreset?.id,
+		nextRunNumber:
+			workspace === undefined ? (savedView?.nextRunNumber ?? 1) : runHistory.nextNumber,
 		outputLines,
 		recursive,
 		resizedColumns: [...resizedColumns],
@@ -430,6 +440,7 @@
 		rowSelection = {}
 		search = ''
 		rowFilter.restore(emptyFilter(), false)
+		void runHistory.reset(runs).catch(showError)
 		selectedOnly = false
 		resizedColumns.clear()
 		table.resetColumnVisibility()
@@ -555,10 +566,11 @@
 				recursive,
 			})
 			if (restored !== undefined) {
-				runs = await request<CommandRun[]>('/api/runs/restore', {
-					ids: restored.runIds,
+				const restoredRuns = await request<CommandRun[]>('/api/runs/restore', {
+					ids: [...restored.runIds, ...restored.clearedRunIds],
 					workspaceId: next.id,
 				})
+				runs = runHistory.restore(restoredRuns, restored.clearedRunIds, restored.nextRunNumber)
 				applySavedView(restored)
 				rowFilter.prune()
 				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
@@ -832,11 +844,13 @@
 			const run = await request<CommandRun>('/api/runs', {
 				command,
 				concurrency,
+				number: runHistory.nextNumber,
 				repositoryIds: targets.map((row) => row.id),
 				sourceRunIds: runs.map((run) => run.id),
 				workspaceId: workspace.id,
 			})
 			runs = [...runs, run]
+			runHistory.counted(run)
 			if (commandHistory.at(-1) !== run.command) {
 				commandHistory = [...commandHistory, run.command].slice(-100)
 			}
@@ -870,7 +884,7 @@
 
 	async function removeRun(runId: string) {
 		try {
-			await request(`/api/runs/${runId}`, {}, 'DELETE')
+			await runHistory.clear(runId, runs)
 			table.setSorting((previous) => previous.filter((entry) => entry.id !== runId))
 			runs = runs.filter((run) => run.id !== runId)
 			rowFilter.prune()
@@ -1354,7 +1368,7 @@
 												/></label
 											>
 										{:else if run !== undefined}<RunHeader
-												number={runs.indexOf(run) + 1}
+												number={run.number}
 												onRemove={async () => removeRun(run.id)}
 												onSort={(multiple: boolean) => {
 													sortOutput(run.id, multiple)

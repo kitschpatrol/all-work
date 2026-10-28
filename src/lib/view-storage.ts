@@ -11,6 +11,8 @@ import { parseFilter } from './row-filter.js'
 export type SavedView = {
 	autoClear: boolean
 	autoClearPredecessors: Record<string, string>
+	/** Runs whose columns were cleared while filter rules still read them. */
+	clearedRunIds: string[]
 	columnOrder: string[]
 	columnPreset: ColumnPresetId | undefined
 	columnSizing: Record<string, number>
@@ -22,6 +24,7 @@ export type SavedView = {
 	filter: FilterGroup
 	filterOpen: boolean
 	filterPreset: FilterPresetId | undefined
+	nextRunNumber: number
 	outputLines: number
 	recursive: boolean
 	resizedColumns: string[]
@@ -66,6 +69,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 				(entry): entry is [string, string] => typeof entry[1] === 'string',
 			),
 		),
+		clearedRunIds: strings(record.clearedRunIds).slice(-1000),
 		columnOrder: strings(record.columnOrder),
 		columnPreset: isColumnPresetId(record.columnPreset) ? record.columnPreset : undefined,
 		columnSizing: Object.fromEntries(
@@ -85,6 +89,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		filter: parseFilter(record.filter),
 		filterOpen: record.filterOpen === true,
 		filterPreset: isFilterPresetId(record.filterPreset) ? record.filterPreset : undefined,
+		nextRunNumber: integer(record.nextRunNumber, 1, 1),
 		outputLines: integer(record.outputLines, 3, 1),
 		recursive: record.recursive !== false,
 		resizedColumns: strings(record.resizedColumns),

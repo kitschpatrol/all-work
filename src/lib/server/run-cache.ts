@@ -7,6 +7,11 @@ import { cacheDirectory } from './cache.js'
 const runIdPattern = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/iv
 const writes = new Map<string, Promise<void>>()
 
+/** Whether a value can be a run's number: a whole number from 1. */
+export function isRunNumber(value: unknown): value is number {
+	return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
+}
+
 function cachePath(id: string) {
 	return path.join(cacheDirectory('runs'), `${id}.json`)
 }
@@ -50,7 +55,8 @@ export async function readRunCache(id: string): Promise<CommandRun | undefined> 
 			typeof value.command !== 'string' ||
 			typeof value.createdAt !== 'string' ||
 			typeof value.finished !== 'boolean' ||
-			typeof value.concurrency !== 'number'
+			typeof value.concurrency !== 'number' ||
+			!isRunNumber(value.number)
 		) {
 			return undefined
 		}
@@ -85,6 +91,7 @@ export async function readRunCache(id: string): Promise<CommandRun | undefined> 
 			createdAt: value.createdAt,
 			finished: value.finished,
 			id,
+			number: value.number,
 			results,
 		}
 	} catch {

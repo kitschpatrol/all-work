@@ -36,13 +36,14 @@ const repository: Repository = {
 	version: '1.2.3',
 }
 
-function outputRun(id: string, output: string): CommandRun {
+function outputRun(id: string, output: string, number = 1): CommandRun {
 	return {
 		command: 'git status --short',
 		concurrency: 1,
 		createdAt: '2026-10-15T12:00:00.000Z',
 		finished: true,
 		id,
+		number,
 		results: {
 			[repository.id]: { output, repositoryId: repository.id, status: 'success', truncated: false },
 		},
@@ -183,7 +184,7 @@ describe('column variables', () => {
 	})
 
 	it('distinguishes repeated commands by current run number and includes exact multiline output', () => {
-		const runs = [outputRun('first', 'one\ntwo\n'), outputRun('second', 'three\n')]
+		const runs = [outputRun('first', 'one\ntwo\n'), outputRun('second', 'three\n', 2)]
 		const environment = getColumnEnvironment(repository, runs)
 		expect(environment.ALLWORK_COLUMN_RUN_1).toBe('one\ntwo\n')
 		expect(environment.ALLWORK_COLUMN_RUN_2).toBe('three\n')
@@ -204,11 +205,16 @@ describe('column variables', () => {
 				name: 'ALLWORK_COLUMN_RUN_2',
 			},
 		])
-		expect(getColumnEnvironment(repository, runs.slice(1)).ALLWORK_COLUMN_RUN_1).toBe('three\n')
+	})
+
+	it('keeps a run variable named by its run number after an earlier run is cleared', () => {
+		const environment = getColumnEnvironment(repository, [outputRun('second', 'three\n', 2)])
+		expect(environment.ALLWORK_COLUMN_RUN_2).toBe('three\n')
+		expect(environment.ALLWORK_COLUMN_RUN_1).toBeUndefined()
 	})
 
 	it('names the variable for repository and run columns, and none for other columns', () => {
-		const runs = [outputRun('first', 'one'), outputRun('second', 'two')]
+		const runs = [outputRun('first', 'one'), outputRun('second', 'two', 2)]
 		expect(getColumnVariableName('branch')).toBe('ALLWORK_COLUMN_BRANCH')
 		expect(getColumnVariableName('ahead')).toBe('ALLWORK_COLUMN_AHEAD')
 		expect(getColumnVariableName('metadata:Git Remotes Ahead')).toBe(
