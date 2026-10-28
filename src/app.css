@@ -1167,12 +1167,12 @@ th.last-output-cell {
 
 .repository-cell::after {
 	left: calc(100% + 1px);
-	background: linear-gradient(to right, #00000038, #0000);
+	background: linear-gradient(to right, #0000001c, #0000);
 }
 
 .last-output-cell::after {
 	right: calc(100% + 1px);
-	background: linear-gradient(to left, #00000038, #0000);
+	background: linear-gradient(to left, #0000001c, #0000);
 }
 
 th.selection-cell,
