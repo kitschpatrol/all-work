@@ -1214,6 +1214,13 @@ th.column-dragged {
 	background: none;
 }
 
+.header-label {
+	overflow: hidden;
+	min-width: 0;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .numeric-cell {
 	text-align: right;
 }

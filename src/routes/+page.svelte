@@ -1371,9 +1371,8 @@
 													scheduleMetadata()
 												}}
 												type="button"
-												>{String(
-													header.column.columnDef.header,
-												)}{#if header.column.getIsSorted() !== false}<span
+												><span class="header-label">{String(header.column.columnDef.header)}</span
+												>{#if header.column.getIsSorted() !== false}<span
 														class="sort-indicator"
 														class:descending={header.column.getIsSorted() === 'desc'}
 														aria-hidden="true"
