@@ -1069,6 +1069,43 @@ td.output-cell {
 	vertical-align: top;
 }
 
+td.output-cell[data-run-status='success'] {
+	background: #edf6ef;
+}
+
+td.output-cell[data-run-status='failed'] {
+	background: #fbeeed;
+}
+
+tr:nth-child(even) td.output-cell[data-run-status='success'] {
+	background: #e8f2ea;
+}
+
+tr:nth-child(even) td.output-cell[data-run-status='failed'] {
+	background: #f7e9e8;
+}
+
+td.output-cell[data-run-status='running'] {
+	background:
+		linear-gradient(-45deg, #ffffff99 25%, #fff0 25% 50%, #ffffff99 50% 75%, #fff0 75%) 0 0 / 16px
+			16px,
+		#e6edf7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	td.output-cell[data-run-status='running'] {
+		animation: run-cell-stripes 0.8s linear infinite;
+	}
+}
+
+@keyframes run-cell-stripes {
+	to {
+		background-position:
+			16px 0,
+			0 0;
+	}
+}
+
 /* The newest run stays in view at the right edge, as the repository column does at the left */
 .last-output-cell {
 	position: sticky;
@@ -1976,7 +2013,7 @@ tr.selected
 }
 
 @media (hover: hover) {
-	tr:not(.selected):hover td:not(.table-filler) {
+	tr:not(.selected):hover td:not(.table-filler, [data-run-status]) {
 		background: #eef3fa;
 	}
 

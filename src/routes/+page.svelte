@@ -68,7 +68,7 @@
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
 	import RunHeader from '#lib/RunHeader.svelte'
-	import { getColumnSizingValue } from '#lib/table-formatting.js'
+	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
@@ -1408,6 +1408,9 @@
 										class:repository-cell={cell.column.id === 'relativePath'}
 										class:selection-cell={cell.column.id === 'select'}
 										data-column-id={cell.column.id}
+										data-run-status={run === undefined
+											? undefined
+											: runCellStatus(run, repository.id)}
 										title={tooltip}
 									>
 										{#if cell.column.id === 'select'}<label

@@ -29,6 +29,15 @@ export function runProgress(run: CommandRun) {
 	return `${results.filter((result) => result.status !== 'queued' && result.status !== 'running').length}/${results.length}`
 }
 
+/**
+ * The status that tints a repository's output cell: running, success, or
+ * failed. Queued, cancelled, and missing results keep the row background.
+ */
+export function runCellStatus(run: CommandRun, repositoryId: string) {
+	const status = run.results[repositoryId]?.status
+	return status === 'running' || status === 'success' || status === 'failed' ? status : undefined
+}
+
 /** Count the repositories whose command succeeded and failed. */
 export function runOutcomes(run: CommandRun) {
 	const results = Object.values(run.results)

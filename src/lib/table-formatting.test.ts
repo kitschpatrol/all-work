@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, MetadataGroup, MetadataState, Repository } from './workspace.js'
-import { getColumnCopyLines, pendingMetadata, runOutcomes } from './table-formatting.js'
+import {
+	getColumnCopyLines,
+	pendingMetadata,
+	runCellStatus,
+	runOutcomes,
+} from './table-formatting.js'
 
 function repository(
 	id: string,
@@ -101,5 +106,29 @@ describe('runOutcomes', () => {
 
 	it('counts nothing for a run without results', () => {
 		expect(runOutcomes(run())).toEqual({ failed: 0, succeeded: 0 })
+	})
+})
+
+describe('runCellStatus', () => {
+	const run = {
+		results: {
+			cancelled: { status: 'cancelled' },
+			failed: { status: 'failed' },
+			queued: { status: 'queued' },
+			running: { status: 'running' },
+			success: { status: 'success' },
+		},
+	} as unknown as CommandRun
+
+	it('tints running, successful, and failed results', () => {
+		expect(runCellStatus(run, 'running')).toBe('running')
+		expect(runCellStatus(run, 'success')).toBe('success')
+		expect(runCellStatus(run, 'failed')).toBe('failed')
+	})
+
+	it('leaves queued, cancelled, and missing results without a tint', () => {
+		expect(runCellStatus(run, 'queued')).toBeUndefined()
+		expect(runCellStatus(run, 'cancelled')).toBeUndefined()
+		expect(runCellStatus(run, 'absent')).toBeUndefined()
 	})
 })
