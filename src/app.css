@@ -1111,9 +1111,7 @@ td.output-cell[data-run-status='running'] {
 	position: sticky;
 	z-index: 2;
 	right: 0;
-	box-shadow:
-		-1px 0 #c5ccd6,
-		-5px 0 6px -5px #0000002e;
+	box-shadow: -1px 0 #aeb6c2;
 }
 
 th.last-output-cell {
@@ -1153,9 +1151,28 @@ th.last-output-cell {
 	position: sticky;
 	z-index: 2;
 	left: 32px;
-	box-shadow:
-		1px 0 #c5ccd6,
-		5px 0 6px -5px #0000002e;
+	box-shadow: 1px 0 #aeb6c2;
+}
+
+/* Pinned columns cast a continuous shadow over the columns scrolling beneath them */
+.repository-cell::after,
+.last-output-cell::after {
+	pointer-events: none;
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: -1px;
+	width: 20px;
+}
+
+.repository-cell::after {
+	left: calc(100% + 1px);
+	background: linear-gradient(to right, #00000038, #0000);
+}
+
+.last-output-cell::after {
+	right: calc(100% + 1px);
+	background: linear-gradient(to left, #00000038, #0000);
 }
 
 th.selection-cell,
