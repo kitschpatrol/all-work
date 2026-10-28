@@ -4,7 +4,7 @@
 	import FolderIcon from './FolderIcon.svelte'
 	import GithubIcon from './GithubIcon.svelte'
 	import { getGithubUrl, openRepositoryLink } from './repository-links.js'
-	import { pendingMetadata, vscodeUrl } from './table-formatting.js'
+	import { metadataActivity, vscodeUrl } from './table-formatting.js'
 	const {
 		onOpen,
 		onRefresh,
@@ -19,7 +19,7 @@
 		tooltip: string
 	} = $props()
 	const githubUrl = $derived(getGithubUrl(repository.remote))
-	const refreshing = $derived(pendingMetadata([repository]).groups > 0)
+	const activity = $derived(metadataActivity(repository))
 	let menuError = $state('')
 
 	async function showMenu(event: MouseEvent) {
@@ -188,10 +188,15 @@
 			</button>
 			<button
 				class="repository-action"
-				class:refreshing
+				class:queued={activity === 'queued'}
+				class:refreshing={activity === 'loading'}
 				aria-label="Refresh metadata for {repository.name}"
 				onclick={async () => onRefresh(repository)}
-				title={refreshing ? 'Loading metadata…' : 'Refresh metadata'}
+				title={activity === 'loading'
+					? 'Loading metadata…'
+					: activity === 'queued'
+						? 'Waiting to load metadata…'
+						: 'Refresh metadata'}
 				type="button"
 			>
 				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"

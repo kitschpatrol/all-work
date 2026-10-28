@@ -67,6 +67,19 @@ export function pendingMetadata(repositories: readonly Repository[]) {
 	return { groups, repositories: waiting }
 }
 
+/**
+ * Whether a repository has metadata loading now, only queued, or neither.
+ * Loading wins, since only a few repositories load at once.
+ */
+export function metadataActivity(repository: Repository): 'loading' | 'queued' | undefined {
+	const states = Object.values(repository.metadata?.groups ?? {})
+	if (states.some((state) => state.status === 'loading')) {
+		return 'loading'
+	}
+
+	return states.some((state) => state.status === 'queued') ? 'queued' : undefined
+}
+
 /** Format the displayed cell text for inexpensive width measurement. */
 export function getColumnSizingValue(
 	repository: Repository,

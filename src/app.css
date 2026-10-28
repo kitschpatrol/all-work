@@ -1328,6 +1328,12 @@ th[aria-sort='descending'] {
 	height: 14px;
 }
 
+/* Queued rows wait without animating; a spinning icon is a composited layer, and only the few loading rows spin */
+.repository-action.queued,
+.repository-action.refreshing {
+	color: #2f7ae6;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	.repository-action.refreshing svg {
 		animation: refresh-spin 1s linear infinite;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CommandRun, MetadataGroup, MetadataState, Repository } from './workspace.js'
 import {
 	getColumnCopyLines,
+	metadataActivity,
 	pendingMetadata,
 	runCellStatus,
 	runOutcomes,
@@ -57,6 +58,23 @@ describe('pending metadata', () => {
 	it('treats repositories without metadata and empty workspaces as idle', () => {
 		expect(pendingMetadata([repository('a')])).toEqual({ groups: 0, repositories: 0 })
 		expect(pendingMetadata([])).toEqual({ groups: 0, repositories: 0 })
+	})
+})
+
+describe('metadata activity', () => {
+	it('reports loading ahead of queued groups', () => {
+		expect(metadataActivity(repository('a', { git: 'queued', local: 'loading' }))).toBe('loading')
+	})
+
+	it('reports queued groups when none are loading', () => {
+		expect(metadataActivity(repository('a', { git: 'queued', local: 'ready' }))).toBe('queued')
+	})
+
+	it('treats finished, failed, and missing metadata as idle', () => {
+		expect(
+			metadataActivity(repository('a', { ci: 'unavailable', git: 'error', local: 'ready' })),
+		).toBeUndefined()
+		expect(metadataActivity(repository('a'))).toBeUndefined()
 	})
 })
 
