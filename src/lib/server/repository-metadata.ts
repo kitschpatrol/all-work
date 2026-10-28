@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto'
 import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { cacheDirectory } from './cache.js'
+import { resolveGithubToken } from './github-token.js'
 import { extractMetadata } from './metascope-process.js'
 import { findReadme } from './readme.js'
 import { repositoryTemplate } from './repository-template.js'
@@ -369,6 +370,8 @@ export function startWorkspaceMetadata(
 	let disposed = false
 	let active = 0
 	const controller = new AbortController()
+	// Looked up once, when the first network source needs it
+	let githubToken: Promise<string | undefined> | undefined
 
 	async function extract({ group, repository }: Job) {
 		const { metadata } = repository
@@ -379,11 +382,16 @@ export function startWorkspaceMetadata(
 		metadata.groups[group] = { ...metadata.groups[group], error: undefined, status: 'loading' }
 		notify(repository)
 		try {
+			const offline = ['code', 'files', 'git', 'local'].includes(group)
+			if (!offline) {
+				githubToken ??= resolveGithubToken()
+			}
+
 			const extracted: unknown = await extractMetadata(
 				{
 					absolute: true,
-					credentials: { githubToken: process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN },
-					offline: ['code', 'files', 'git', 'local'].includes(group),
+					credentials: offline ? {} : { githubToken: await githubToken },
+					offline,
 					path: repository.path,
 					recursive: false,
 					sources: sources[group],

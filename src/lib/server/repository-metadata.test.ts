@@ -6,10 +6,12 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repository, Workspace } from '../workspace.js'
 import { metadataColumns } from '../metadata-columns.js'
+import { resolveGithubToken } from './github-token.js'
 import { extractMetadata } from './metascope-process.js'
 import { startWorkspaceMetadata } from './repository-metadata.js'
 
 vi.mock('./metascope-process.js', () => ({ extractMetadata: vi.fn() }))
+vi.mock('./github-token.js', () => ({ resolveGithubToken: vi.fn() }))
 
 let temporaryDirectory: string
 const controllers: Array<ReturnType<typeof startWorkspaceMetadata>> = []
@@ -225,6 +227,32 @@ describe('progressive Metascope metadata', () => {
 			offline: false,
 			sources: ['dependencyUpdates'],
 		})
+	})
+
+	it('looks up the GitHub token once, for network sources only', async () => {
+		vi.mocked(resolveGithubToken).mockClear()
+		vi.mocked(resolveGithubToken).mockResolvedValue('resolved-token')
+		const workspace = fixture()
+		const controller = begin(workspace)
+		await ready(workspace)
+		expect(resolveGithubToken).not.toHaveBeenCalled()
+		const offlineCalls = vi.mocked(extractMetadata).mock.calls.length
+		controller.request(['fixture'], ['github', 'ci', 'registry'], true)
+		await vi.waitFor(() =>
+			expect(vi.mocked(extractMetadata).mock.calls.length).toBe(offlineCalls + 3),
+		)
+		const calls = vi.mocked(extractMetadata).mock.calls.map(([options]) => options)
+		expect(
+			calls
+				.slice(0, offlineCalls)
+				.every((options) => options.credentials?.githubToken === undefined),
+		).toBe(true)
+		expect(calls.slice(offlineCalls).map((options) => options.credentials?.githubToken)).toEqual([
+			'resolved-token',
+			'resolved-token',
+			'resolved-token',
+		])
+		expect(resolveGithubToken).toHaveBeenCalledOnce()
 	})
 
 	it('keeps known false flags and zero counts when a later remote response has no source data', async () => {
