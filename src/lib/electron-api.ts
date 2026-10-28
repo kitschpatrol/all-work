@@ -9,6 +9,8 @@ import { asRecord } from './record.js'
  * renderer.
  */
 export type MenuCommand =
+	| 'column.clearFinishedLeft'
+	| 'column.clearFinishedRight'
 	| 'column.copy'
 	| 'column.copySelected'
 	| 'column.copyVariable'
@@ -95,8 +97,11 @@ export type ColumnMenuRequest = {
 	canHide: boolean
 	canSort: boolean
 	columnId: string
+	hasFinishedRunsLeft: boolean
+	hasFinishedRunsRight: boolean
 	hasSelection: boolean
 	hasVariable: boolean
+	isRun: boolean
 }
 
 /** Hidden columns offered to show again, grouped by category in column order. */
@@ -157,8 +162,11 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 		typeof request.canFilter === 'boolean' &&
 		typeof request.canHide === 'boolean' &&
 		typeof request.canSort === 'boolean' &&
+		typeof request.hasFinishedRunsLeft === 'boolean' &&
+		typeof request.hasFinishedRunsRight === 'boolean' &&
 		typeof request.hasSelection === 'boolean' &&
-		typeof request.hasVariable === 'boolean'
+		typeof request.hasVariable === 'boolean' &&
+		typeof request.isRun === 'boolean'
 	)
 }
 

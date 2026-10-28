@@ -235,7 +235,13 @@ async function main(): Promise<void> {
 				return
 			}
 
-			const items: Array<'separator' | [string, MenuCommand, boolean]> = [
+			type ColumnMenuItem = 'separator' | [string, MenuCommand, boolean]
+			const runItems: ColumnMenuItem[] = [
+				'separator',
+				['Clear Finished to Left', 'column.clearFinishedLeft', request.hasFinishedRunsLeft],
+				['Clear Finished to Right', 'column.clearFinishedRight', request.hasFinishedRunsRight],
+			]
+			const items: ColumnMenuItem[] = [
 				['Sort Ascending', 'column.sortAscending', request.canSort],
 				['Sort Descending', 'column.sortDescending', request.canSort],
 				['Hide Column', 'column.hide', request.canHide],
@@ -244,6 +250,7 @@ async function main(): Promise<void> {
 				['Copy', 'column.copy', true],
 				['Copy Selected', 'column.copySelected', request.hasSelection],
 				['Copy Variable', 'column.copyVariable', request.hasVariable],
+				...(request.isRun ? runItems : []),
 			]
 			Menu.buildFromTemplate(
 				items.map((item) => {

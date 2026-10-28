@@ -24,6 +24,8 @@ type OptionalColumn = {
 type ColumnMenuOptions = {
 	beforeSort: () => void
 	getColumn: (id: string) => MenuColumn | undefined
+	/** Visible column ids in display order. */
+	getColumnOrder: () => readonly string[]
 	/** Columns that can be shown and hidden, in column order. */
 	getOptionalColumns: () => readonly OptionalColumn[]
 	/** Rows shown by the table, or only the selected ones, in table order. */
@@ -32,6 +34,7 @@ type ColumnMenuOptions = {
 	onError: (error: unknown) => void
 	onFilter: (id: string) => void
 	onHide: (id: string) => Promise<void>
+	onRemoveRuns: (ids: readonly string[]) => void
 	/** Show a hidden column at the end of the table, where its menu opened. */
 	onShow: (id: string) => Promise<void>
 	onSort: () => void
@@ -39,9 +42,9 @@ type ColumnMenuOptions = {
 }
 
 /**
- * Connect a column's native menu to sorting, visibility, filter rules, and
- * copying its plain text or shell variable, and the empty header space's menu
- * to showing hidden columns.
+ * Connect a column's native menu to sorting, visibility, filter rules, copying
+ * its plain text or shell variable, and clearing finished runs beside a run
+ * column, and the empty header space's menu to showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -53,6 +56,30 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		return (
 			column.getCanHide() && !pinned.start.includes(column.id) && !pinned.end.includes(column.id)
 		)
+	}
+
+	function getFinishedRunsBeside(id: string | undefined, side: 'left' | 'right') {
+		const order = options.getColumnOrder()
+		const index = id === undefined ? -1 : order.indexOf(id)
+		if (index === -1) {
+			return []
+		}
+
+		const finished = new Set(
+			options
+				.getRuns()
+				.filter((run) => run.finished)
+				.map((run) => run.id),
+		)
+		const beside = side === 'left' ? order.slice(0, index) : order.slice(index + 1)
+		return beside.filter((columnId) => finished.has(columnId))
+	}
+
+	function clearFinishedBeside(id: string | undefined, side: 'left' | 'right') {
+		const ids = getFinishedRunsBeside(id, side)
+		if (ids.length > 0) {
+			options.onRemoveRuns(ids)
+		}
 	}
 
 	async function filter(id: string) {
@@ -109,6 +136,12 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 	}
 
 	const actions: Pick<MenuActions, Extract<keyof MenuActions, `column.${string}`>> = {
+		'column.clearFinishedLeft'(payload) {
+			clearFinishedBeside(payload, 'left')
+		},
+		'column.clearFinishedRight'(payload) {
+			clearFinishedBeside(payload, 'right')
+		},
 		'column.copy'(payload) {
 			void copy(payload, false)
 		},
@@ -159,8 +192,11 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					canHide: canHide(column),
 					canSort: column.getCanSort(),
 					columnId,
+					hasFinishedRunsLeft: getFinishedRunsBeside(columnId, 'left').length > 0,
+					hasFinishedRunsRight: getFinishedRunsBeside(columnId, 'right').length > 0,
 					hasSelection: options.getRows(true).length > 0,
 					hasVariable: getColumnVariableName(columnId, options.getRuns()) !== undefined,
+					isRun: options.getRuns().some((run) => run.id === columnId),
 				})
 			} catch (error) {
 				options.onError(error)

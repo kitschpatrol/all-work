@@ -251,12 +251,18 @@
 	const columnMenu = createColumnMenu({
 		beforeSort: refreshTableData,
 		getColumn: (id) => table.getColumn(id),
+		getColumnOrder: () => table.getVisibleLeafColumns().map((column) => column.id),
 		getOptionalColumns: () => optionalColumns,
 		getRows: (selected) => (selected ? targets : visibleRepositories).map((row) => row.original),
 		getRuns: () => runs,
 		onError: showError,
 		onFilter: rowFilter.addColumnRule,
 		onHide: async (id) => setColumnsVisible([id], false),
+		onRemoveRuns(ids) {
+			for (const id of ids) {
+				void removeRun(id)
+			}
+		},
 		async onShow(id) {
 			columnOrder = moveColumnToEnd(resolvedColumnOrder, id, pinnedColumns)
 			await setColumnsVisible([id], true)

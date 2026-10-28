@@ -27,7 +27,10 @@ const runs: CommandRun[] = [
 	},
 ]
 
-function menu(onError = vi.fn<(error: unknown) => void>()) {
+function menu(
+	onError = vi.fn<(error: unknown) => void>(),
+	overrides: Partial<Parameters<typeof createColumnMenu>[0]> = {},
+) {
 	return createColumnMenu({
 		beforeSort: vi.fn<() => void>(),
 		getColumn: (id) => ({
@@ -37,15 +40,18 @@ function menu(onError = vi.fn<(error: unknown) => void>()) {
 			id,
 			toggleSorting: vi.fn<(descending: boolean, multiple: boolean) => void>(),
 		}),
+		getColumnOrder: () => ['select', 'branch', 'run-id'],
 		getOptionalColumns: () => optionalColumns,
 		getRows: () => [],
 		getRuns: () => runs,
 		onError,
 		onFilter: vi.fn<(id: string) => void>(),
 		onHide: vi.fn<(id: string) => Promise<void>>(),
+		onRemoveRuns: vi.fn<(ids: readonly string[]) => void>(),
 		onShow,
 		onSort: vi.fn<() => void>(),
 		pinned: () => ({ start: ['select'], end: [] }),
+		...overrides,
 	})
 }
 
@@ -91,6 +97,47 @@ describe('copying a column variable', () => {
 	])('enables Copy Variable for the %s column: %s', async (id, hasVariable) => {
 		await menu().show({ preventDefault: vi.fn() } as unknown as MouseEvent, id)
 		expect(showColumnMenu).toHaveBeenCalledWith(expect.objectContaining({ hasVariable }))
+	})
+})
+
+describe('clearing finished runs beside a run column', () => {
+	function run(id: string, finished: boolean): CommandRun {
+		return { command: id, concurrency: 1, createdAt: '', finished, id, results: {} }
+	}
+
+	const besideRuns = [run('a', true), run('b', false), run('c', true), run('d', true)]
+	// Columns are in display order, which can differ from the order the runs started
+	const order = ['select', 'd', 'branch', 'b', 'c', 'a']
+
+	function besideMenu(onRemoveRuns = vi.fn<(ids: readonly string[]) => void>()) {
+		return menu(undefined, { getColumnOrder: () => order, getRuns: () => besideRuns, onRemoveRuns })
+	}
+
+	it('clears only finished runs on the chosen side, in display order', () => {
+		const onRemoveRuns = vi.fn<(ids: readonly string[]) => void>()
+		besideMenu(onRemoveRuns).actions['column.clearFinishedLeft']('c')
+		besideMenu(onRemoveRuns).actions['column.clearFinishedRight']('b')
+		expect(onRemoveRuns.mock.calls).toEqual([[['d']], [['c', 'a']]])
+	})
+
+	it('clears nothing past the table edge or for an unknown column', () => {
+		const onRemoveRuns = vi.fn<(ids: readonly string[]) => void>()
+		besideMenu(onRemoveRuns).actions['column.clearFinishedRight']('a')
+		besideMenu(onRemoveRuns).actions['column.clearFinishedLeft']('missing')
+		besideMenu(onRemoveRuns).actions['column.clearFinishedLeft']()
+		expect(onRemoveRuns).not.toHaveBeenCalled()
+	})
+
+	it('offers the actions only for run columns, enabled when finished runs are beside it', async () => {
+		const rightClick = { preventDefault: vi.fn() } as unknown as MouseEvent
+		await besideMenu().show(rightClick, 'b')
+		await besideMenu().show(rightClick, 'a')
+		await besideMenu().show(rightClick, 'branch')
+		expect(showColumnMenu.mock.calls.map(([request]) => request)).toMatchObject([
+			{ hasFinishedRunsLeft: true, hasFinishedRunsRight: true, isRun: true },
+			{ hasFinishedRunsLeft: true, hasFinishedRunsRight: false, isRun: true },
+			{ isRun: false },
+		])
 	})
 })
 

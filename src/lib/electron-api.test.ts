@@ -13,10 +13,15 @@ describe('menu requests arriving over IPC', () => {
 			canHide: true,
 			canSort: true,
 			columnId: 'branch',
+			hasFinishedRunsLeft: false,
+			hasFinishedRunsRight: true,
 			hasSelection: false,
 			hasVariable: true,
+			isRun: true,
 		}
 		expect(isColumnMenuRequest(request)).toBe(true)
+		expect(isColumnMenuRequest({ ...request, isRun: undefined })).toBe(false)
+		expect(isColumnMenuRequest({ ...request, hasFinishedRunsLeft: 1 })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, hasVariable: undefined })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, hasVariable: 'true' })).toBe(false)
 	})
