@@ -196,6 +196,8 @@ function applyIdentity(repository: Repository, project: Project) {
 	repository.gitStatusAvailable = true
 	repository.ahead = project.ahead
 	repository.behind = project.behind
+	repository.upstream = project.upstream
+	repository.upstreamGone = project.upstreamGone
 	repository.lastCommitDate = project.lastCommitDate ?? ''
 }
 
@@ -316,12 +318,6 @@ async function applyGitSupplement(
 		'Git Dirty Files': repository.changedFiles,
 		'Latest Commit Date': repository.lastCommitDate,
 	})
-	if (!available) {
-		Object.assign(repository.metadata.values, {
-			'Git Remotes Ahead': repository.ahead,
-			'Git Remotes Behind': repository.behind,
-		})
-	}
 }
 
 function needsRefresh(state: MetadataState | undefined, group: MetadataGroup, force: boolean) {

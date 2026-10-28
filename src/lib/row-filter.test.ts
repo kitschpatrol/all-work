@@ -56,6 +56,8 @@ function repository(
 		remote: '',
 		repoName: id,
 		repoOwner: '',
+		upstream: '',
+		upstreamGone: false,
 		version: '',
 		...fields,
 	}

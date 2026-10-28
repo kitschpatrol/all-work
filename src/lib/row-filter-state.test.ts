@@ -24,6 +24,8 @@ function repository(id: string, changedFiles: number): Repository {
 		remote: '',
 		repoName: id,
 		repoOwner: '',
+		upstream: '',
+		upstreamGone: false,
 		version: '',
 	}
 }

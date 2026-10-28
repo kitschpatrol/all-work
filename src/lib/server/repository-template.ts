@@ -1,6 +1,21 @@
 import { defineTemplate, helpers, templates } from 'metascope'
 import { getRemoteRepository } from './repository-remote.js'
 
+type UpstreamStats = { upstreamAhead?: number; upstreamBehind?: number; upstreamBranch?: string }
+
+/**
+ * Compare with the upstream the current branch tracks. Metascope omits the
+ * counts when the upstream ref is missing locally.
+ */
+function getUpstream(gitStats: undefined | UpstreamStats) {
+	return {
+		ahead: gitStats?.upstreamAhead ?? 0,
+		behind: gitStats?.upstreamBehind ?? 0,
+		upstream: gitStats?.upstreamBranch ?? '',
+		upstreamGone: gitStats?.upstreamBranch !== undefined && gitStats.upstreamAhead === undefined,
+	}
+}
+
 /** Derive AllWork's project and repository fields from local Metascope sources. */
 export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const project = templates.project(context, templateData)
@@ -12,7 +27,7 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const identity = getRemoteRepository(remote ?? '')
 	return {
 		...project,
-		ahead: gitStats?.totalAhead ?? 0,
+		...getUpstream(gitStats),
 		available: {
 			ci: helpers.firstOf(context.githubActions) !== undefined,
 			code: helpers.firstOf(context.codeStats) !== undefined,
@@ -25,7 +40,6 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 				helpers.firstOf(context.obsidianPluginRegistry) !== undefined,
 			updates: helpers.firstOf(context.dependencyUpdates) !== undefined,
 		},
-		behind: gitStats?.totalBehind ?? 0,
 		branch: gitStats?.branchCurrent,
 		changedFiles: gitStats?.uncommittedFileCount,
 		frontmatter,

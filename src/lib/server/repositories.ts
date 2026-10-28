@@ -77,10 +77,15 @@ function readGitStatus(status: string, repository: Repository) {
 
 		if (entry.startsWith('# branch.head ')) {
 			repository.branch = entry.slice('# branch.head '.length)
+		} else if (entry.startsWith('# branch.upstream ')) {
+			repository.upstream = entry.slice('# branch.upstream '.length)
+			repository.upstreamGone = true
 		} else if (entry.startsWith('# branch.ab ')) {
+			// Git omits this line when the upstream ref is missing locally
 			const counts = branchCounts.exec(entry)
 			repository.ahead = Number(counts?.[1] ?? 0)
 			repository.behind = Number(counts?.[2] ?? 0)
+			repository.upstreamGone = false
 		} else if (changedEntry.test(entry)) {
 			repository.changedFiles++
 			skipRenameSource = entry.startsWith('2 ')
@@ -142,6 +147,8 @@ async function createRepository(
 		remote: '',
 		repoName: path.basename(directory),
 		repoOwner: '',
+		upstream: '',
+		upstreamGone: false,
 		version: '',
 	}
 	// Linked worktrees keep their effective config outside the repository directory.

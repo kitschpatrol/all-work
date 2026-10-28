@@ -49,6 +49,8 @@ const repository: Repository = {
 	remote: '',
 	repoName: 'right repo',
 	repoOwner: '',
+	upstream: '',
+	upstreamGone: false,
 	version: '',
 }
 const workspace: Workspace = {

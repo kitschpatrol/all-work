@@ -6,6 +6,7 @@ import {
 	getColumnDisplay,
 	getColumnEnvironment,
 	getColumnPreviewTooltip,
+	getColumnTooltip,
 	getColumnVariableName,
 	getColumnVariables,
 	getPendingCommandColumns,
@@ -30,6 +31,8 @@ const repository: Repository = {
 	remote: 'git@github.com:example/project.git',
 	repoName: 'project',
 	repoOwner: 'example',
+	upstream: 'origin/main',
+	upstreamGone: false,
 	version: '1.2.3',
 }
 
@@ -49,6 +52,8 @@ function outputRun(id: string, output: string): CommandRun {
 describe('column variables', () => {
 	it('sets counts as numbers, versions and locations as code, and prose, names, and booleans as text', () => {
 		const expected = {
+			ahead: 'number',
+			behind: 'number',
 			description: 'text',
 			'metadata:Author': 'text',
 			'metadata:Created': 'code',
@@ -127,6 +132,8 @@ describe('column variables', () => {
 				['ALLWORK_COLUMN_DESCRIPTION', 'Example project description'],
 				['ALLWORK_COLUMN_BRANCH', 'feature/example'],
 				['ALLWORK_COLUMN_WORKING_TREE', '4'],
+				['ALLWORK_COLUMN_AHEAD', '2'],
+				['ALLWORK_COLUMN_BEHIND', '3'],
 				['ALLWORK_COLUMN_SYNC', '5'],
 				['ALLWORK_COLUMN_LAST_COMMIT', '2026-10-15T12:00:00.000Z'],
 				['ALLWORK_COLUMN_VERSION', '1.2.3'],
@@ -149,7 +156,30 @@ describe('column variables', () => {
 		expect(unavailable.ALLWORK_COLUMN_VERSION).toBe('')
 		const clean = getColumnEnvironment({ ...repository, ahead: 0, behind: 0, changedFiles: 0 })
 		expect(clean.ALLWORK_COLUMN_WORKING_TREE).toBe('0')
+		expect(clean.ALLWORK_COLUMN_AHEAD).toBe('0')
 		expect(clean.ALLWORK_COLUMN_SYNC).toBe('0')
+	})
+
+	it('leaves upstream counts empty without an upstream or when its ref is missing', () => {
+		for (const environment of [
+			getColumnEnvironment({ ...repository, ahead: 0, behind: 0, upstream: '' }),
+			getColumnEnvironment({ ...repository, ahead: 0, behind: 0, upstreamGone: true }),
+		]) {
+			expect(environment.ALLWORK_COLUMN_AHEAD).toBe('')
+			expect(environment.ALLWORK_COLUMN_BEHIND).toBe('')
+			expect(environment.ALLWORK_COLUMN_SYNC).toBe('')
+		}
+	})
+
+	it('names the compared upstream in upstream count tooltips', () => {
+		expect(getColumnTooltip(repository, 'ahead')).toContain('Upstream: origin/main')
+		expect(getColumnTooltip({ ...repository, upstream: '' }, 'behind')).toContain(
+			'No upstream branch',
+		)
+		expect(getColumnTooltip({ ...repository, upstreamGone: true }, 'sync')).toContain(
+			'Upstream origin/main is missing locally',
+		)
+		expect(getColumnTooltip(repository, 'branch')).not.toContain('Upstream')
 	})
 
 	it('distinguishes repeated commands by current run number and includes exact multiline output', () => {
@@ -180,7 +210,10 @@ describe('column variables', () => {
 	it('names the variable for repository and run columns, and none for other columns', () => {
 		const runs = [outputRun('first', 'one'), outputRun('second', 'two')]
 		expect(getColumnVariableName('branch')).toBe('ALLWORK_COLUMN_BRANCH')
-		expect(getColumnVariableName('metadata:Git Remotes Ahead')).toBe('ALLWORK_COLUMN_AHEAD')
+		expect(getColumnVariableName('ahead')).toBe('ALLWORK_COLUMN_AHEAD')
+		expect(getColumnVariableName('metadata:Git Remotes Ahead')).toBe(
+			'ALLWORK_COLUMN_GIT_REMOTES_AHEAD',
+		)
 		expect(getColumnVariableName('second', runs)).toBe('ALLWORK_COLUMN_RUN_2')
 		expect(getColumnVariableName('select', runs)).toBeUndefined()
 		expect(getColumnVariableName('removed-run', runs)).toBeUndefined()

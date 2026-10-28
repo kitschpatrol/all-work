@@ -17,6 +17,29 @@ type RepositoryColumn = {
 	visible: boolean
 }
 
+const upstreamNote =
+	'Compared with the upstream branch as last fetched. Empty without an upstream or when its ref is missing locally.'
+
+const upstreamColumns = new Set(['ahead', 'behind', 'sync'])
+
+function describeUpstream(repository: Repository) {
+	if (!repository.gitStatusAvailable) {
+		return ''
+	}
+
+	return repository.upstream === ''
+		? 'No upstream branch'
+		: repository.upstreamGone
+			? `Upstream ${repository.upstream} is missing locally`
+			: `Upstream: ${repository.upstream}`
+}
+
+function upstreamCount(repository: Repository, count: number) {
+	return repository.gitStatusAvailable && repository.upstream !== '' && !repository.upstreamGone
+		? count
+		: ''
+}
+
 const existingColumns = [
 	{
 		header: 'Repository',
@@ -43,10 +66,23 @@ const existingColumns = [
 			repository.gitStatusAvailable ? repository.changedFiles : '',
 	},
 	{
+		header: 'Ahead',
+		id: 'ahead',
+		note: upstreamNote,
+		value: (repository: Repository) => upstreamCount(repository, repository.ahead),
+	},
+	{
+		header: 'Behind',
+		id: 'behind',
+		note: upstreamNote,
+		value: (repository: Repository) => upstreamCount(repository, repository.behind),
+	},
+	{
 		header: 'Sync',
 		id: 'sync',
+		note: upstreamNote,
 		value: (repository: Repository) =>
-			repository.gitStatusAvailable ? repository.ahead + repository.behind : '',
+			upstreamCount(repository, repository.ahead + repository.behind),
 	},
 	{
 		header: 'Last commit',
@@ -62,6 +98,9 @@ const existingColumns = [
 	{ header: 'Remote', id: 'remote', value: (repository: Repository) => repository.remote },
 ] as const
 
+const gitColumns = new Set(['ahead', 'behind', 'branch', 'changedFiles', 'lastCommitDate', 'sync'])
+const countColumns = new Set(['ahead', 'behind', 'changedFiles', 'sync'])
+
 const representedFields: Record<string, string> = {
 	Description: 'description',
 	'Git Current Branch': 'branch',
@@ -74,24 +113,15 @@ const representedFields: Record<string, string> = {
 export const repositoryColumns: RepositoryColumn[] = [
 	...existingColumns.map((column): RepositoryColumn => ({
 		...column,
-		category: ['branch', 'changedFiles', 'lastCommitDate', 'sync'].includes(column.id)
-			? 'Git'
-			: 'Identity',
-		display:
-			column.id === 'sync'
-				? 'number'
-				: ['packageManager', 'remote', 'version'].includes(column.id)
-					? 'code'
-					: 'text',
-		field: Object.entries(representedFields).find(([, id]) => id === column.id)?.[0],
-		group: ['branch', 'changedFiles', 'lastCommitDate', 'sync'].includes(column.id)
-			? 'git'
-			: 'local',
-		kind: ['changedFiles', 'sync'].includes(column.id)
+		category: gitColumns.has(column.id) ? 'Git' : 'Identity',
+		display: upstreamColumns.has(column.id)
 			? 'number'
-			: column.id === 'lastCommitDate'
-				? 'date'
+			: ['packageManager', 'remote', 'version'].includes(column.id)
+				? 'code'
 				: 'text',
+		field: Object.entries(representedFields).find(([, id]) => id === column.id)?.[0],
+		group: gitColumns.has(column.id) ? 'git' : 'local',
+		kind: countColumns.has(column.id) ? 'number' : column.id === 'lastCommitDate' ? 'date' : 'text',
 		sort: 'alphanumeric',
 		visible: !['packageManager', 'remote', 'sync'].includes(column.id),
 	})),
@@ -99,20 +129,13 @@ export const repositoryColumns: RepositoryColumn[] = [
 		.filter(({ field }) => representedFields[field] === undefined)
 		.map((column): RepositoryColumn => ({
 			...column,
-			header:
-				column.field === 'Git Remotes Ahead'
-					? 'Ahead'
-					: column.field === 'Git Remotes Behind'
-						? 'Behind'
-						: column.field,
+			header: column.field,
 			id: `metadata:${column.field}`,
 			value(repository) {
 				const value = repository.metadata?.values[column.field]
 				return Array.isArray(value) ? metadataText(value) : value
 			},
-			visible:
-				column.visible === true ||
-				['Git Remotes Ahead', 'Git Remotes Behind'].includes(column.field),
+			visible: column.visible === true,
 		})),
 ]
 
@@ -248,6 +271,7 @@ export function getColumnTooltip(repository: Repository, columnId: string): stri
 	return [
 		String(column.value(repository) ?? ''),
 		metadataHint(repository, column.group),
+		upstreamColumns.has(columnId) ? describeUpstream(repository) : '',
 		column.note ?? '',
 	]
 		.filter(Boolean)

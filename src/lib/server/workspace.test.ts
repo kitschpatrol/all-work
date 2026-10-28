@@ -108,6 +108,7 @@ beforeAll(async () => {
 	await git(nested, ['remote', 'add', 'backup', 'https://gitlab.com/team/backup.git'])
 	await git(nested, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
 	await git(nested, ['update-ref', 'refs/remotes/backup/main', 'HEAD'])
+	await git(nested, ['branch', '--set-upstream-to=origin/main'])
 	await git(nested, [
 		'-c',
 		'user.name=AllWork Test',
@@ -127,6 +128,8 @@ beforeAll(async () => {
 		'worktree-test',
 		path.join(temporaryDirectory, 'linked-worktree'),
 	])
+	await git(first, ['config', 'branch.worktree-test.remote', 'origin'])
+	await git(first, ['config', 'branch.worktree-test.merge', 'refs/heads/deleted'])
 	await symlink(first, path.join(temporaryDirectory, 'symlinked-repository'))
 	workspace = await scanWorkspace(temporaryDirectory)
 	await vi.waitFor(
@@ -298,17 +301,35 @@ describe('repository discovery and Metascope metadata', () => {
 		})
 	})
 
-	it('uses Metascope totals across cached remotes, including without a configured upstream', () => {
+	it('compares with the tracked upstream only, keeping totals across remotes as metadata', () => {
 		const repository = workspace.repositories.find(
 			(candidate) => candidate.relativePath === 'group/plain-git',
 		)
 		expect(repository).toMatchObject({
-			ahead: 2,
+			ahead: 1,
 			behind: 0,
 			branch: 'main',
 			changedFiles: 0,
 			gitStatusAvailable: true,
+			upstream: 'origin/main',
+			upstreamGone: false,
 		})
+		expect(repository?.metadata?.values).toMatchObject({
+			'Git Remotes Ahead': 2,
+			'Git Remotes Behind': 0,
+		})
+	})
+
+	it('flags an upstream whose ref is missing locally, and repositories without one', () => {
+		const byPath = (relativePath: string) =>
+			workspace.repositories.find((candidate) => candidate.relativePath === relativePath)
+		expect(byPath('linked-worktree')).toMatchObject({
+			ahead: 0,
+			behind: 0,
+			upstream: 'origin/deleted',
+			upstreamGone: true,
+		})
+		expect(byPath('project with spaces')).toMatchObject({ upstream: '', upstreamGone: false })
 	})
 	it('keeps repository identifiers stable when metadata is refreshed', async () => {
 		const refreshed = await scanWorkspace(temporaryDirectory)
@@ -365,7 +386,12 @@ describe('parallel command runs', () => {
 						['ALLWORK_COLUMN_DESCRIPTION', repository.description],
 						['ALLWORK_COLUMN_BRANCH', repository.branch],
 						['ALLWORK_COLUMN_WORKING_TREE', String(repository.changedFiles)],
-						['ALLWORK_COLUMN_SYNC', String(repository.ahead + repository.behind)],
+						[
+							'ALLWORK_COLUMN_SYNC',
+							repository.upstream === '' || repository.upstreamGone
+								? ''
+								: String(repository.ahead + repository.behind),
+						],
 						['ALLWORK_COLUMN_LAST_COMMIT', repository.lastCommitDate],
 						['ALLWORK_COLUMN_VERSION', repository.version],
 						['ALLWORK_COLUMN_PACKAGE_MANAGER', repository.packageManager],

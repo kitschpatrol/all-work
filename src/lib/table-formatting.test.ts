@@ -32,6 +32,8 @@ function repository(
 		remote: '',
 		repoName: id,
 		repoOwner: '',
+		upstream: 'origin/main',
+		upstreamGone: false,
 		version: '',
 	}
 }
@@ -58,13 +60,15 @@ describe('getColumnCopyLines', () => {
 		const clean = repository('clean')
 		const dirty = { ...repository('dirty'), ahead: 2, changedFiles: 3, version: '1.2.0' }
 		const unknown = { ...repository('unknown'), branch: '', gitStatusAvailable: false }
-		const rows = [clean, dirty, unknown]
-		expect(getColumnCopyLines(rows, 'name', [])).toBe('clean\ndirty\nunknown')
-		expect(getColumnCopyLines(rows, 'branch', [])).toBe('main\nmain\n')
-		expect(getColumnCopyLines(rows, 'changedFiles', [])).toBe('Clean\n3 Changed\n')
-		expect(getColumnCopyLines(rows, 'sync', [])).toBe('↑0 ↓0\n↑2 ↓0\n')
-		expect(getColumnCopyLines(rows, 'version', [])).toBe('\n1.2.0\n')
-		expect(getColumnCopyLines(rows, 'lastCommitDate', [])).toBe('\n\n')
+		const untracked = { ...repository('untracked'), upstream: '' }
+		const rows = [clean, dirty, unknown, untracked]
+		expect(getColumnCopyLines(rows, 'name', [])).toBe('clean\ndirty\nunknown\nuntracked')
+		expect(getColumnCopyLines(rows, 'branch', [])).toBe('main\nmain\n\nmain')
+		expect(getColumnCopyLines(rows, 'changedFiles', [])).toBe('Clean\n3 Changed\n\nClean')
+		expect(getColumnCopyLines(rows, 'sync', [])).toBe('↑0 ↓0\n↑2 ↓0\n\n')
+		expect(getColumnCopyLines(rows, 'ahead', [])).toBe('0\n2\n\n')
+		expect(getColumnCopyLines(rows, 'version', [])).toBe('\n1.2.0\n\n')
+		expect(getColumnCopyLines(rows, 'lastCommitDate', [])).toBe('\n'.repeat(3))
 	})
 
 	it('copies command output for run columns', () => {

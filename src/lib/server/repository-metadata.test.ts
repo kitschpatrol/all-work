@@ -41,6 +41,8 @@ function fixture(): Workspace {
 		remote: '',
 		repoName: 'fixture',
 		repoOwner: '',
+		upstream: '',
+		upstreamGone: false,
 		version: '',
 	}
 	return {

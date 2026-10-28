@@ -43,6 +43,8 @@ describe('opening selected repositories', () => {
 		remote: '',
 		repoName: '',
 		repoOwner: '',
+		upstream: '',
+		upstreamGone: false,
 		version: '',
 	}
 

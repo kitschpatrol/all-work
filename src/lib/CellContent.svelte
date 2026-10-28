@@ -62,9 +62,7 @@
 				: 'Clean'
 			: getMetadataPlaceholder(repository, 'changedFiles')}</span
 	>
-{:else if columnId === 'sync'}<span
-		class="sync-value"
-		title={`${tooltip}\nTotals across locally cached remotes; no fetch is performed`}
+{:else if columnId === 'sync'}<span class="sync-value" title={tooltip}
 		>{repository.ahead > 0 || repository.behind > 0
 			? `↑${repository.ahead} ↓${repository.behind}`
 			: '—'}</span

@@ -35,6 +35,13 @@ export type Repository = {
 	remote: string
 	repoName: string
 	repoOwner: string
+	/**
+	 * Upstream the current branch tracks, such as `origin/main`, or empty without
+	 * one.
+	 */
+	upstream: string
+	/** Whether the upstream is configured but its ref is missing locally. */
+	upstreamGone: boolean
 	version: string
 }
 
