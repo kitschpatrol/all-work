@@ -122,7 +122,7 @@ describe('progressive Metascope metadata', () => {
 		expect(calls[1]?.[0]?.sources).toEqual(['gitStats'])
 		expect(calls[2]?.[0]?.sources).toEqual(['codeStats'])
 		expect(calls[3]?.[0]?.sources).toEqual(['fileStats'])
-		expect(calls.every(([options]) => options?.offline === true)).toBe(true)
+		expect(calls.every(([options]) => options.offline === true)).toBe(true)
 	})
 
 	it('leaves skipped flags and update counts unknown, and retains narrow Git fallbacks', async () => {
@@ -142,7 +142,7 @@ describe('progressive Metascope metadata', () => {
 		let totalFiles = 42
 		vi.mocked(extractMetadata).mockImplementation(async (options) => {
 			await Promise.resolve()
-			return options?.sources?.includes('fileStats') === true
+			return options.sources?.includes('fileStats') === true
 				? context({
 						fileStats: {
 							data: { totalFileCount: totalFiles, totalSizeBytes: 1024 },
@@ -419,7 +419,7 @@ describe('progressive Metascope metadata', () => {
 		const order = vi
 			.mocked(extractMetadata)
 			.mock.calls.slice(baseline)
-			.map(([options]) => options?.path?.slice(original.path.length + 1))
+			.map(([options]) => options.path?.slice(original.path.length + 1))
 		expect(order).toEqual(['0', '1', '2', '3', '8', '9', '10', '11', '7', '4', '5', '6'])
 		for (const resolve of pending.splice(0)) {
 			resolve()
