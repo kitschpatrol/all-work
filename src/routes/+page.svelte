@@ -277,9 +277,6 @@
 	})
 	const targets = $derived(visibleRepositories.filter((row) => rowSelection[row.id]))
 	const previewRepository = $derived(targets[0]?.original ?? visibleRepositories[0]?.original)
-	const selectedCount = $derived(
-		workspace === undefined ? 0 : Object.values(rowSelection).filter(Boolean).length,
-	)
 	const activeRuns = $derived(runs.filter((run) => !run.finished))
 	const dirtyCount = $derived(
 		workspace?.repositories.filter((repository) => repository.changedFiles > 0).length ?? 0,
@@ -714,9 +711,7 @@
 
 	async function refreshMetadata(
 		groups: MetadataGroup[],
-		repositoryIds = workspace?.repositories
-			.filter((repository) => rowSelection[repository.id])
-			.map((repository) => repository.id) ?? [],
+		repositoryIds = targets.map((row) => row.id),
 	) {
 		if (workspace === undefined || repositoryIds.length === 0) {
 			return
@@ -1269,13 +1264,13 @@
 					<MetadataControls
 						{columnPresets}
 						columns={optionalColumns}
-						disabled={loading || selectedCount === 0}
+						disabled={loading || targets.length === 0}
 						onRefresh={refreshMetadata}
 						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
 						onVisibilityAll={async (visible: boolean) =>
 							setColumnsVisible(optionalColumnIds, visible)}
 						onVisibilityMany={setColumnsVisible}
-						{selectedCount}
+						selectedCount={targets.length}
 					/>
 				</div>
 			</div>
@@ -1485,11 +1480,7 @@
 					</div>{/if}
 			</div>
 			<footer class="table-footer">
-				<span class="selection-count" aria-live="polite"
-					>{selectedCount} selected{selectedCount > targets.length
-						? ` · ${selectedCount - targets.length} hidden`
-						: ''}</span
-				>
+				<span class="selection-count" aria-live="polite">{targets.length} selected</span>
 				<span
 					>{visibleRepositories.length} of {workspace?.repositories.length ?? 0} repositories
 					<span class="caption-divider">·</span>
