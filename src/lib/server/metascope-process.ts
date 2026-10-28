@@ -11,7 +11,9 @@ import { execa } from 'execa'
 // credentials, travel over IPC rather than as command-line arguments.
 const scanner = `
 const ready = import(process.argv[1]).then(({ getMetadata, setLogger }) => {
-  setLogger({ log() {}, info() {}, warn() {}, error() {}, debug() {} })
+  // Without a logger, Metascope logs nothing. A partial console-like object
+  // instead turns on its debug output.
+  setLogger()
   return getMetadata
 })
 process.on('disconnect', () => process.exit())
