@@ -17,7 +17,15 @@
 		}),
 	)
 
+	// The main process rebuilds the whole menu for each update, so send only changes
+	let sent = ''
 	$effect(() => {
+		const next = JSON.stringify(state)
+		if (next === sent) {
+			return
+		}
+
+		sent = next
 		globalThis._allWork?.updateMenuState(state)
 	})
 </script>
