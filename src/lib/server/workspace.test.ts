@@ -491,6 +491,32 @@ describe('parallel command runs', () => {
 		expect(getRun(run.id)).toBe(run)
 	})
 
+	it('reports each repository as its command finishes', async () => {
+		const finished: string[] = []
+		const run = startRun('printf done', repositories, 2, 1, [], (repository) => {
+			finished.push(repository.id)
+		})
+		runIds.push(run.id)
+		await waitForRun(run)
+		expect(finished.toSorted()).toEqual(repositories.map((repository) => repository.id).toSorted())
+	})
+
+	it('reports only repositories whose commands started before a stop', async () => {
+		const finished: string[] = []
+		const run = startRun('printf started; sleep 30', repositories, 1, 1, [], (repository) => {
+			finished.push(repository.id)
+		})
+		runIds.push(run.id)
+		await vi.waitFor(() =>
+			expect(Object.values(run.results).some((result) => result.output.includes('started'))).toBe(
+				true,
+			),
+		)
+		stopRun(run.id)
+		await waitForRun(run)
+		expect(finished).toHaveLength(1)
+	})
+
 	it('preserves shell operators, quoting, and Unicode output', async () => {
 		const run = startRun(
 			String.raw`printf '%s\n' 'café $HOME "quotes"' | cat && printf '%s\n' '日本語' >&2`,

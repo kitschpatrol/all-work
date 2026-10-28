@@ -15,6 +15,7 @@ type Job = {
 	deleted: boolean
 	environments: Map<string, Record<string, string>>
 	listeners: Set<(event: RunEvent) => void>
+	onFinished?: (repository: Repository) => void
 	run: CommandRun
 }
 
@@ -108,12 +109,14 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 		job.environments.delete(repository.id)
 		result.duration = Date.now() - started
 		emit(job, { result, type: 'result' })
+		job.onFinished?.(repository)
 	}
 }
 
 /**
  * Start a bounded parallel shell run, keeping each repository's output
- * independent.
+ * independent. `onFinished` hears each repository whose command started, as
+ * that command finishes.
  */
 export function startRun(
 	command: string,
@@ -121,6 +124,7 @@ export function startRun(
 	concurrency: number,
 	number: number,
 	sourceRuns: readonly CommandRun[] = [],
+	onFinished?: (repository: Repository) => void,
 ): CommandRun {
 	const run: CommandRun = {
 		command,
@@ -152,6 +156,7 @@ export function startRun(
 			]),
 		),
 		listeners: new Set(),
+		onFinished,
 		run,
 	}
 	jobs.set(run.id, job)

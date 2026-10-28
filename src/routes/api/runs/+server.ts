@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit'
 import { getPendingCommandColumns } from '#lib/column-variables.js'
 import { getRun, startRun } from '#lib/server/commands.js'
-import { getWorkspace } from '#lib/server/repositories.js'
+import { getWorkspace, requestWorkspaceMetadata } from '#lib/server/repositories.js'
 import { readRequest } from '#lib/server/request.js'
 import { isRunNumber } from '#lib/server/run-cache.js'
 import type { RequestHandler } from './$types'
@@ -71,8 +71,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		)
 	}
 
+	// A command may commit, switch branches, or change files, so each
+	// repository's Git status refreshes as its command finishes
 	return Response.json(
-		startRun(body.command.trim(), repositories, concurrency, number, sourceRuns),
+		startRun(body.command.trim(), repositories, concurrency, number, sourceRuns, (repository) => {
+			requestWorkspaceMetadata(workspace.id, [repository.id], ['git'], true)
+		}),
 		{
 			status: 201,
 		},
