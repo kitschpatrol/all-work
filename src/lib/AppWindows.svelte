@@ -1,30 +1,55 @@
 <script lang="ts">
-	import type { AppWindow } from './app-windows.js'
+	import { onMount } from 'svelte'
+	import type { AppWindow, OutputTarget } from './app-windows.js'
 	import type { Preferences } from './preferences.js'
-	import { openElectronWindow } from './app-windows.js'
+	import type { CommandRun, Repository } from './workspace.js'
+	import { getOutputNeighbors, openElectronWindow } from './app-windows.js'
 	import OutputPanel from './OutputPanel.svelte'
 	import PreferencesPanel from './PreferencesPanel.svelte'
+	import { listenForWindowMessages, postWindowMessage } from './window-messages.js'
 
 	/**
 	 * Opens preferences and run output: as native windows in the Electron app,
 	 * where the application menu provides the shortcuts, or as dialogs over the
-	 * page in a browser.
+	 * page in a browser. Tells output windows and dialogs which results sit
+	 * beside theirs in the table, so they can step between them.
 	 */
 	const {
 		isElectron,
 		onError,
 		onPreferences,
 		onResetView,
+		rows,
+		runs,
 	}: {
 		isElectron: boolean
 		onError: (error: unknown) => void
 		onPreferences: (preferences: Preferences) => void
 		onResetView: (clearHistory: boolean) => void
+		/** The table's rows in display order, for stepping between results. */
+		rows: readonly Repository[]
+		runs: readonly CommandRun[]
 	} = $props()
 	let preferencesDialog = $state<HTMLDialogElement>()
 	let outputDialog = $state<HTMLDialogElement>()
 	let preferencesOpen = $state(false)
 	let output = $state<Extract<AppWindow, { kind: 'output' }>>()
+
+	function getNeighbors(target: { repositoryId: string; runId: string }) {
+		return getOutputNeighbors(
+			rows,
+			runs.find((run) => run.id === target.runId),
+			target.repositoryId,
+		)
+	}
+
+	onMount(() =>
+		listenForWindowMessages((message) => {
+			if (message.type === 'output-neighbors-request') {
+				postWindowMessage({ ...message, ...getNeighbors(message), type: 'output-neighbors' })
+			}
+		}),
+	)
 
 	/**
 	 * Open the target, bringing an existing Electron window forward instead of
@@ -95,7 +120,11 @@
 	>
 		{#if output !== undefined}<OutputPanel
 				name={output.name}
+				neighbors={getNeighbors(output)}
 				onClose={() => outputDialog?.close()}
+				onNavigate={(target: OutputTarget) => {
+					output = { kind: 'output', ...target }
+				}}
 				path={output.path}
 				repositoryId={output.repositoryId}
 				runId={output.runId}

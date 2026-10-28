@@ -1981,6 +1981,13 @@ tr.selected
 	background: #f7f7f7;
 }
 
+.window-toolbar-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+
 .full-output {
 	overflow: auto;
 	flex: 1;

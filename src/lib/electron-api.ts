@@ -82,10 +82,12 @@ export type MenuState = {
 	visibleCount: number
 }
 
-/** A secondary window the renderer asks Electron to open, sized by the caller. */
+/**
+ * A secondary window the renderer asks Electron to open, sized by the caller. A
+ * window already showing the same address is brought forward instead.
+ */
 export type AppWindowRequest = {
 	height: number
-	name: string
 	resizable: boolean
 	url: string
 	width: number
@@ -134,8 +136,6 @@ export function isAppWindowRequest(value: unknown): value is AppWindowRequest {
 		typeof request.height === 'number' &&
 		request.height >= 200 &&
 		request.height <= 4000 &&
-		typeof request.name === 'string' &&
-		request.name !== '' &&
 		typeof request.resizable === 'boolean' &&
 		typeof request.url === 'string' &&
 		request.url.startsWith('/') &&

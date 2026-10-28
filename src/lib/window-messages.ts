@@ -1,17 +1,62 @@
+import type { OutputNeighbors, OutputTarget } from './app-windows.js'
 import type { Preferences } from './preferences.js'
 import { asRecord, parsePreferences } from './preferences.js'
 
 /** Messages exchanged between the main page and its secondary windows. */
 export type WindowMessage =
+	| (OutputNeighbors & { repositoryId: string; runId: string; type: 'output-neighbors' })
 	| { clearHistory: boolean; type: 'reset-view' }
 	| { preferences: Preferences; type: 'preferences-changed' }
+	| { repositoryId: string; runId: string; type: 'output-neighbors-request' }
 	| { runId: string; type: 'run-removed' }
 
 const CHANNEL = 'allwork-windows'
 
+function isString(value: unknown): value is string {
+	return typeof value === 'string'
+}
+
+function parseOutputTarget(value: unknown): OutputTarget | undefined {
+	const record = asRecord(value)
+	return record !== undefined &&
+		isString(record.name) &&
+		isString(record.path) &&
+		isString(record.repositoryId) &&
+		isString(record.runId)
+		? {
+				name: record.name,
+				path: record.path,
+				repositoryId: record.repositoryId,
+				runId: record.runId,
+			}
+		: undefined
+}
+
 function parseWindowMessage(value: unknown): undefined | WindowMessage {
 	const record = asRecord(value)
 	switch (record?.type) {
+		case 'output-neighbors': {
+			return isString(record.repositoryId) && isString(record.runId)
+				? {
+						next: parseOutputTarget(record.next),
+						previous: parseOutputTarget(record.previous),
+						repositoryId: record.repositoryId,
+						runId: record.runId,
+						type: 'output-neighbors',
+					}
+				: undefined
+		}
+
+		case 'output-neighbors-request': {
+			return isString(record.repositoryId) && isString(record.runId)
+				? {
+						repositoryId: record.repositoryId,
+						runId: record.runId,
+						type: 'output-neighbors-request',
+					}
+				: undefined
+		}
+
 		case 'preferences-changed': {
 			return { preferences: parsePreferences(record.preferences), type: 'preferences-changed' }
 		}

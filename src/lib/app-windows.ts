@@ -1,34 +1,55 @@
 import type { AppWindowRequest } from './electron-api.js'
+import type { CommandRun, Repository } from './workspace.js'
+
+/** One repository's result in a run, as an output window shows it. */
+export type OutputTarget = { name: string; path: string; repositoryId: string; runId: string }
+
+/** The results before and after an output window's own, in table order. */
+export type OutputNeighbors = { next: OutputTarget | undefined; previous: OutputTarget | undefined }
 
 /** Secondary windows the main page can open. */
-export type AppWindow =
-	| { kind: 'output'; name: string; path: string; repositoryId: string; runId: string }
-	| { kind: 'preferences' }
+export type AppWindow = (OutputTarget & { kind: 'output' }) | { kind: 'preferences' }
 
-function describeWindow(target: AppWindow): AppWindowRequest {
-	if (target.kind === 'preferences') {
-		return {
-			height: 720,
-			name: 'allwork-preferences',
-			resizable: false,
-			url: '/preferences',
-			width: 520,
-		}
-	}
-
+/** The output window's address for a result. */
+export function outputWindowUrl(target: OutputTarget): string {
 	const params = new URLSearchParams({
 		name: target.name,
 		path: target.path,
 		repository: target.repositoryId,
 		run: target.runId,
 	})
-	return {
-		height: 640,
-		name: `allwork-output-${target.runId}-${target.repositoryId}`,
-		resizable: true,
-		url: `/output?${params.toString()}`,
-		width: 900,
-	}
+	return `/output?${params.toString()}`
+}
+
+/**
+ * Find the results beside a repository's result, skipping rows the run did not
+ * include. A repository missing from the rows has no neighbors.
+ *
+ * @param rows The table's rows in display order.
+ * @param run The run whose results are being stepped through.
+ * @param repositoryId The repository whose result is shown.
+ */
+export function getOutputNeighbors(
+	rows: readonly Repository[],
+	run: CommandRun | undefined,
+	repositoryId: string,
+): OutputNeighbors {
+	const withResults =
+		run === undefined ? [] : rows.filter((row) => Object.hasOwn(run.results, row.id))
+	const index = withResults.findIndex((row) => row.id === repositoryId)
+	const target = (row: Repository | undefined) =>
+		row === undefined || run === undefined
+			? undefined
+			: { name: row.name, path: row.path, repositoryId: row.id, runId: run.id }
+	return index === -1
+		? { next: undefined, previous: undefined }
+		: { next: target(withResults[index + 1]), previous: target(withResults[index - 1]) }
+}
+
+function describeWindow(target: AppWindow): AppWindowRequest {
+	return target.kind === 'preferences'
+		? { height: 720, resizable: false, url: '/preferences', width: 520 }
+		: { height: 640, resizable: true, url: outputWindowUrl(target), width: 900 }
 }
 
 /**

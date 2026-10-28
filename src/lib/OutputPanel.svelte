@@ -1,22 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
 	import { on } from 'svelte/events'
+	import type { OutputNeighbors, OutputTarget } from './app-windows.js'
 	import type { CommandRun, StreamEvent } from './workspace.js'
 
 	/**
 	 * Live output for one repository in one run, shared by the Electron output
 	 * window and the in-page dialog. Subscribes to the run's event stream on its
-	 * own, so it needs nothing from the main page.
+	 * own; the main page only supplies the neighboring results to step to.
 	 */
 	const {
 		name,
+		neighbors,
 		onClose,
+		onNavigate,
 		path,
 		repositoryId,
 		runId,
 	}: {
 		name: string
+		neighbors: OutputNeighbors
 		onClose?: () => void
+		onNavigate: (target: OutputTarget) => void
 		path: string
 		repositoryId: string
 		runId: string
@@ -58,6 +63,12 @@
 		}
 	})
 
+	function step(target: OutputTarget | undefined) {
+		if (target !== undefined) {
+			onNavigate(target)
+		}
+	}
+
 	async function copyOutput() {
 		try {
 			await navigator.clipboard.writeText(result?.output ?? '')
@@ -91,14 +102,38 @@
 				? ''
 				: ` · exit ${result.exitCode}`}</span
 		>
-		<button class="button subtle" disabled={result === undefined} onclick={copyOutput} type="button"
-			>Copy output</button
-		>
+		<div class="window-toolbar-actions">
+			<button
+				class="button subtle"
+				disabled={neighbors.previous === undefined}
+				onclick={() => {
+					step(neighbors.previous)
+				}}
+				title={neighbors.previous?.name}
+				type="button">Previous result</button
+			>
+			<button
+				class="button subtle"
+				disabled={neighbors.next === undefined}
+				onclick={() => {
+					step(neighbors.next)
+				}}
+				title={neighbors.next?.name}
+				type="button">Next result</button
+			>
+			<button
+				class="button subtle"
+				disabled={result === undefined}
+				onclick={copyOutput}
+				type="button">Copy output</button
+			>
+		</div>
 	</div>
 	{#if message !== ''}<div class="message error" role="alert"><span>{message}</span></div>{/if}
-	<pre class="full-output">{result === undefined || result.output === ''
-			? 'No output yet.'
-			: result.output}{result?.truncated === true
-			? '\n\n[Output truncated at 128,000 characters. The command continues to run.]'
-			: ''}</pre>
+	<!-- Stepping to another result starts its output at the top -->
+	{#key repositoryId}<pre class="full-output">{result === undefined || result.output === ''
+				? 'No output yet.'
+				: result.output}{result?.truncated === true
+				? '\n\n[Output truncated at 128,000 characters. The command continues to run.]'
+				: ''}</pre>{/key}
 </div>

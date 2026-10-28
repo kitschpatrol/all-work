@@ -1122,6 +1122,8 @@
 		void applyPreferences(next)
 	}}
 	onResetView={resetFromWindow}
+	rows={visibleRepositories.map((row) => row.original)}
+	{runs}
 />
 
 <ViewPersistence

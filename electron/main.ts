@@ -29,8 +29,9 @@ setDefaultLogOptions({ logJsonToFile: true, name: 'AllWork' })
 let isQuitting = false
 
 let mainWindow: BrowserWindow | undefined
-// Preferences and output windows, keyed by the name the renderer asked for
-const secondaryWindows = new Map<string, BrowserWindow>()
+// Preferences and output windows. Output windows step between results, so they
+// are found by the address they show now rather than the one they opened with.
+const secondaryWindows = new Set<BrowserWindow>()
 
 const webPreferences = {
 	contextIsolation: true,
@@ -94,8 +95,22 @@ function createWindow(appUrl: URL): void {
 	})
 }
 
+/** The path and query of a URL, with its parameters in a stable order. */
+function getAddress(url: string, base: URL): string | undefined {
+	const parsed = URL.parse(url, base)
+	if (parsed === null) {
+		return undefined
+	}
+
+	parsed.searchParams.sort()
+	return `${parsed.pathname}${parsed.search}`
+}
+
 function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
-	const existing = secondaryWindows.get(request.name)
+	const address = getAddress(request.url, appUrl)
+	const existing = [...secondaryWindows].find(
+		(window) => getAddress(window.webContents.getURL(), appUrl) === address,
+	)
 	if (existing !== undefined) {
 		existing.show()
 		existing.focus()
@@ -115,9 +130,9 @@ function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
 	})
 	window.menuBarVisible = false
 	guardNavigation(window)
-	secondaryWindows.set(request.name, window)
+	secondaryWindows.add(window)
 	window.on('closed', () => {
-		secondaryWindows.delete(request.name)
+		secondaryWindows.delete(window)
 	})
 	void window.loadURL(new URL(request.url, appUrl).href)
 }
