@@ -27,7 +27,7 @@
 		"build": "svelte-kit sync && vite build && electron-vite build",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.build.json --watch",
-		"clean-deep": "shx rm -f pnpm-lock.yaml && git clean -fdX -e !.claude/",
+		"clean-deep": "shx rm -f pnpm-lock.yaml && git clean -fdX",
 		"dev": "poptab && vite dev --host 127.0.0.1 --open",
 		"dev:electron": "electron-vite dev",
 		"electron:build": "pnpm build && electron-builder",
