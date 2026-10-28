@@ -31,6 +31,8 @@ const edgeZone = 32
 const maxScrollStep = 16
 const slideOptions: KeyframeAnimationOptions = { duration: 150, easing: 'ease-out' }
 let latestDrag = 0
+// Running slides by column, replaced without asking every cell for its animations
+const slides = new Map<string, Animation[]>()
 
 function columnElements(scroller: HTMLElement, id: string) {
 	return [...scroller.querySelectorAll<HTMLElement>(`[data-column-id="${CSS.escape(id)}"]`)]
@@ -41,13 +43,30 @@ function headerLeft(scroller: HTMLElement, id: string) {
 		.left
 }
 
-function slide(elements: HTMLElement[], from: number) {
-	return elements.map((element) =>
+function cancelSlide(id: string) {
+	const running = slides.get(id) ?? []
+	for (const animation of running) {
+		animation.cancel()
+	}
+
+	slides.delete(id)
+}
+
+function slide(scroller: HTMLElement, id: string, from: number) {
+	cancelSlide(id)
+	const animations = columnElements(scroller, id).map((element) =>
 		element.animate(
 			[{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }],
 			slideOptions,
 		),
 	)
+	slides.set(id, animations)
+	void Promise.allSettled(animations.map(async (animation) => animation.finished)).then(() => {
+		if (slides.get(id) === animations) {
+			slides.delete(id)
+		}
+	})
+	return animations
 }
 
 function totalWidth(columns: Layout['columns']) {
@@ -107,6 +126,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	let offset = 0
 	let drag: number | undefined
 	let frame: number | undefined
+	// Measured once as the drag begins, so each frame avoids a forced layout
+	let bounds = new DOMRect()
 
 	function setOffset(next: number) {
 		offset = next
@@ -116,7 +137,6 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	}
 
 	function autoScroll(current: Layout) {
-		const bounds = scroller.getBoundingClientRect()
 		const leftEdge = bounds.left + current.startWidth + edgeZone
 		const rightEdge = bounds.right - current.endWidth - edgeZone
 		const depth = pointerX < leftEdge ? pointerX - leftEdge : Math.max(0, pointerX - rightEdge)
@@ -139,15 +159,10 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		)
 		void tick().then(() => {
 			for (const [columnId, left] of before) {
-				const elements = columnElements(scroller, columnId)
-				const running = elements.flatMap((element) => element.getAnimations())
-				for (const animation of running) {
-					animation.cancel()
-				}
-
+				cancelSlide(columnId)
 				const after = headerLeft(scroller, columnId)
 				if (left !== undefined && after !== undefined && Math.abs(left - after) >= 1) {
-					slide(elements, left - after)
+					slide(scroller, columnId, left - after)
 				}
 			}
 		})
@@ -199,6 +214,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		latestDrag += 1
 		drag = latestDrag
+		bounds = scroller.getBoundingClientRect()
 		originLeft = current.startWidth + totalWidth(current.columns.slice(0, index))
 		document.documentElement.classList.add('column-dragging')
 		options.onDragging(id)
@@ -225,7 +241,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		suppressNextClick()
 		const settling = offset
 		setOffset(0)
-		const animations = settling === 0 ? [] : slide(columnElements(scroller, id), settling)
+		const animations = settling === 0 ? [] : slide(scroller, id, settling)
 		void Promise.allSettled(animations.map(async (animation) => animation.finished)).then(() => {
 			// A newer drag owns the dragging state now
 			if (settled === latestDrag) {
