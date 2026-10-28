@@ -656,7 +656,10 @@
 						}
 					}
 
-					tableRows.changed()
+					// Loading states alone change no values the filter or sort read
+					if (event.repositories.length > 0) {
+						tableRows.changed()
+					}
 				}
 
 				scheduleMetadata()
