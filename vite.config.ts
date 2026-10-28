@@ -11,6 +11,26 @@ export default defineConfig({
 		}),
 	],
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}'],
+		projects: [
+			{
+				extends: true,
+				test: {
+					exclude: ['src/**/*.svelte.test.ts'],
+					include: ['src/**/*.{test,spec}.{js,ts}'],
+					name: 'node',
+				},
+			},
+			// Rune tests run Svelte's client runtime, where effects run and derived values memoize
+			{
+				extends: true,
+				resolve: { conditions: ['browser'] },
+				test: {
+					environment: './src/test/svelte-client-environment.ts',
+					include: ['src/**/*.svelte.test.ts'],
+					name: 'svelte',
+					server: { deps: { inline: ['svelte'] } },
+				},
+			},
+		],
 	},
 })
