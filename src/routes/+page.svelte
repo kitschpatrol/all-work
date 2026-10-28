@@ -67,7 +67,8 @@
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
-	import { getColumnSizingValue, runProgress } from '#lib/table-formatting.js'
+	import RunHeader from '#lib/RunHeader.svelte'
+	import { getColumnSizingValue } from '#lib/table-formatting.js'
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
@@ -1344,41 +1345,17 @@
 													type="checkbox"
 												/></label
 											>
-										{:else if run !== undefined}<div class="run-header">
-												<button
-													class="sort-button run-sort-button"
-													aria-label="Sort output for {run.command}"
-													onclick={(event) => sortOutput(run.id, event.shiftKey)}
-													type="button"
-												>
-													<span class="run-header-content">
-														<span class="run-label"
-															>RUN {runs.indexOf(run) + 1}
-															<span
-																>{runProgress(run)}{run.finished ? ' complete' : ' running'}</span
-															></span
-														><code title={previewColumn(run.id)}>$ {run.command}</code>
-													</span>
-													{#if header.column.getIsSorted() !== false}<span
-															class="sort-indicator"
-															class:descending={header.column.getIsSorted() === 'desc'}
-															aria-hidden="true"
-														></span>{/if}
-												</button>
-												<div class="run-actions">
-													{#if !run.finished}<button
-															class="stop-button"
-															aria-label="Stop command"
-															onclick={async () => stop(run.id)}
-															type="button">■</button
-														>{/if}<button
-														class="remove-button"
-														aria-label="Delete output column"
-														onclick={async () => removeRun(run.id)}
-														type="button">×</button
-													>
-												</div>
-											</div>
+										{:else if run !== undefined}<RunHeader
+												number={runs.indexOf(run) + 1}
+												onRemove={async () => removeRun(run.id)}
+												onSort={(multiple: boolean) => {
+													sortOutput(run.id, multiple)
+												}}
+												onStop={async () => stop(run.id)}
+												preview={previewColumn(run.id)}
+												{run}
+												sorted={header.column.getIsSorted()}
+											/>
 										{:else}<button
 												class="sort-button"
 												disabled={!header.column.getCanSort()}

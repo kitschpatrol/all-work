@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, MetadataGroup, MetadataState, Repository } from './workspace.js'
-import { getColumnCopyLines, pendingMetadata } from './table-formatting.js'
+import { getColumnCopyLines, pendingMetadata, runOutcomes } from './table-formatting.js'
 
 function repository(
 	id: string,
@@ -83,5 +83,23 @@ describe('getColumnCopyLines', () => {
 
 	it('copies nothing without rows', () => {
 		expect(getColumnCopyLines([], 'name', [])).toBe('')
+	})
+})
+
+describe('runOutcomes', () => {
+	function run(...statuses: Array<CommandRun['results'][string]['status']>) {
+		return {
+			results: Object.fromEntries(statuses.map((status, index) => [String(index), { status }])),
+		} as unknown as CommandRun
+	}
+
+	it('counts succeeded and failed results, ignoring unfinished and cancelled ones', () => {
+		expect(
+			runOutcomes(run('success', 'failed', 'success', 'queued', 'running', 'cancelled')),
+		).toEqual({ failed: 1, succeeded: 2 })
+	})
+
+	it('counts nothing for a run without results', () => {
+		expect(runOutcomes(run())).toEqual({ failed: 0, succeeded: 0 })
 	})
 })

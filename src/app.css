@@ -1403,6 +1403,18 @@ th[aria-sort='descending'] {
 	font-weight: 400;
 }
 
+.run-outcome {
+	font-variant-numeric: tabular-nums;
+}
+
+.run-outcome.succeeded {
+	color: #2c7a3b;
+}
+
+.run-outcome.failed {
+	color: #b42318;
+}
+
 .run-header code {
 	overflow: hidden;
 	display: block;

@@ -29,6 +29,15 @@ export function runProgress(run: CommandRun) {
 	return `${results.filter((result) => result.status !== 'queued' && result.status !== 'running').length}/${results.length}`
 }
 
+/** Count the repositories whose command succeeded and failed. */
+export function runOutcomes(run: CommandRun) {
+	const results = Object.values(run.results)
+	return {
+		failed: results.filter((result) => result.status === 'failed').length,
+		succeeded: results.filter((result) => result.status === 'success').length,
+	}
+}
+
 /**
  * Count the metadata groups still queued or loading, and the repositories
  * waiting on them.
