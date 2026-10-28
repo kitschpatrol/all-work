@@ -577,17 +577,20 @@ export function startWorkspaceMetadata(
 		pump()
 	}
 
-	void Promise.all(
-		workspace.repositories.map(async (repository) => {
-			await restoreCache(repository, workspace.identity)
-			if (disposed) {
-				return
-			}
+	async function restore() {
+		await Promise.all(
+			workspace.repositories.map(async (repository) => {
+				await restoreCache(repository, workspace.identity)
+				if (disposed) {
+					return
+				}
 
-			notify(repository, 'row')
-			request([repository.id], ['local', 'git', 'code', 'files'], true)
-		}),
-	)
+				notify(repository, 'row')
+				request([repository.id], ['local', 'git', 'code', 'files'], true)
+			}),
+		)
+	}
+
 	return {
 		dispose() {
 			disposed = true
@@ -596,5 +599,10 @@ export function startWorkspaceMetadata(
 			contexts.clear()
 		},
 		request,
+		/**
+		 * Settles once every repository shows its cached metadata and its refreshes
+		 * are queued.
+		 */
+		restored: restore(),
 	}
 }

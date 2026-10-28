@@ -341,6 +341,19 @@ describe('repository discovery and Metascope metadata', () => {
 		expect(getWorkspace(refreshed.id)).toBeUndefined()
 	})
 
+	it('scans again with cached names and branches already applied', async () => {
+		const refreshed = await scanWorkspace(temporaryDirectory)
+		try {
+			expect(
+				refreshed.repositories.find(
+					(repository) => repository.relativePath === 'project with spaces',
+				),
+			).toMatchObject({ branch: 'main', name: 'example-project', version: '1.2.3' })
+		} finally {
+			forgetWorkspace(refreshed.id)
+		}
+	})
+
 	it('rejects a working directory that resolves through a symlink', async () => {
 		const repository = repositories[0]
 		if (repository === undefined) {

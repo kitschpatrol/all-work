@@ -288,19 +288,19 @@ export async function scanWorkspace(
 	)
 	workspace.repositories.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 	workspaces.set(workspace.id, workspace)
-	metadataControllers.set(
-		workspace.id,
-		startWorkspaceMetadata(
-			workspace,
-			(repository, change) => {
-				const listeners = workspaceListeners.get(workspace.id) ?? []
-				for (const listener of listeners) {
-					listener(repository, change)
-				}
-			},
-			supplementGitMetadata,
-		),
+	const metadata = startWorkspaceMetadata(
+		workspace,
+		(repository, change) => {
+			const listeners = workspaceListeners.get(workspace.id) ?? []
+			for (const listener of listeners) {
+				listener(repository, change)
+			}
+		},
+		supplementGitMetadata,
 	)
+	metadataControllers.set(workspace.id, metadata)
+	// Rows first appear with their cached names, branches, and other metadata
+	await metadata.restored
 	return workspace
 }
 
