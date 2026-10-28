@@ -535,15 +535,13 @@ function compileOutput(rule: FilterRule, run: CommandRun): FilterPredicate | und
 	}
 
 	const test = compileText(rule.operator, rule.value)
-	if (test === undefined) {
-		return undefined
-	}
-
-	return (repository) =>
-		// Output is incomplete until the command finishes
-		runStatus(run, repository.id) === 'running'
-			? undefined
-			: test(run.results[repository.id]?.output ?? '')
+	// Output is incomplete until the command finishes
+	return test === undefined
+		? undefined
+		: (repository) =>
+				runStatus(run, repository.id) === 'running'
+					? undefined
+					: test(run.results[repository.id]?.output ?? '')
 }
 
 function compileRule(

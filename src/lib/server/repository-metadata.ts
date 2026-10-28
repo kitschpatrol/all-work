@@ -333,8 +333,6 @@ function needsRefresh(state: MetadataState | undefined, group: MetadataGroup, fo
 	return age !== undefined && Date.now() - Date.parse(state.updatedAt ?? '') >= age
 }
 
-type Job = { group: MetadataGroup; priority: number; repository: Repository }
-
 // Background work runs local scans first and network sources last
 const backgroundPriorities: Record<MetadataGroup, number> = {
 	ci: 5,
@@ -364,6 +362,7 @@ export function startWorkspaceMetadata(
 	notify: (repository: Repository) => void,
 	supplementGit: (repository: Repository) => Promise<void>,
 ) {
+	type Job = { group: MetadataGroup; priority: number; repository: Repository }
 	const contexts = new Map<string, MetadataContext>()
 	const busy = new Set<string>()
 	const queue: Job[] = []

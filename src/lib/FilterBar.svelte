@@ -30,7 +30,7 @@
 	const hasRules = $derived(rowFilter.filter.rules.length > 0)
 	const selection = $derived(selected?.id ?? (hasRules ? 'custom' : 'all'))
 	// Saved presets can be deleted; a saved edit to a built-in preset can be undone
-	const removeLabel = $derived(
+	const removalLabel = $derived(
 		selected === undefined
 			? undefined
 			: selected.id.startsWith('custom:')
@@ -239,7 +239,7 @@
 				<hr />
 				<option value="new">New filter…</option>
 				{#if hasRules}<option value="save">Save as preset…</option>{/if}
-				{#if removeLabel !== undefined}<option value="remove">{removeLabel}</option>{/if}
+				{#if removalLabel !== undefined}<option value="remove">{removalLabel}</option>{/if}
 			</select>
 			{#if rowFilter.modified}<span class="filter-edited">Edited</span>
 				<button

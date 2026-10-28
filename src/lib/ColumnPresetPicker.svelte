@@ -161,7 +161,7 @@
 				>{/each}
 			<hr />
 			<option value="save">Save as preset…</option>
-			{#if columnPresets.modified && selected !== undefined}<option value="revert"
+			{#if selected !== undefined && columnPresets.modified}<option value="revert"
 					>Revert to “{selected.label}”</option
 				>{/if}
 			{#if saved && selected !== undefined}<option value="remove">Delete “{selected.label}”</option

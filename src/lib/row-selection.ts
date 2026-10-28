@@ -15,9 +15,6 @@ type RowSelectionOptions = {
 	selection: () => Selection
 }
 
-/** A Shift-click or drag range in progress, measured from the last plain click. */
-type Extension = { anchor: string; base: Selection; checked: boolean; result: Selection }
-
 const dragThreshold = 4
 const edgeZone = 8
 const maxScrollStep = 16
@@ -66,6 +63,8 @@ function isTextField(target: unknown) {
  * a text field has focus.
  */
 export function createRowSelection(options: RowSelectionOptions) {
+	// A Shift-click or drag range in progress, measured from the last plain click
+	type Extension = { anchor: string; base: Selection; checked: boolean; result: Selection }
 	let extension: Extension | undefined
 
 	function emit(next: Selection) {

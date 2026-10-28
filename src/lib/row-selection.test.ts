@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRowSelection, rangeIds, withChecked } from './row-selection.js'
 
-type Handler = (event: unknown) => void
-
 class FakeInput {
 	checked = true
 }
@@ -10,6 +8,7 @@ class FakeInput {
 const ids = ['a', 'b', 'c', 'd', 'e']
 
 function setup(initial: Record<string, true> = {}, visible = ids) {
+	type Handler = (event: unknown) => void
 	let selection = initial
 	const controller = createRowSelection({
 		ids: () => visible,

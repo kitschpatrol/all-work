@@ -22,11 +22,7 @@ for (const project of workspace.repositories) {
 	)
 
 	for (const dependencyName of allDependencyNames) {
-		if (dependencyFrequency.has(dependencyName)) {
-			dependencyFrequency.set(dependencyName, dependencyFrequency.get(dependencyName)! + 1)
-		} else {
-			dependencyFrequency.set(dependencyName, 1)
-		}
+		dependencyFrequency.set(dependencyName, (dependencyFrequency.get(dependencyName) ?? 0) + 1)
 	}
 }
 
