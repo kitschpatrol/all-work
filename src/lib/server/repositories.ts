@@ -67,7 +67,19 @@ async function optionalGit(directory: string, args: string[]): Promise<string> {
 	}
 }
 
-function readGitStatus(status: string, repository: Repository) {
+/**
+ * Read the branch, upstream comparison, and changed file count from `git status
+ * --porcelain=v2 --branch -z` output.
+ */
+export function parseGitStatus(status: string) {
+	const parsed = {
+		ahead: 0,
+		behind: 0,
+		branch: '',
+		changedFiles: 0,
+		upstream: '',
+		upstreamGone: false,
+	}
 	let skipRenameSource = false
 	for (const entry of status.split('\0')) {
 		if (skipRenameSource) {
@@ -76,21 +88,23 @@ function readGitStatus(status: string, repository: Repository) {
 		}
 
 		if (entry.startsWith('# branch.head ')) {
-			repository.branch = entry.slice('# branch.head '.length)
+			parsed.branch = entry.slice('# branch.head '.length)
 		} else if (entry.startsWith('# branch.upstream ')) {
-			repository.upstream = entry.slice('# branch.upstream '.length)
-			repository.upstreamGone = true
+			parsed.upstream = entry.slice('# branch.upstream '.length)
+			parsed.upstreamGone = true
 		} else if (entry.startsWith('# branch.ab ')) {
 			// Git omits this line when the upstream ref is missing locally
 			const counts = branchCounts.exec(entry)
-			repository.ahead = Number(counts?.[1] ?? 0)
-			repository.behind = Number(counts?.[2] ?? 0)
-			repository.upstreamGone = false
+			parsed.ahead = Number(counts?.[1] ?? 0)
+			parsed.behind = Number(counts?.[2] ?? 0)
+			parsed.upstreamGone = false
 		} else if (changedEntry.test(entry)) {
-			repository.changedFiles++
+			parsed.changedFiles++
 			skipRenameSource = entry.startsWith('2 ')
 		}
 	}
+
+	return parsed
 }
 
 async function supplementGitMetadata(repository: Repository) {
@@ -98,9 +112,9 @@ async function supplementGitMetadata(repository: Repository) {
 	// worktrees. Only query status directly when that source has no data.
 	if (!repository.gitStatusAvailable) {
 		try {
-			readGitStatus(
-				await git(repository.path, ['status', '--porcelain=v2', '--branch', '-z']),
+			Object.assign(
 				repository,
+				parseGitStatus(await git(repository.path, ['status', '--porcelain=v2', '--branch', '-z'])),
 			)
 			repository.gitStatusAvailable = true
 		} catch (error) {
