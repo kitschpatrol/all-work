@@ -1059,10 +1059,10 @@ tr:nth-child(even) td {
 }
 
 tr.selected td {
-	border-right-color: #cddcf2;
-	border-bottom-color: #c5d6ef;
-	color: #17345c;
-	background: linear-gradient(#e6effd, #dce8fb);
+	border-right-color: #dce2eb;
+	border-bottom-color: #d5dce6;
+	color: #1f2c3d;
+	background: linear-gradient(#f0f3f8, #e9eef5);
 }
 
 td.output-cell {
@@ -2021,7 +2021,7 @@ tr.selected
 
 @media (hover: hover) {
 	tr:not(.selected):hover td:not(.table-filler, [data-run-status]) {
-		background: #eef3fa;
+		background: #f5f7fa;
 	}
 
 	.repository-action:hover:enabled,
