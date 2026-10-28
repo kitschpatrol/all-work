@@ -1,4 +1,4 @@
-/** Send a same-origin request to the local AllWork server. */
+/** Send a same-origin request to the local All Work server. */
 export async function request<T>(
 	url: string,
 	body: Record<string, unknown>,
@@ -7,7 +7,7 @@ export async function request<T>(
 ): Promise<T> {
 	const response = await fetch(url, {
 		body: JSON.stringify(body),
-		headers: { 'Content-Type': 'application/json', 'X-Allwork-Request': '1' },
+		headers: { 'Content-Type': 'application/json', 'X-All-Work-Request': '1' },
 		keepalive,
 		method,
 	})

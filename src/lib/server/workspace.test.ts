@@ -43,7 +43,7 @@ async function createRepository(relativePath: string, commit = true) {
 		await git(directory, ['add', '.'])
 		await git(directory, [
 			'-c',
-			'user.name=AllWork Test',
+			'user.name=All Work Test',
 			'-c',
 			'user.email=test@example.com',
 			'commit',
@@ -60,9 +60,9 @@ async function waitForRun(run: CommandRun) {
 }
 
 beforeAll(async () => {
-	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-test-'))
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-test-'))
 	vi.stubEnv('SHELL', fixtureShell)
-	vi.stubEnv('ALLWORK_CACHE_DIRECTORY', path.join(temporaryDirectory, '.metadata-cache'))
+	vi.stubEnv('ALL_WORK_CACHE_DIRECTORY', path.join(temporaryDirectory, '.metadata-cache'))
 	if (hasZsh) {
 		const shellDirectory = path.join(temporaryDirectory, '.shell-config')
 		const binDirectory = path.join(shellDirectory, 'bin')
@@ -70,21 +70,21 @@ beforeAll(async () => {
 		vi.stubEnv('ZDOTDIR', shellDirectory)
 		await writeFile(
 			path.join(shellDirectory, '.zprofile'),
-			'export ALLWORK_SHELL_PROFILE="login configuration loaded"\n',
+			'export ALL_WORK_SHELL_PROFILE="login configuration loaded"\n',
 		)
 		await writeFile(
 			path.join(shellDirectory, '.zshrc'),
 			[
 				'export PATH="$ZDOTDIR/bin:$PATH"',
-				String.raw`alias allwork_fixture_alias='printf "alias works\n"'`,
-				String.raw`allwork_fixture_function() { printf "function works\n"; }`,
+				String.raw`alias all_work_fixture_alias='printf "alias works\n"'`,
+				String.raw`all_work_fixture_function() { printf "function works\n"; }`,
 				String.raw`printf "startup stdout\n"`,
 				String.raw`printf "startup stderr\n" >&2`,
 				'cd "$ZDOTDIR"',
 			].join('\n'),
 		)
 		await writeFile(
-			path.join(binDirectory, 'allwork-fixture-tool'),
+			path.join(binDirectory, 'all-work-fixture-tool'),
 			'#!/bin/sh\nprintf "path works\\n"\n',
 			{ mode: 0o755 },
 		)
@@ -111,7 +111,7 @@ beforeAll(async () => {
 	await git(nested, ['branch', '--set-upstream-to=origin/main'])
 	await git(nested, [
 		'-c',
-		'user.name=AllWork Test',
+		'user.name=All Work Test',
 		'-c',
 		'user.email=test@example.com',
 		'commit',
@@ -190,8 +190,8 @@ describe('repository discovery and Metascope metadata', () => {
 	})
 
 	it('follows symlinks only to repositories, listing them by link name and running in the target', async () => {
-		const root = await mkdtemp(path.join(os.tmpdir(), 'allwork-links-'))
-		const elsewhere = await mkdtemp(path.join(os.tmpdir(), 'allwork-elsewhere-'))
+		const root = await mkdtemp(path.join(os.tmpdir(), 'all-work-links-'))
+		const elsewhere = await mkdtemp(path.join(os.tmpdir(), 'all-work-elsewhere-'))
 		try {
 			const target = path.join(elsewhere, 'target')
 			await mkdir(path.join(target, 'nested'), { recursive: true })
@@ -363,11 +363,11 @@ describe('parallel command runs', () => {
 			branch: `branch-${index}`,
 			name: `${index}: project "quotes" $(printf injected); literal\nsecond line`,
 		}))
-		const inherited = process.env.ALLWORK_COLUMN_STALE
-		vi.stubEnv('ALLWORK_COLUMN_STALE', 'must not leak')
+		const inherited = process.env.ALL_WORK_COLUMN_STALE
+		vi.stubEnv('ALL_WORK_COLUMN_STALE', 'must not leak')
 		try {
 			const run = startRun(
-				`'${process.execPath}' -e 'process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("ALLWORK_COLUMN_")))))'`,
+				`'${process.execPath}' -e 'process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("ALL_WORK_COLUMN_")))))'`,
 				selected,
 				2,
 				1,
@@ -380,41 +380,41 @@ describe('parallel command runs', () => {
 				const environment: unknown = JSON.parse(result?.output ?? '{}')
 				expect(environment).toMatchObject(
 					Object.fromEntries([
-						['ALLWORK_COLUMN_REPOSITORY', repository.relativePath],
-						['ALLWORK_COLUMN_REPO_NAME', repository.repoName],
-						['ALLWORK_COLUMN_REPO_OWNER', repository.repoOwner],
-						['ALLWORK_COLUMN_NAME', repository.name],
-						['ALLWORK_COLUMN_DESCRIPTION', repository.description],
-						['ALLWORK_COLUMN_BRANCH', repository.branch],
-						['ALLWORK_COLUMN_WORKING_TREE', String(repository.changedFiles)],
+						['ALL_WORK_COLUMN_REPOSITORY', repository.relativePath],
+						['ALL_WORK_COLUMN_REPO_NAME', repository.repoName],
+						['ALL_WORK_COLUMN_REPO_OWNER', repository.repoOwner],
+						['ALL_WORK_COLUMN_NAME', repository.name],
+						['ALL_WORK_COLUMN_DESCRIPTION', repository.description],
+						['ALL_WORK_COLUMN_BRANCH', repository.branch],
+						['ALL_WORK_COLUMN_WORKING_TREE', String(repository.changedFiles)],
 						[
-							'ALLWORK_COLUMN_SYNC',
+							'ALL_WORK_COLUMN_SYNC',
 							repository.upstream === '' || repository.upstreamGone
 								? ''
 								: String(repository.ahead + repository.behind),
 						],
-						['ALLWORK_COLUMN_LAST_COMMIT', repository.lastCommitDate],
-						['ALLWORK_COLUMN_VERSION', repository.version],
-						['ALLWORK_COLUMN_PACKAGE_MANAGER', repository.packageManager],
-						['ALLWORK_COLUMN_REMOTE', repository.remote],
+						['ALL_WORK_COLUMN_LAST_COMMIT', repository.lastCommitDate],
+						['ALL_WORK_COLUMN_VERSION', repository.version],
+						['ALL_WORK_COLUMN_PACKAGE_MANAGER', repository.packageManager],
+						['ALL_WORK_COLUMN_REMOTE', repository.remote],
 					]),
 				)
 			}
 		} finally {
-			vi.stubEnv('ALLWORK_COLUMN_STALE', inherited)
+			vi.stubEnv('ALL_WORK_COLUMN_STALE', inherited)
 		}
 	})
 
 	it('snapshots output variables before queueing and preserves them after the source run is deleted', async () => {
 		const source = startRun(
-			String.raw`printf '%s\n' "$ALLWORK_COLUMN_REPOSITORY"`,
+			String.raw`printf '%s\n' "$ALL_WORK_COLUMN_REPOSITORY"`,
 			repositories,
 			2,
 			1,
 		)
 		runIds.push(source.id)
 		await waitForRun(source)
-		const run = startRun('printf \'%s\' "$ALLWORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, 2, [
+		const run = startRun('printf \'%s\' "$ALL_WORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, 2, [
 			source,
 		])
 		runIds.push(run.id)
@@ -436,7 +436,7 @@ describe('parallel command runs', () => {
 		'loads login and interactive configuration, aliases, functions, and PATH without startup chatter',
 		async () => {
 			const run = startRun(
-				String.raw`allwork_fixture_alias; allwork_fixture_function; allwork-fixture-tool; printf '%s\n' "$ALLWORK_SHELL_PROFILE"; pwd`,
+				String.raw`all_work_fixture_alias; all_work_fixture_function; all-work-fixture-tool; printf '%s\n' "$ALL_WORK_SHELL_PROFILE"; pwd`,
 				repositories,
 				2,
 				1,
@@ -458,7 +458,7 @@ describe('parallel command runs', () => {
 		async () => {
 			vi.stubEnv('SHELL', undefined)
 			try {
-				const run = startRun('allwork_fixture_alias', repositories.slice(0, 1), 1, 1)
+				const run = startRun('all_work_fixture_alias', repositories.slice(0, 1), 1, 1)
 				runIds.push(run.id)
 				await waitForRun(run)
 				expect(Object.values(run.results)[0]).toMatchObject({
@@ -631,7 +631,7 @@ describe('local API request protection', () => {
 			readRequest(
 				new Request(url, {
 					body: '{}',
-					headers: { origin: 'https://example.com', 'X-Allwork-Request': '1' },
+					headers: { origin: 'https://example.com', 'X-All-Work-Request': '1' },
 					method: 'POST',
 				}),
 				url,
@@ -641,7 +641,7 @@ describe('local API request protection', () => {
 			readRequest(
 				new Request(url, {
 					body: '{"command":"pwd"}',
-					headers: { origin: url.origin, 'X-Allwork-Request': '1' },
+					headers: { origin: url.origin, 'X-All-Work-Request': '1' },
 					method: 'POST',
 				}),
 				url,

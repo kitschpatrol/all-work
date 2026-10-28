@@ -1,16 +1,16 @@
 {
-	"name": "allwork",
+	"name": "all-work",
 	"version": "0.0.6",
 	"private": true,
 	"description": "A parallel command line for all your Git repositories.",
 	"keywords": [
 		"github"
 	],
-	"homepage": "https://github.com/kitschpatrol/allwork",
-	"bugs": "https://github.com/kitschpatrol/allwork/issues",
+	"homepage": "https://github.com/kitschpatrol/all-work",
+	"bugs": "https://github.com/kitschpatrol/all-work/issues",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/kitschpatrol/allwork.git"
+		"url": "git+https://github.com/kitschpatrol/all-work.git"
 	},
 	"license": "MIT",
 	"author": {
@@ -33,7 +33,7 @@
 		"electron:build": "pnpm build && electron-builder",
 		"fix": "ksc fix",
 		"lint": "ksc lint",
-		"move": "shx rm -rf /Applications/AllWork.app && shx mv ./dist/mac-arm64/AllWork.app /Applications/AllWork.app",
+		"move": "shx rm -rf '/Applications/All Work.app' && shx mv './dist/mac-arm64/All Work.app' '/Applications/All Work.app'",
 		"prepare": "svelte-kit sync",
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm build",

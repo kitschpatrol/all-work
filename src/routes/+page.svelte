@@ -768,7 +768,7 @@
 
 	async function browseDirectory() {
 		try {
-			const chosen = await globalThis._allwork?.chooseDirectory()
+			const chosen = await globalThis._allWork?.chooseDirectory()
 			if (chosen !== undefined) {
 				directory = chosen
 				await loadDirectory()
@@ -1094,7 +1094,7 @@
 <svelte:window onkeydown={data.isElectron ? undefined : selection.shortcut} />
 
 <svelte:head>
-	<title>AllWork</title>
+	<title>All Work</title>
 	<meta
 		name="description"
 		content="Discover Git repositories, select a working set, and run shell commands in parallel."
@@ -1184,7 +1184,7 @@
 					/>
 					<span>Recursive</span>
 				</label>
-				{#if typeof window !== 'undefined' && globalThis._allwork !== undefined}<button
+				{#if typeof window !== 'undefined' && globalThis._allWork !== undefined}<button
 						class="button subtle"
 						disabled={loading || activeRuns.length > 0}
 						onclick={async () => browseDirectory()}

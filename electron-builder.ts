@@ -1,9 +1,9 @@
 import type { Configuration } from 'electron-builder'
 
 const config: Configuration = {
-	appId: 'com.ericmika.allwork',
+	appId: 'com.ericmika.all-work',
 	// eslint-disable-next-line no-template-curly-in-string
-	artifactName: '${productName}_${version}-${os}-${arch}.${ext}',
+	artifactName: '${name}_${version}-${os}-${arch}.${ext}',
 	files: ['build/**/*', 'out/**/*'],
 	linux: { icon: 'electron/resources/icons/png/1024x1024.png', target: 'tar.gz' },
 	mac: {
@@ -16,7 +16,7 @@ const config: Configuration = {
 		target: 'zip',
 	},
 	nsis: { allowToChangeInstallationDirectory: true, oneClick: false },
-	productName: 'AllWork',
+	productName: 'All Work',
 	publish: { provider: 'github', releaseType: 'release', vPrefixedTagName: true },
 	win: { icon: 'electron/resources/icons/win/icon.ico', target: 'nsis' },
 }

@@ -9,8 +9,8 @@ import { readSettings, resetSavedView, saveSettings, settingsDirectory } from '.
 
 let temporaryDirectory: string
 beforeEach(async () => {
-	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-settings-'))
-	vi.stubEnv('ALLWORK_SETTINGS_DIRECTORY', path.join(temporaryDirectory, 'settings'))
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-settings-'))
+	vi.stubEnv('ALL_WORK_SETTINGS_DIRECTORY', path.join(temporaryDirectory, 'settings'))
 })
 afterEach(async () => {
 	await rm(temporaryDirectory, { force: true, recursive: true })
@@ -20,14 +20,14 @@ afterEach(async () => {
 describe('system JSON settings', () => {
 	it('uses the system application-data location or an explicit override', () => {
 		expect(settingsDirectory()).toBe(path.join(temporaryDirectory, 'settings'))
-		vi.stubEnv('ALLWORK_SETTINGS_DIRECTORY', undefined)
+		vi.stubEnv('ALL_WORK_SETTINGS_DIRECTORY', undefined)
 		const base =
 			process.platform === 'darwin'
 				? path.join(os.homedir(), 'Library', 'Application Support')
 				: process.platform === 'win32'
 					? (process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'))
 					: (process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'))
-		expect(settingsDirectory()).toBe(path.join(base, 'AllWork'))
+		expect(settingsDirectory()).toBe(path.join(base, 'All Work'))
 	})
 
 	it('creates separate readable JSON files and restores them after the settings module is reloaded', async () => {

@@ -22,8 +22,8 @@ import { initialMenuState, syncMenu } from './menu.js'
 // its URL through ELECTRON_RENDERER_URL.
 const packagedServer = { host: '127.0.0.1', port: 4173 }
 
-app.setName('AllWork')
-setDefaultLogOptions({ logJsonToFile: true, name: 'AllWork' })
+app.setName('All Work')
+setDefaultLogOptions({ logJsonToFile: true, name: 'All Work' })
 
 // Distinguishes a deliberate shutdown from the server dying underneath us
 let isQuitting = false
@@ -78,7 +78,7 @@ function createWindow(appUrl: URL): void {
 		height: 1024,
 		minHeight: 640,
 		minWidth: 800,
-		title: 'AllWork',
+		title: 'All Work',
 		webPreferences,
 		width: 1440,
 	})
@@ -124,7 +124,7 @@ function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
 		minHeight: 240,
 		minWidth: 360,
 		resizable: request.resizable,
-		title: 'AllWork',
+		title: 'All Work',
 		webPreferences,
 		width: request.width,
 	})
@@ -163,7 +163,7 @@ async function waitForServer(host: string, port: number): Promise<void> {
 				if (retries >= MAX_RETRIES) {
 					reject(
 						new Error(
-							`Couldn't connect to the AllWork server at ${host}:${port} after ${MAX_RETRIES} attempts`,
+							`Couldn't connect to the All Work server at ${host}:${port} after ${MAX_RETRIES} attempts`,
 						),
 					)
 				} else {
@@ -193,7 +193,8 @@ function startServer(appUrl: URL): void {
 	const server = utilityProcess.fork(path.join(import.meta.dirname, 'server.js'), [], {
 		env: {
 			...process.env,
-			ALLWORK_SETTINGS_DIRECTORY: process.env.ALLWORK_SETTINGS_DIRECTORY ?? app.getPath('userData'),
+			ALL_WORK_SETTINGS_DIRECTORY:
+				process.env.ALL_WORK_SETTINGS_DIRECTORY ?? app.getPath('userData'),
 			HOST: appUrl.hostname,
 			PORT: appUrl.port,
 		},
@@ -205,7 +206,7 @@ function startServer(appUrl: URL): void {
 			return
 		}
 
-		dialog.showErrorBox('Error', `The AllWork server exited unexpectedly with code ${code}.`)
+		dialog.showErrorBox('Error', `The All Work server exited unexpectedly with code ${code}.`)
 		app.quit()
 	})
 }
@@ -215,18 +216,18 @@ async function main(): Promise<void> {
 		await app.whenReady()
 		const appUrl = getAppUrl()
 
-		ipcMain.handle('allwork:choose-directory', async (event) => {
+		ipcMain.handle('all-work:choose-directory', async (event) => {
 			if (!isTrustedSender(event, appUrl)) {
-				throw new Error('Directory picker is only available inside AllWork.')
+				throw new Error('Directory picker is only available inside All Work.')
 			}
 
 			const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
 			return result.canceled ? undefined : result.filePaths[0]
 		})
 
-		ipcMain.handle('allwork:open-window', (event, request: unknown) => {
+		ipcMain.handle('all-work:open-window', (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
-				throw new Error('Windows can only be opened from inside AllWork.')
+				throw new Error('Windows can only be opened from inside All Work.')
 			}
 
 			if (!isAppWindowRequest(request)) {
@@ -236,9 +237,9 @@ async function main(): Promise<void> {
 			openSecondaryWindow(appUrl, request)
 		})
 
-		ipcMain.handle('allwork:column-menu', (event, request: unknown) => {
+		ipcMain.handle('all-work:column-menu', (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
-				throw new Error('Column menus are only available inside AllWork.')
+				throw new Error('Column menus are only available inside All Work.')
 			}
 
 			if (!isColumnMenuRequest(request)) {
@@ -276,7 +277,7 @@ async function main(): Promise<void> {
 					const [label, command, enabled] = item
 					return {
 						click() {
-							event.sender.send('allwork:menu-command', command, request.columnId)
+							event.sender.send('all-work:menu-command', command, request.columnId)
 						},
 						enabled,
 						label,
@@ -285,9 +286,9 @@ async function main(): Promise<void> {
 			).popup({ window })
 		})
 
-		ipcMain.handle('allwork:hidden-columns-menu', (event, request: unknown) => {
+		ipcMain.handle('all-work:hidden-columns-menu', (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
-				throw new Error('Column menus are only available inside AllWork.')
+				throw new Error('Column menus are only available inside All Work.')
 			}
 
 			if (!isHiddenColumnsMenuRequest(request)) {
@@ -307,7 +308,7 @@ async function main(): Promise<void> {
 					: { enabled: false, label: category },
 				...columns.map(({ id, label }): MenuItemConstructorOptions => ({
 					click() {
-						event.sender.send('allwork:menu-command', 'column.show' satisfies MenuCommand, id)
+						event.sender.send('all-work:menu-command', 'column.show' satisfies MenuCommand, id)
 					},
 					label,
 				})),
@@ -317,9 +318,9 @@ async function main(): Promise<void> {
 			).popup({ window })
 		})
 
-		ipcMain.handle('allwork:repository-menu', async (event, request: unknown) => {
+		ipcMain.handle('all-work:repository-menu', async (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
-				throw new Error('Repository menus are only available inside AllWork.')
+				throw new Error('Repository menus are only available inside All Work.')
 			}
 
 			if (!isRepositoryMenuRequest(request)) {
@@ -366,7 +367,7 @@ async function main(): Promise<void> {
 			})
 		})
 
-		ipcMain.on('allwork:menu-state', (event, state: unknown) => {
+		ipcMain.on('all-work:menu-state', (event, state: unknown) => {
 			if (isTrustedSender(event, appUrl) && isMenuState(state)) {
 				syncMenu(state, () => mainWindow)
 			}

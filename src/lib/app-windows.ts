@@ -57,9 +57,9 @@ function describeWindow(target: AppWindow): AppWindowRequest {
  * already open brings it to the front instead.
  */
 export async function openElectronWindow(target: AppWindow): Promise<void> {
-	if (globalThis._allwork === undefined) {
-		throw new Error('Native windows are only available in the AllWork app.')
+	if (globalThis._allWork === undefined) {
+		throw new Error('Native windows are only available in the All Work app.')
 	}
 
-	await globalThis._allwork.openWindow(describeWindow(target))
+	await globalThis._allWork.openWindow(describeWindow(target))
 }

@@ -62,7 +62,7 @@ beforeEach(() => {
 	showHiddenColumnsMenu.mockResolvedValue()
 	onShow.mockResolvedValue()
 	vi.stubGlobal('navigator', { clipboard: { writeText } })
-	vi.stubGlobal('_allwork', { showColumnMenu, showHiddenColumnsMenu })
+	vi.stubGlobal('_allWork', { showColumnMenu, showHiddenColumnsMenu })
 })
 
 afterEach(() => {
@@ -72,8 +72,8 @@ afterEach(() => {
 
 describe('copying a column variable', () => {
 	it.each([
-		['branch', '$ALLWORK_COLUMN_BRANCH'],
-		['run-id', '$ALLWORK_COLUMN_RUN_1'],
+		['branch', '$ALL_WORK_COLUMN_BRANCH'],
+		['run-id', '$ALL_WORK_COLUMN_RUN_1'],
 	])('copies the %s column as %s, ready to paste into a command', async (id, expected) => {
 		menu().actions['column.copyVariable'](id)
 		await vi.waitFor(() => expect(writeText).toHaveBeenCalledExactlyOnceWith(expected))
@@ -166,7 +166,7 @@ describe('showing hidden columns from the empty header space', () => {
 	})
 
 	it('leaves the browser context menu alone outside Electron', async () => {
-		vi.stubGlobal('_allwork', undefined)
+		vi.stubGlobal('_allWork', undefined)
 		await menu().showHidden(rightClick)
 		expect(preventDefault).not.toHaveBeenCalled()
 	})

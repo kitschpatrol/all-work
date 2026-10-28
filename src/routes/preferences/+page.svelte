@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>AllWork Preferences</title>
+	<title>All Work Preferences</title>
 </svelte:head>
 
 <div class="preferences-window">

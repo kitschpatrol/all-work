@@ -201,7 +201,7 @@ export async function listReadmeApps(request: Request, url: URL): Promise<Respon
 	}
 
 	// Launch Services only answers for files that exist
-	const directory = await mkdtemp(path.join(os.tmpdir(), 'allwork-readme-'))
+	const directory = await mkdtemp(path.join(os.tmpdir(), 'all-work-readme-'))
 	try {
 		const sample = path.join(directory, 'readme.md')
 		await writeFile(sample, '# Readme\n')

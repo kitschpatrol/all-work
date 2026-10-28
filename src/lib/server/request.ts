@@ -11,10 +11,10 @@ export async function readRequest(
 ): Promise<Record<string, unknown>> {
 	if (
 		!['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname) ||
-		request.headers.get('x-allwork-request') !== '1' ||
+		request.headers.get('x-all-work-request') !== '1' ||
 		(request.headers.has('origin') && request.headers.get('origin') !== url.origin)
 	) {
-		error(403, 'This action must be requested from AllWork.')
+		error(403, 'This action must be requested from All Work.')
 	}
 
 	if (Number(request.headers.get('content-length') ?? 0) > maxBytes) {

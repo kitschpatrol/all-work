@@ -4,8 +4,8 @@ import { completeColumnVariable, getColumnCompletion } from './command-completio
 describe('command column completion', () => {
 	it('recognizes a dollar trigger and a partial variable at the cursor', () => {
 		expect(getColumnCompletion('echo $', 6)).toEqual({ braced: false, end: 6, query: '', start: 5 })
-		const value = 'echo $ALLWORK_COLUMN_VER'
-		expect(getColumnCompletion(value, value.length)?.query).toBe('ALLWORK_COLUMN_VER')
+		const value = 'echo $ALL_WORK_COLUMN_VER'
+		expect(getColumnCompletion(value, value.length)?.query).toBe('ALL_WORK_COLUMN_VER')
 	})
 
 	it('ignores escaped dollars, process IDs, command substitutions, and text selections', () => {
@@ -25,9 +25,9 @@ describe('command column completion', () => {
 			throw new Error('Missing variable completion')
 		}
 
-		expect(completeColumnVariable(value, token, 'ALLWORK_COLUMN_VERSION')).toEqual({
-			caret: 29,
-			value: 'echo "$ALLWORK_COLUMN_VERSION" && pwd',
+		expect(completeColumnVariable(value, token, 'ALL_WORK_COLUMN_VERSION')).toEqual({
+			caret: 30,
+			value: 'echo "$ALL_WORK_COLUMN_VERSION" && pwd',
 		})
 	})
 
@@ -39,8 +39,8 @@ describe('command column completion', () => {
 			throw new Error('Missing variable completion')
 		}
 
-		expect(completeColumnVariable(value, token, 'ALLWORK_COLUMN_VERSION').value).toBe(
-			'echo $ALLWORK_COLUMN_VERSION tail',
+		expect(completeColumnVariable(value, token, 'ALL_WORK_COLUMN_VERSION').value).toBe(
+			'echo $ALL_WORK_COLUMN_VERSION tail',
 		)
 	})
 
@@ -52,8 +52,8 @@ describe('command column completion', () => {
 				throw new Error('Missing variable completion')
 			}
 
-			expect(completeColumnVariable(value, token, 'ALLWORK_COLUMN_VERSION').value).toBe(
-				`echo \${ALLWORK_COLUMN_VERSION}`,
+			expect(completeColumnVariable(value, token, 'ALL_WORK_COLUMN_VERSION').value).toBe(
+				`echo \${ALL_WORK_COLUMN_VERSION}`,
 			)
 		}
 	})

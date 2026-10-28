@@ -143,7 +143,7 @@ const spacesPattern = /\s+/gv
 const wordStartPattern = /(?<!\p{L})\p{Ll}/gv
 // Metascope reports authorship status as lowercase keywords
 const titleCasedColumns = new Set(['metadata:Status'])
-const commandVariablePattern = /\$\{?(ALLWORK_COLUMN_\w+)/gv
+const commandVariablePattern = /\$\{?(ALL_WORK_COLUMN_\w+)/gv
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
 const repositoryVariables = new Map(
 	repositoryColumns.map(({ category, header, id }) => [
@@ -152,7 +152,7 @@ const repositoryVariables = new Map(
 			category,
 			id,
 			label: header,
-			name: `ALLWORK_COLUMN_${header.toUpperCase().replaceAll(spacesPattern, '_')}`,
+			name: `ALL_WORK_COLUMN_${header.toUpperCase().replaceAll(spacesPattern, '_')}`,
 		},
 	]),
 )
@@ -172,7 +172,7 @@ function runVariable(run: Pick<CommandRun, 'command' | 'id' | 'number'>) {
 		category: 'Runs',
 		id: run.id,
 		label: `Run ${run.number}: ${run.command}`,
-		name: `ALLWORK_COLUMN_RUN_${run.number}`,
+		name: `ALL_WORK_COLUMN_RUN_${run.number}`,
 	}
 }
 
@@ -283,8 +283,8 @@ export function getColumnTooltip(repository: Repository, columnId: string): stri
 }
 
 /**
- * The shell variable name, such as `ALLWORK_COLUMN_BRANCH`, for a repository or
- * run column.
+ * The shell variable name, such as `ALL_WORK_COLUMN_BRANCH`, for a repository
+ * or run column.
  */
 export function getColumnVariableName(
 	columnId: string,

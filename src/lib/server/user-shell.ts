@@ -30,7 +30,7 @@ end 1>&3 2>&3 3>&-`
 		args: [
 			'-lic',
 			script,
-			...(path.basename(file) === 'fish' ? [] : ['allwork']),
+			...(path.basename(file) === 'fish' ? [] : ['all-work']),
 			command,
 			directory,
 		],

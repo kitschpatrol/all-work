@@ -5,7 +5,7 @@ import { defaultColumnPreset } from '../src/lib/column-presets.js'
 import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
-const HOMEPAGE = 'https://github.com/kitschpatrol/allwork'
+const HOMEPAGE = 'https://github.com/kitschpatrol/all-work'
 
 export const initialMenuState: MenuState = {
 	autoClear: false,
@@ -238,7 +238,7 @@ function buildTemplate(
 				click() {
 					void shell.openExternal(`${HOMEPAGE}#readme`)
 				},
-				label: 'AllWork Help',
+				label: 'All Work Help',
 			},
 			{
 				click() {
@@ -267,7 +267,7 @@ function buildTemplate(
  */
 export function syncMenu(state: MenuState, getWindow: () => BrowserWindow | undefined): void {
 	const send: Send = (command, payload) => {
-		getWindow()?.webContents.send('allwork:menu-command', command, payload)
+		getWindow()?.webContents.send('all-work:menu-command', command, payload)
 	}
 
 	// The main window decides between its text fields and its rows; other windows select text

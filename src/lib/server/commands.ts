@@ -58,7 +58,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 
 		const environment: Record<string, string | undefined> = {
 			...Object.fromEntries(
-				Object.entries(process.env).filter(([name]) => !name.startsWith('ALLWORK_COLUMN_')),
+				Object.entries(process.env).filter(([name]) => !name.startsWith('ALL_WORK_COLUMN_')),
 			),
 			...job.environments.get(repository.id),
 			// eslint-disable-next-line ts/naming-convention -- Git expects this exact environment variable name.
@@ -243,7 +243,7 @@ function markInterrupted(run: CommandRun) {
 		}
 
 		result.status = 'cancelled'
-		result.output += '\n[Interrupted when AllWork closed.]'
+		result.output += '\n[Interrupted when All Work closed.]'
 	}
 
 	run.finished = true

@@ -10,7 +10,7 @@ export type WindowMessage =
 	| { repositoryId: string; runId: string; type: 'output-neighbors-request' }
 	| { runId: string; type: 'run-removed' }
 
-const CHANNEL = 'allwork-windows'
+const CHANNEL = 'all-work-windows'
 
 function isString(value: unknown): value is string {
 	return typeof value === 'string'
@@ -77,7 +77,7 @@ function parseWindowMessage(value: unknown): undefined | WindowMessage {
 	}
 }
 
-/** Notify the other AllWork windows of this origin. The sender is not notified. */
+/** Notify the other All Work windows of this origin. The sender is not notified. */
 export function postWindowMessage(message: WindowMessage): void {
 	const channel = new BroadcastChannel(CHANNEL)
 	channel.postMessage(message)
@@ -85,7 +85,7 @@ export function postWindowMessage(message: WindowMessage): void {
 }
 
 /**
- * Receive messages from the other AllWork windows until the returned function
+ * Receive messages from the other All Work windows until the returned function
  * is called.
  */
 export function listenForWindowMessages(listener: (message: WindowMessage) => void): () => void {

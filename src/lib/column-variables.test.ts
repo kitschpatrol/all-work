@@ -91,7 +91,7 @@ describe('column variables', () => {
 			),
 		).toEqual(['Author', 'Maintainer', 'Observer', 'Unknown'])
 		expect(formatColumnCellValue(status('author'), 'metadata:Author')).toBe('lowercase author')
-		expect(getColumnEnvironment(status('author')).ALLWORK_COLUMN_STATUS).toBe('author')
+		expect(getColumnEnvironment(status('author')).ALL_WORK_COLUMN_STATUS).toBe('author')
 	})
 
 	it('formats expanded metadata and keeps unknown values distinct from zero and false', () => {
@@ -100,24 +100,24 @@ describe('column variables', () => {
 			metadata: { groups: {}, values: { Public: false, Stars: 0, Tags: ['one', 'two'] } },
 		}
 		const environment = getColumnEnvironment(expanded)
-		expect(environment.ALLWORK_COLUMN_PUBLIC).toBe('false')
-		expect(environment.ALLWORK_COLUMN_STARS).toBe('0')
-		expect(environment.ALLWORK_COLUMN_TAGS).toBe('one, two')
-		expect(environment.ALLWORK_COLUMN_TOTAL_UPDATES).toBe('')
+		expect(environment.ALL_WORK_COLUMN_PUBLIC).toBe('false')
+		expect(environment.ALL_WORK_COLUMN_STARS).toBe('0')
+		expect(environment.ALL_WORK_COLUMN_TAGS).toBe('one, two')
+		expect(environment.ALL_WORK_COLUMN_TOTAL_UPDATES).toBe('')
 		const variables = getColumnVariables()
 		expect(new Set(variables.map((variable) => variable.name)).size).toBe(variables.length)
 	})
 
 	it('blocks only referenced values that are still waiting for metadata', () => {
-		expect(getPendingCommandColumns('printf "$ALLWORK_COLUMN_STARS"', [repository])).toEqual([
+		expect(getPendingCommandColumns('printf "$ALL_WORK_COLUMN_STARS"', [repository])).toEqual([
 			'Stars',
 		])
-		expect(getPendingCommandColumns(`printf "\${ALLWORK_COLUMN_PUBLIC}"`, [repository])).toEqual([
+		expect(getPendingCommandColumns(`printf "\${ALL_WORK_COLUMN_PUBLIC}"`, [repository])).toEqual([
 			'Public',
 		])
 		expect(getPendingCommandColumns('pwd', [repository])).toEqual([])
 		expect(
-			getPendingCommandColumns('printf "$ALLWORK_COLUMN_STARS"', [
+			getPendingCommandColumns('printf "$ALL_WORK_COLUMN_STARS"', [
 				{ ...repository, metadata: { groups: {}, values: { Stars: 0 } } },
 			]),
 		).toEqual([])
@@ -126,20 +126,20 @@ describe('column variables', () => {
 	it('exposes each data column with a shell-safe name and its raw value', () => {
 		expect(getColumnEnvironment(repository)).toMatchObject(
 			Object.fromEntries([
-				['ALLWORK_COLUMN_REPOSITORY', 'project with spaces'],
-				['ALLWORK_COLUMN_REPO_NAME', 'project'],
-				['ALLWORK_COLUMN_REPO_OWNER', 'example'],
-				['ALLWORK_COLUMN_NAME', '@example/project'],
-				['ALLWORK_COLUMN_DESCRIPTION', 'Example project description'],
-				['ALLWORK_COLUMN_BRANCH', 'feature/example'],
-				['ALLWORK_COLUMN_WORKING_TREE', '4'],
-				['ALLWORK_COLUMN_AHEAD', '2'],
-				['ALLWORK_COLUMN_BEHIND', '3'],
-				['ALLWORK_COLUMN_SYNC', '5'],
-				['ALLWORK_COLUMN_LAST_COMMIT', '2026-10-15T12:00:00.000Z'],
-				['ALLWORK_COLUMN_VERSION', '1.2.3'],
-				['ALLWORK_COLUMN_PACKAGE_MANAGER', 'pnpm@12.11.2'],
-				['ALLWORK_COLUMN_REMOTE', 'git@github.com:example/project.git'],
+				['ALL_WORK_COLUMN_REPOSITORY', 'project with spaces'],
+				['ALL_WORK_COLUMN_REPO_NAME', 'project'],
+				['ALL_WORK_COLUMN_REPO_OWNER', 'example'],
+				['ALL_WORK_COLUMN_NAME', '@example/project'],
+				['ALL_WORK_COLUMN_DESCRIPTION', 'Example project description'],
+				['ALL_WORK_COLUMN_BRANCH', 'feature/example'],
+				['ALL_WORK_COLUMN_WORKING_TREE', '4'],
+				['ALL_WORK_COLUMN_AHEAD', '2'],
+				['ALL_WORK_COLUMN_BEHIND', '3'],
+				['ALL_WORK_COLUMN_SYNC', '5'],
+				['ALL_WORK_COLUMN_LAST_COMMIT', '2026-10-15T12:00:00.000Z'],
+				['ALL_WORK_COLUMN_VERSION', '1.2.3'],
+				['ALL_WORK_COLUMN_PACKAGE_MANAGER', 'pnpm@12.11.2'],
+				['ALL_WORK_COLUMN_REMOTE', 'git@github.com:example/project.git'],
 			]),
 		)
 	})
@@ -151,14 +151,14 @@ describe('column variables', () => {
 			lastCommitDate: '',
 			version: '',
 		})
-		expect(unavailable.ALLWORK_COLUMN_WORKING_TREE).toBe('')
-		expect(unavailable.ALLWORK_COLUMN_SYNC).toBe('')
-		expect(unavailable.ALLWORK_COLUMN_LAST_COMMIT).toBe('')
-		expect(unavailable.ALLWORK_COLUMN_VERSION).toBe('')
+		expect(unavailable.ALL_WORK_COLUMN_WORKING_TREE).toBe('')
+		expect(unavailable.ALL_WORK_COLUMN_SYNC).toBe('')
+		expect(unavailable.ALL_WORK_COLUMN_LAST_COMMIT).toBe('')
+		expect(unavailable.ALL_WORK_COLUMN_VERSION).toBe('')
 		const clean = getColumnEnvironment({ ...repository, ahead: 0, behind: 0, changedFiles: 0 })
-		expect(clean.ALLWORK_COLUMN_WORKING_TREE).toBe('0')
-		expect(clean.ALLWORK_COLUMN_AHEAD).toBe('0')
-		expect(clean.ALLWORK_COLUMN_SYNC).toBe('0')
+		expect(clean.ALL_WORK_COLUMN_WORKING_TREE).toBe('0')
+		expect(clean.ALL_WORK_COLUMN_AHEAD).toBe('0')
+		expect(clean.ALL_WORK_COLUMN_SYNC).toBe('0')
 	})
 
 	it('leaves upstream counts empty without an upstream or when its ref is missing', () => {
@@ -166,9 +166,9 @@ describe('column variables', () => {
 			getColumnEnvironment({ ...repository, ahead: 0, behind: 0, upstream: '' }),
 			getColumnEnvironment({ ...repository, ahead: 0, behind: 0, upstreamGone: true }),
 		]) {
-			expect(environment.ALLWORK_COLUMN_AHEAD).toBe('')
-			expect(environment.ALLWORK_COLUMN_BEHIND).toBe('')
-			expect(environment.ALLWORK_COLUMN_SYNC).toBe('')
+			expect(environment.ALL_WORK_COLUMN_AHEAD).toBe('')
+			expect(environment.ALL_WORK_COLUMN_BEHIND).toBe('')
+			expect(environment.ALL_WORK_COLUMN_SYNC).toBe('')
 		}
 	})
 
@@ -186,41 +186,41 @@ describe('column variables', () => {
 	it('distinguishes repeated commands by current run number and includes exact multiline output', () => {
 		const runs = [outputRun('first', 'one\ntwo\n'), outputRun('second', 'three\n', 2)]
 		const environment = getColumnEnvironment(repository, runs)
-		expect(environment.ALLWORK_COLUMN_RUN_1).toBe('one\ntwo\n')
-		expect(environment.ALLWORK_COLUMN_RUN_2).toBe('three\n')
+		expect(environment.ALL_WORK_COLUMN_RUN_1).toBe('one\ntwo\n')
+		expect(environment.ALL_WORK_COLUMN_RUN_2).toBe('three\n')
 		expect(
-			getColumnEnvironment({ ...repository, id: 'not-targeted' }, runs).ALLWORK_COLUMN_RUN_1,
+			getColumnEnvironment({ ...repository, id: 'not-targeted' }, runs).ALL_WORK_COLUMN_RUN_1,
 		).toBe('')
 		expect(getColumnVariables(runs).slice(-2)).toEqual([
 			{
 				category: 'Runs',
 				id: 'first',
 				label: 'Run 1: git status --short',
-				name: 'ALLWORK_COLUMN_RUN_1',
+				name: 'ALL_WORK_COLUMN_RUN_1',
 			},
 			{
 				category: 'Runs',
 				id: 'second',
 				label: 'Run 2: git status --short',
-				name: 'ALLWORK_COLUMN_RUN_2',
+				name: 'ALL_WORK_COLUMN_RUN_2',
 			},
 		])
 	})
 
 	it('keeps a run variable named by its run number after an earlier run is cleared', () => {
 		const environment = getColumnEnvironment(repository, [outputRun('second', 'three\n', 2)])
-		expect(environment.ALLWORK_COLUMN_RUN_2).toBe('three\n')
-		expect(environment.ALLWORK_COLUMN_RUN_1).toBeUndefined()
+		expect(environment.ALL_WORK_COLUMN_RUN_2).toBe('three\n')
+		expect(environment.ALL_WORK_COLUMN_RUN_1).toBeUndefined()
 	})
 
 	it('names the variable for repository and run columns, and none for other columns', () => {
 		const runs = [outputRun('first', 'one'), outputRun('second', 'two', 2)]
-		expect(getColumnVariableName('branch')).toBe('ALLWORK_COLUMN_BRANCH')
-		expect(getColumnVariableName('ahead')).toBe('ALLWORK_COLUMN_AHEAD')
+		expect(getColumnVariableName('branch')).toBe('ALL_WORK_COLUMN_BRANCH')
+		expect(getColumnVariableName('ahead')).toBe('ALL_WORK_COLUMN_AHEAD')
 		expect(getColumnVariableName('metadata:Git Remotes Ahead')).toBe(
-			'ALLWORK_COLUMN_GIT_REMOTES_AHEAD',
+			'ALL_WORK_COLUMN_GIT_REMOTES_AHEAD',
 		)
-		expect(getColumnVariableName('second', runs)).toBe('ALLWORK_COLUMN_RUN_2')
+		expect(getColumnVariableName('second', runs)).toBe('ALL_WORK_COLUMN_RUN_2')
 		expect(getColumnVariableName('select', runs)).toBeUndefined()
 		expect(getColumnVariableName('removed-run', runs)).toBeUndefined()
 	})
@@ -231,15 +231,15 @@ describe('column variables', () => {
 		expect(getColumnPreviewTooltip(repository, 'first', runs)).toBe(
 			'clean\nRepository: project with spaces',
 		)
-		expect(getColumnPreviewTooltip(repository, 'description')).not.toContain('ALLWORK_COLUMN')
+		expect(getColumnPreviewTooltip(repository, 'description')).not.toContain('ALL_WORK_COLUMN')
 		expect(getColumnPreviewTooltip(undefined, 'branch')).toBe('')
 		expect(getColumnPreviewTooltip(repository, 'select')).toBe('')
 		expect(getVariablePreviewTooltip(repository, 'branch').split('\n', 1)[0]).toBe(
-			'$ALLWORK_COLUMN_BRANCH = feature/example',
+			'$ALL_WORK_COLUMN_BRANCH = feature/example',
 		)
 		expect(getVariablePreviewTooltip(repository, 'metadata:Stars').split('\n', 1)[0]).toBe(
-			'$ALLWORK_COLUMN_STARS = ""',
+			'$ALL_WORK_COLUMN_STARS = ""',
 		)
-		expect(getVariablePreviewTooltip(undefined, 'branch')).toBe('$ALLWORK_COLUMN_BRANCH')
+		expect(getVariablePreviewTooltip(undefined, 'branch')).toBe('$ALL_WORK_COLUMN_BRANCH')
 	})
 })

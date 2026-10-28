@@ -181,13 +181,13 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		actions,
 		async show(event: MouseEvent, columnId: string) {
 			const column = getColumn(columnId)
-			if (column === undefined || globalThis._allwork === undefined) {
+			if (column === undefined || globalThis._allWork === undefined) {
 				return
 			}
 
 			event.preventDefault()
 			try {
-				await globalThis._allwork.showColumnMenu({
+				await globalThis._allWork.showColumnMenu({
 					canFilter: column.getCanFilter(),
 					canHide: canHide(column),
 					canSort: column.getCanSort(),
@@ -203,7 +203,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			}
 		},
 		async showHidden(event: MouseEvent) {
-			if (globalThis._allwork === undefined) {
+			if (globalThis._allWork === undefined) {
 				return
 			}
 
@@ -211,7 +211,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			const hidden = options.getOptionalColumns().filter((column) => !column.visible)
 			const groups = Map.groupBy(hidden, (column) => column.category)
 			try {
-				await globalThis._allwork.showHiddenColumnsMenu({
+				await globalThis._allWork.showHiddenColumnsMenu({
 					groups: Array.from(groups, ([category, columns]) => ({
 						category,
 						columns: columns.map(({ header, id, onDemand }) => ({

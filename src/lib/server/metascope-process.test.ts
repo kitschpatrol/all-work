@@ -6,7 +6,7 @@ import { extractMetadata } from './metascope-process.js'
 
 let directory: string
 beforeAll(async () => {
-	directory = await mkdtemp(path.join(os.tmpdir(), 'allwork-isolation-'))
+	directory = await mkdtemp(path.join(os.tmpdir(), 'all-work-isolation-'))
 	await writeFile(
 		path.join(directory, 'README.md'),
 		'# Heavy fixture\n\n' +

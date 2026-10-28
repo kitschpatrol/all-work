@@ -7,7 +7,7 @@ export const commandPresets = [
 	{ command: 'git remote -v', label: 'Show remote URLs' },
 	{ command: 'git fetch --all --prune', label: 'Fetch remote updates' },
 	{
-		command: 'git push origin "$ALLWORK_COLUMN_BRANCH" --force-with-lease',
+		command: 'git push origin "$ALL_WORK_COLUMN_BRANCH" --force-with-lease',
 		label: 'Force push branch (with lease)',
 	},
 	{
@@ -20,7 +20,7 @@ export const commandPresets = [
 	},
 	{ command: 'git ls-files', label: 'List tracked files' },
 	{
-		command: 'gh secret list --repo $ALLWORK_COLUMN_REPO_OWNER/$ALLWORK_COLUMN_REPO_NAME',
+		command: 'gh secret list --repo $ALL_WORK_COLUMN_REPO_OWNER/$ALL_WORK_COLUMN_REPO_NAME',
 		label: 'List GitHub Secrets',
 	},
 ] as const

@@ -1,4 +1,4 @@
-# AllWork
+# All Work
 
 <!-- badges -->
 
@@ -14,7 +14,7 @@
 
 ## Overview
 
-AllWork is a local desktop and browser workspace for running one shell command across many Git repositories. A fixed toolbar keeps the workspace field on the left and the command field on the right. The table fills the remaining window and scrolls through every matching repository without pagination.
+All Work is a local desktop and browser workspace for running one shell command across many Git repositories. A fixed toolbar keeps the workspace field on the left and the command field on the right. The table fills the remaining window and scrolls through every matching repository without pagination.
 
 - Discovers Git repositories and worktrees, including projects without `package.json`. Choose recursive discovery or scan only one level down.
 - Uses [Metascope](https://github.com/kitschpatrol/metascope) for local project metadata, current branch, working tree status, and cached remote comparisons.
@@ -48,7 +48,7 @@ To run the production build in a browser, use `pnpm build` followed by `pnpm sta
 
 The Electron app adds a menu bar. Every toolbar action is available from the **File**, **Command**, **Repositories**, and **View** menus with keyboard shortcuts, including Open Workspace (⌘O), Reload Workspace (⌘R), Run (⌘↩), Stop All (⌘.), Clear Finished Runs (⌘K), Go to Command Field (⌘L), Search Repositories (⌘F), Show Filter Rules (⌥⌘F), Select All (⌘A, which selects all matching repositories unless a text field has focus), Deselect All (⌥⌘A), and Refresh Metadata for Selected (⇧⌘R). The menus also offer commands kept out of the toolbar: Select Repositories with Changes, Open Selected In for Tower, VS Code, GitHub, Finder, or Terminal (up to 10 repositories), a Presets submenu, filter presets and Clear Filter, Show All, Hide All Optional, and column presets under Columns, Fit Columns to Contents, and Reset View. Menu items enable and disable to match the current selection and running commands.
 
-Output combines stdout and stderr, removes terminal control sequences, and retains up to 128,000 characters per repository per run. Commands continue after that capture limit. Output columns live in memory for the current page/server session. The latest 100 submitted commands, chosen directory, recursive preference, and auto clear preference are remembered locally. Clearing output columns does not clear command recall. Set `ALLWORK_DIRECTORY` to change the initial directory suggestion.
+Output combines stdout and stderr, removes terminal control sequences, and retains up to 128,000 characters per repository per run. Commands continue after that capture limit. Output columns live in memory for the current page/server session. The latest 100 submitted commands, chosen directory, recursive preference, and auto clear preference are remembered locally. Clearing output columns does not clear command recall. Set `ALL_WORK_DIRECTORY` to change the initial directory suggestion.
 
 A custom Metascope template exposes all 78 fields from the Obsidian frontmatter workflow, including the derived Homebrew flag (a dependency on `brewpub`). **Columns** groups fields by category and provides a search field. The menu at its top switches between column presets: **Defaults** shows the starter columns, and **Save as preset…** names the columns now showing. Changing a preset's columns by hand marks it edited; **Save** updates a saved preset, and the menu can revert the changes or delete the preset. Presets show and hide repository columns only, leaving command output columns as they are, and are saved with your preferences. Existing repository, project, package-manager, and app-launch columns remain available; **Ahead** and **Behind** compare the current branch with its upstream as last fetched, so a fork's other remotes don't count; they're empty without an upstream. The combined Sync column remains available in Columns for compatibility, and **Git Remotes Ahead** and **Git Remotes Behind** keep Metascope's totals across every remote's main or master branch.
 
@@ -56,33 +56,33 @@ Loading is progressive, with up to four isolated scanner processes at once. Repo
 
 Choose **Metadata → Refresh selected metadata** to refresh local, Git, GitHub, registry, and CI information. **Scan selected codebases** explicitly runs file totals and Tokei code statistics. **Check selected dependency updates** explicitly runs Metascope's dependency-update source. These expensive scans do not run automatically when their columns are enabled. Select the relevant columns to view their results. Unloaded, loading, unavailable, false, and zero remain distinct. Hover a cell for its raw variable value, source group, update time, cache status, and field-specific meaning.
 
-Successful enrichment and explicit scans persist in the user cache directory (`~/Library/Caches/AllWork/metadata` on macOS). GitHub data is refreshed when requested after 15 minutes, CI after 2 minutes, and registry data after a day. Codebase scans and dependency checks retain their last results until explicitly requested again; their timestamps identify the snapshot. A failed refresh retains previous values. Set `ALLWORK_CACHE_DIRECTORY` to override the cache location.
+Successful enrichment and explicit scans persist in the user cache directory (`~/Library/Caches/All Work/metadata` on macOS). GitHub data is refreshed when requested after 15 minutes, CI after 2 minutes, and registry data after a day. Codebase scans and dependency checks retain their last results until explicitly requested again; their timestamps identify the snapshot. A failed refresh retains previous values. Set `ALL_WORK_CACHE_DIRECTORY` to override the cache location.
 
 Branch, changed-file count, latest commit date, and remote comparisons come from Metascope's `gitStats`. Ahead and Behind compare with the current branch's upstream, and Git Remotes Ahead and Git Remotes Behind total comparisons against locally cached main/master refs across remotes; scans do not fetch. Metascope 0.13 returns no Git statistics for linked worktrees or repositories without commits, so a narrow Git fallback fills those missing fields. A direct Git query supplies commit subjects for date tooltips. Metascope currently builds a recursive file tree for each source-group call, and its Git statistics source also reads history and tracked-file sizes; these costs remain in the background.
 
 Some fields inherit source-specific meanings: Status describes authorship/maintenance, CI is the latest completed default-branch run of a workflow named CI, Releases can fall back to version-tag count, and Downloads Total may represent npm lifetime downloads, Obsidian community downloads, PyPI's last 180 days, or the latest GitHub release's asset downloads. Column hovers explain these distinctions.
 
-Commands receive a variable for each column, including hidden columns. Choose **Variables…** to insert a quoted reference at the command field's cursor. Hover a cell to see its variable and row value, such as `$ALLWORK_COLUMN_VERSION = 0.1.1`. Column headers and the variable picker preview the first selected repository, or the first visible repository when none are selected; the tooltip identifies that repository. Each repository supplies its own values, captured when you click **Run**. New columns receive variables using the same naming scheme, such as `$ALLWORK_COLUMN_LICENSE`, `$ALLWORK_COLUMN_STARS`, and `$ALLWORK_COLUMN_GIT_REMOTES_AHEAD`. A command referencing metadata that is still pending reports the columns that need loading instead of silently supplying empty values:
+Commands receive a variable for each column, including hidden columns. Choose **Variables…** to insert a quoted reference at the command field's cursor. Hover a cell to see its variable and row value, such as `$ALL_WORK_COLUMN_VERSION = 0.1.1`. Column headers and the variable picker preview the first selected repository, or the first visible repository when none are selected; the tooltip identifies that repository. Each repository supplies its own values, captured when you click **Run**. New columns receive variables using the same naming scheme, such as `$ALL_WORK_COLUMN_LICENSE`, `$ALL_WORK_COLUMN_STARS`, and `$ALL_WORK_COLUMN_GIT_REMOTES_AHEAD`. A command referencing metadata that is still pending reports the columns that need loading instead of silently supplying empty values:
 
-| Variable                                            | Value                                                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `$ALLWORK_COLUMN_REPOSITORY`                        | Repository path relative to the workspace; `$PWD` gives the absolute working directory                 |
-| `$ALLWORK_COLUMN_REPO_NAME`                         | Origin repository name; falls back to the local folder name                                            |
-| `$ALLWORK_COLUMN_REPO_OWNER`                        | Origin owner or namespace, including nested groups; empty without a supported remote                   |
-| `$ALLWORK_COLUMN_NAME`                              | Project name                                                                                           |
-| `$ALLWORK_COLUMN_DESCRIPTION`                       | Project description                                                                                    |
-| `$ALLWORK_COLUMN_BRANCH`                            | Git branch                                                                                             |
-| `$ALLWORK_COLUMN_WORKING_TREE`                      | Number of changed files, or empty when Git status is unavailable                                       |
-| `$ALLWORK_COLUMN_AHEAD`                             | Commits ahead of the upstream branch, or empty without an upstream or Git status                       |
-| `$ALLWORK_COLUMN_BEHIND`                            | Commits behind the upstream branch, or empty without an upstream or Git status                         |
-| `$ALLWORK_COLUMN_SYNC`                              | Total commits ahead of and behind the upstream branch, or empty without an upstream or Git status      |
-| `$ALLWORK_COLUMN_LAST_COMMIT`                       | ISO timestamp of the latest commit, or empty for no commits                                            |
-| `$ALLWORK_COLUMN_VERSION`                           | Project version                                                                                        |
-| `$ALLWORK_COLUMN_PACKAGE_MANAGER`                   | Package manager and version                                                                            |
-| `$ALLWORK_COLUMN_REMOTE`                            | Origin remote URL                                                                                      |
-| `$ALLWORK_COLUMN_RUN_1`, `$ALLWORK_COLUMN_RUN_2`, … | Raw output of existing run columns, numbered as shown in the table; empty if that row was not included |
+| Variable                                              | Value                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `$ALL_WORK_COLUMN_REPOSITORY`                         | Repository path relative to the workspace; `$PWD` gives the absolute working directory                 |
+| `$ALL_WORK_COLUMN_REPO_NAME`                          | Origin repository name; falls back to the local folder name                                            |
+| `$ALL_WORK_COLUMN_REPO_OWNER`                         | Origin owner or namespace, including nested groups; empty without a supported remote                   |
+| `$ALL_WORK_COLUMN_NAME`                               | Project name                                                                                           |
+| `$ALL_WORK_COLUMN_DESCRIPTION`                        | Project description                                                                                    |
+| `$ALL_WORK_COLUMN_BRANCH`                             | Git branch                                                                                             |
+| `$ALL_WORK_COLUMN_WORKING_TREE`                       | Number of changed files, or empty when Git status is unavailable                                       |
+| `$ALL_WORK_COLUMN_AHEAD`                              | Commits ahead of the upstream branch, or empty without an upstream or Git status                       |
+| `$ALL_WORK_COLUMN_BEHIND`                             | Commits behind the upstream branch, or empty without an upstream or Git status                         |
+| `$ALL_WORK_COLUMN_SYNC`                               | Total commits ahead of and behind the upstream branch, or empty without an upstream or Git status      |
+| `$ALL_WORK_COLUMN_LAST_COMMIT`                        | ISO timestamp of the latest commit, or empty for no commits                                            |
+| `$ALL_WORK_COLUMN_VERSION`                            | Project version                                                                                        |
+| `$ALL_WORK_COLUMN_PACKAGE_MANAGER`                    | Package manager and version                                                                            |
+| `$ALL_WORK_COLUMN_REMOTE`                             | Origin remote URL                                                                                      |
+| `$ALL_WORK_COLUMN_RUN_1`, `$ALL_WORK_COLUMN_RUN_2`, … | Raw output of existing run columns, numbered as shown in the table; empty if that row was not included |
 
-For example, `printf '%s: %s\n' "$ALLWORK_COLUMN_NAME" "$ALLWORK_COLUMN_BRANCH"` prints each project's name and branch. Quote references to preserve spaces and newlines. Values remain literal data, so shell syntax inside a cell is not executed. Existing output is captured at submission, including partial output from active runs, and remains available to queued commands if the source column is deleted. Run numbering follows the columns currently in the table.
+For example, `printf '%s: %s\n' "$ALL_WORK_COLUMN_NAME" "$ALL_WORK_COLUMN_BRANCH"` prints each project's name and branch. Quote references to preserve spaces and newlines. Values remain literal data, so shell syntax inside a cell is not executed. Existing output is captured at submission, including partial output from active runs, and remains available to queued commands if the source column is deleted. Run numbering follows the columns currently in the table.
 
 ## Development
 
@@ -99,7 +99,7 @@ pnpm build
 
 ## Contributing
 
-[Issues](https://github.com/kitschpatrol/allwork/issues) are welcome and appreciated.
+[Issues](https://github.com/kitschpatrol/all-work/issues) are welcome and appreciated.
 
 Please open an issue to discuss changes before submitting a pull request. Unsolicited PRs (especially AI-generated ones) are unlikely to be merged.
 

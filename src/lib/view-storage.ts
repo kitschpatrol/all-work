@@ -112,7 +112,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 	}
 }
 
-/** Load the shared JSON settings through the local AllWork server. */
+/** Load the shared JSON settings through the local All Work server. */
 export async function loadSettings(defaultDirectory: string) {
 	const saved = asRecord(await request<unknown>('/api/settings', {}))
 	return {

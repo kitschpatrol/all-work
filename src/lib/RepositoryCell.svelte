@@ -23,14 +23,14 @@
 	let menuError = $state('')
 
 	async function showMenu(event: MouseEvent) {
-		if (globalThis._allwork === undefined) {
+		if (globalThis._allWork === undefined) {
 			return
 		}
 
 		event.preventDefault()
 		menuError = ''
 		try {
-			const choice = await globalThis._allwork.showRepositoryMenu({
+			const choice = await globalThis._allWork.showRepositoryMenu({
 				hasGithubRemote: githubUrl !== undefined,
 				hasReadme: repository.readme !== '',
 			})

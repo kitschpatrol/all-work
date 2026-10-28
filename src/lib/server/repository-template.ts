@@ -16,7 +16,7 @@ function getUpstream(gitStats: undefined | UpstreamStats) {
 	}
 }
 
-/** Derive AllWork's project and repository fields from local Metascope sources. */
+/** Derive All Work's project and repository fields from local Metascope sources. */
 export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const project = templates.project(context, templateData)
 	const frontmatter = templates.frontmatter(context, templateData)

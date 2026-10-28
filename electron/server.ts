@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 // Adapter-node assumes HTTPS when reconstructing request origins unless a
 // protocol header is configured. Supply one so same-origin checks match this
 // local HTTP app. It must be set before the handler module is imported.
-process.env.PROTOCOL_HEADER = 'x-allwork-protocol'
+process.env.PROTOCOL_HEADER = 'x-all-work-protocol'
 // A large workspace's selection and column state can exceed the adapter's default request limit
 process.env.BODY_SIZE_LIMIT ??= '2M'
 
@@ -26,9 +26,9 @@ if (
 
 const { handler } = builtServer as { handler: http.RequestListener }
 const server = http.createServer((request, response) => {
-	request.headers['x-allwork-protocol'] = 'http'
+	request.headers['x-all-work-protocol'] = 'http'
 	handler(request, response)
 })
 server.listen(port, host, () => {
-	log.info(`AllWork is running at http://${host}:${port}`)
+	log.info(`All Work is running at http://${host}:${port}`)
 })

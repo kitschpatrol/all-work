@@ -19,7 +19,7 @@ async function readmeAmong(files: string[], directories: string[] = []) {
 }
 
 beforeEach(async () => {
-	directory = await mkdtemp(path.join(os.tmpdir(), 'allwork-readme-'))
+	directory = await mkdtemp(path.join(os.tmpdir(), 'all-work-readme-'))
 })
 
 afterEach(async () => {

@@ -10,7 +10,7 @@
 	const { actions, state }: { actions: MenuActions; state: MenuState } = $props()
 
 	onMount(() =>
-		globalThis._allwork?.onMenuCommand((command, payload) => {
+		globalThis._allWork?.onMenuCommand((command, payload) => {
 			if (Object.hasOwn(actions, command)) {
 				actions[command](payload)
 			}
@@ -18,6 +18,6 @@
 	)
 
 	$effect(() => {
-		globalThis._allwork?.updateMenuState(state)
+		globalThis._allWork?.updateMenuState(state)
 	})
 </script>

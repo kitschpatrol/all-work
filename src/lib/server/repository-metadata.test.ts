@@ -81,8 +81,8 @@ async function ready(workspace: Workspace) {
 }
 
 beforeEach(async () => {
-	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-metadata-'))
-	vi.stubEnv('ALLWORK_CACHE_DIRECTORY', path.join(temporaryDirectory, 'cache'))
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-metadata-'))
+	vi.stubEnv('ALL_WORK_CACHE_DIRECTORY', path.join(temporaryDirectory, 'cache'))
 	vi.mocked(extractMetadata).mockReset()
 	vi.mocked(extractMetadata).mockResolvedValue(context())
 })

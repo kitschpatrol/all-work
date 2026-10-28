@@ -13,7 +13,7 @@ import { isRepositoryMenuChoice } from '../src/lib/electron-api.js'
 
 const api: AllWorkApi = {
 	async chooseDirectory(): Promise<string | undefined> {
-		const result: unknown = await ipcRenderer.invoke('allwork:choose-directory')
+		const result: unknown = await ipcRenderer.invoke('all-work:choose-directory')
 		return typeof result === 'string' ? result : undefined
 	},
 	onMenuCommand(callback: (command: MenuCommand, payload?: string) => void): () => void {
@@ -27,29 +27,29 @@ const api: AllWorkApi = {
 			}
 		}
 
-		ipcRenderer.on('allwork:menu-command', listener)
+		ipcRenderer.on('all-work:menu-command', listener)
 		return (): void => {
-			ipcRenderer.removeListener('allwork:menu-command', listener)
+			ipcRenderer.removeListener('all-work:menu-command', listener)
 		}
 	},
 	async openWindow(request: AppWindowRequest): Promise<void> {
-		await ipcRenderer.invoke('allwork:open-window', request)
+		await ipcRenderer.invoke('all-work:open-window', request)
 	},
 	async showColumnMenu(request: ColumnMenuRequest): Promise<void> {
-		await ipcRenderer.invoke('allwork:column-menu', request)
+		await ipcRenderer.invoke('all-work:column-menu', request)
 	},
 	async showHiddenColumnsMenu(request: HiddenColumnsMenuRequest): Promise<void> {
-		await ipcRenderer.invoke('allwork:hidden-columns-menu', request)
+		await ipcRenderer.invoke('all-work:hidden-columns-menu', request)
 	},
 	async showRepositoryMenu(
 		request: RepositoryMenuRequest,
 	): Promise<RepositoryMenuChoice | undefined> {
-		const result: unknown = await ipcRenderer.invoke('allwork:repository-menu', request)
+		const result: unknown = await ipcRenderer.invoke('all-work:repository-menu', request)
 		return isRepositoryMenuChoice(result) ? result : undefined
 	},
 	updateMenuState(state: MenuState): void {
-		ipcRenderer.send('allwork:menu-state', state)
+		ipcRenderer.send('all-work:menu-state', state)
 	},
 }
 
-contextBridge.exposeInMainWorld('_allwork', api)
+contextBridge.exposeInMainWorld('_allWork', api)

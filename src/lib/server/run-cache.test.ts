@@ -33,8 +33,8 @@ function fixture(finished = true): CommandRun {
 }
 
 beforeEach(async () => {
-	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-run-cache-'))
-	vi.stubEnv('ALLWORK_CACHE_DIRECTORY', temporaryDirectory)
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-run-cache-'))
+	vi.stubEnv('ALL_WORK_CACHE_DIRECTORY', temporaryDirectory)
 })
 
 afterEach(async () => {
@@ -65,7 +65,7 @@ describe('persistent command output', () => {
 			finished: true,
 			results: {
 				fixture: {
-					output: 'cached output\n[Interrupted when AllWork closed.]',
+					output: 'cached output\n[Interrupted when All Work closed.]',
 					status: 'cancelled',
 				},
 			},

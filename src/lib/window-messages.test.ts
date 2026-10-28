@@ -11,7 +11,7 @@ function listen() {
 }
 
 function postRaw(data: unknown) {
-	const channel = new BroadcastChannel('allwork-windows')
+	const channel = new BroadcastChannel('all-work-windows')
 	channel.postMessage(data)
 	channel.close()
 }

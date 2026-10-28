@@ -71,7 +71,7 @@ const workspace: Workspace = {
 let temporaryDirectory: string
 
 beforeAll(async () => {
-	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'allwork-open-'))
+	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-open-'))
 	for (const [name, files] of [
 		['with readme', ['readme.txt', 'Readme.md']],
 		['without readme', ['notes.md']],
@@ -104,7 +104,7 @@ function localRequest(route: string, body: Record<string, unknown>) {
 	const url = new URL(`http://127.0.0.1:5173/api/${route}`)
 	const request = new Request(url, {
 		body: JSON.stringify(body),
-		headers: { 'Content-Type': 'application/json', origin: url.origin, 'X-Allwork-Request': '1' },
+		headers: { 'Content-Type': 'application/json', origin: url.origin, 'X-All-Work-Request': '1' },
 		method: 'POST',
 	})
 	return { request, url }

@@ -6,11 +6,11 @@ const metadataCacheFile = /^[a-f\d]{64}\.json$/iv
 
 /** Keep larger local caches outside browser storage. */
 export function cacheDirectory(kind: 'metadata' | 'runs') {
-	const override = process.env.ALLWORK_CACHE_DIRECTORY
+	const override = process.env.ALL_WORK_CACHE_DIRECTORY
 	return override === undefined
 		? path.join(
 				os.homedir(),
-				process.platform === 'darwin' ? 'Library/Caches/AllWork' : '.cache/allwork',
+				process.platform === 'darwin' ? 'Library/Caches/All Work' : '.cache/all-work',
 				kind,
 			)
 		: kind === 'metadata'

@@ -12,7 +12,8 @@ async function deleteRun(runId: string) {
 /**
  * Number new runs and keep cleared runs that filter rules still read. Numbers
  * count up from 1 and are not reused until the view resets, so "Run 3" in a
- * header, a filter rule, or `$ALLWORK_COLUMN_RUN_3` always means the same run.
+ * header, a filter rule, or `$ALL_WORK_COLUMN_RUN_3` always means the same
+ * run.
  *
  * @param isFiltered Whether a filter rule reads a run's output.
  *

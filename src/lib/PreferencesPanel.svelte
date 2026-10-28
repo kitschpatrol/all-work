@@ -215,7 +215,7 @@
 				><input type="checkbox" bind:checked={restoreWorkspace} /> Restore the last workspace on launch</label
 			>
 			<p class="preference-help">
-				Preferences and view settings are saved as JSON files in AllWork’s application data folder.
+				Preferences and view settings are saved as JSON files in All Work’s application data folder.
 				Metadata and command output are cached separately.
 			</p>
 			<div class="preference-reset">

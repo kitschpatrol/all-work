@@ -111,7 +111,7 @@ export type HiddenColumnsMenuRequest = {
 	groups: Array<{ category: string; columns: Array<{ id: string; label: string }> }>
 }
 
-/** The bridge the Electron preload script exposes to the renderer as `_allwork`. */
+/** The bridge the Electron preload script exposes to the renderer as `_allWork`. */
 export type AllWorkApi = {
 	chooseDirectory: () => Promise<string | undefined>
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void

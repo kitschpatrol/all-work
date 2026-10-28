@@ -14,8 +14,8 @@ const revisions = new Map<string, number>()
  * browser server.
  */
 export function settingsDirectory() {
-	if (process.env.ALLWORK_SETTINGS_DIRECTORY !== undefined) {
-		return path.resolve(process.env.ALLWORK_SETTINGS_DIRECTORY)
+	if (process.env.ALL_WORK_SETTINGS_DIRECTORY !== undefined) {
+		return path.resolve(process.env.ALL_WORK_SETTINGS_DIRECTORY)
 	}
 
 	const home = os.homedir()
@@ -25,7 +25,7 @@ export function settingsDirectory() {
 			: process.platform === 'win32'
 				? (process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming'))
 				: (process.env.XDG_CONFIG_HOME ?? path.join(home, '.config'))
-	return path.join(base, 'AllWork')
+	return path.join(base, 'All Work')
 }
 
 function filePath(kind: SettingsKind) {

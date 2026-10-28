@@ -3,7 +3,7 @@
 </script>
 
 <div class="app-identity">
-	<h1>AllWork</h1>
+	<h1>All Work</h1>
 	<button
 		class="button icon-button"
 		aria-label="Preferences"
