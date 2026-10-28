@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import type { Preferences, ReadmeApps } from './preferences.js'
+	import type { AppChoices, Preferences } from './preferences.js'
 	import { request } from './client-request.js'
 	import { defaultPreferences, parseIdentity, parseIdentityNames } from './preferences.js'
 	import { loadSettings, savePreferences } from './view-storage.js'
@@ -24,9 +24,11 @@
 	let authorNames = $state('')
 	let githubAccounts = $state('')
 	let readmeApp = $state('')
-	let readmeApps: ReadmeApps = $state({ apps: [], defaultName: '' })
+	let readmeApps: AppChoices = $state({ apps: [], defaultName: '' })
 	let restoreWorkspace = $state(true)
 	let showRepositoryShortcuts = $state(false)
+	let terminalApp = $state('')
+	let terminalApps: AppChoices = $state({ apps: [], defaultName: '' })
 	let busy = $state(true)
 	let message = $state('')
 	// Keep a saved choice selectable after its app is uninstalled or the list fails to load
@@ -35,6 +37,11 @@
 			? readmeApps.apps
 			: [...readmeApps.apps, { id: readmeApp, name: readmeApp }],
 	)
+	const terminalAppOptions = $derived(
+		terminalApp === '' || terminalApps.apps.some((app) => app.id === terminalApp)
+			? terminalApps.apps
+			: [...terminalApps.apps, { id: terminalApp, name: terminalApp }],
+	)
 
 	function readDraft() {
 		authorNames = preferences.identity.authorNames.join('\n')
@@ -42,6 +49,7 @@
 		readmeApp = preferences.readmeApp
 		restoreWorkspace = preferences.restoreWorkspace
 		showRepositoryShortcuts = preferences.showRepositoryShortcuts
+		terminalApp = preferences.terminalApp
 	}
 
 	onMount(() => {
@@ -67,7 +75,10 @@
 
 		void (async () => {
 			try {
-				readmeApps = await request<ReadmeApps>('/api/readme-apps', {})
+				;[readmeApps, terminalApps] = await Promise.all([
+					request<AppChoices>('/api/readme-apps', {}),
+					request<AppChoices>('/api/terminal-apps', {}),
+				])
 			} catch (error) {
 				message = error instanceof Error ? error.message : 'Applications could not be listed.'
 			}
@@ -111,6 +122,7 @@
 			readmeApp,
 			restoreWorkspace,
 			showRepositoryShortcuts,
+			terminalApp,
 			version: 1,
 		})
 		onClose()
@@ -174,6 +186,27 @@
 			</div>
 			<p class="preference-help">
 				Used by the readme shortcut button. Lists the applications macOS offers for Markdown files.
+			</p>
+		</fieldset>
+		<fieldset disabled={busy}>
+			<legend>Terminal</legend>
+			<div class="preference-field">
+				<label for="preference-terminal-app">Open with</label><select
+					id="preference-terminal-app"
+					bind:value={terminalApp}
+				>
+					<option value=""
+						>{terminalApps.defaultName === ''
+							? 'System default'
+							: `System default (${terminalApps.defaultName})`}</option
+					>
+					{#each terminalAppOptions as app (app.id)}<option value={app.id}>{app.name}</option
+						>{/each}
+				</select>
+			</div>
+			<p class="preference-help">
+				Used by the terminal shortcut button and Open Selected In › Terminal. The system default is
+				the app macOS uses for shell scripts.
 			</p>
 		</fieldset>
 		<fieldset disabled={busy}>

@@ -5,7 +5,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { listReadmeApps, openRepository as openRepositoryInApp } from './open-repository.js'
+import {
+	listReadmeApps,
+	listTerminalApps,
+	openRepository as openRepositoryInApp,
+} from './open-repository.js'
 import { readSettings } from './settings.js'
 
 const { launch } = vi.hoisted(() => ({ launch: vi.fn() }))
@@ -179,6 +183,19 @@ describe.skipIf(process.platform !== 'darwin')('the system default terminal', ()
 		},
 	)
 
+	it('opens the terminal chosen in preferences without looking up the default', async () => {
+		vi.mocked(readSettings).mockResolvedValue({
+			preferences: { terminalApp: 'com.mitchellh.ghostty' },
+			view: undefined,
+		})
+		await openRepository(repository.id, 'Terminal')
+		expect(launch).toHaveBeenCalledExactlyOnceWith(
+			'/usr/bin/open',
+			['-b', 'com.mitchellh.ghostty', '--', repository.path],
+			{ timeout: 15_000 },
+		)
+	})
+
 	it('reports a missing default without falling back to a different terminal', async () => {
 		launch.mockReturnValue('')
 		await expect(openRepository(repository.id, 'Terminal')).rejects.toMatchObject({
@@ -262,6 +279,48 @@ describe.skipIf(process.platform !== 'darwin')('listing applications for readmes
 		})
 		await expect(listApps()).rejects.toMatchObject({
 			body: { message: 'Could not list applications for readmes: osascript timed out' },
+			status: 500,
+		})
+	})
+})
+
+describe.skipIf(process.platform !== 'darwin')('listing terminal applications', () => {
+	async function listApps() {
+		const { request, url } = localRequest('terminal-apps', {})
+		return listTerminalApps(request, url)
+	}
+
+	it('lists installed known terminals by name, and names the system default', async () => {
+		launch.mockReturnValue(
+			JSON.stringify({
+				apps: [
+					{ id: 'com.mitchellh.ghostty', path: '/Applications/Ghostty.app' },
+					{ id: 'com.apple.Terminal', path: '/System/Applications/Utilities/Terminal.app' },
+				],
+				defaultApp: { id: 'com.ridiculousfish.HexFiend', path: '/Applications/Hex Fiend.app' },
+			}),
+		)
+		const response = await listApps()
+		await expect(response.json()).resolves.toEqual({
+			apps: [
+				{ id: 'com.mitchellh.ghostty', name: 'Ghostty' },
+				{ id: 'com.apple.Terminal', name: 'Terminal' },
+			],
+			defaultName: 'Hex Fiend',
+		})
+		expect(launch).toHaveBeenCalledExactlyOnceWith(
+			'/usr/bin/osascript',
+			expect.arrayContaining(['com.apple.Terminal', 'com.googlecode.iterm2']),
+			{ timeout: 15_000 },
+		)
+	})
+
+	it('reports why Launch Services could not be queried', async () => {
+		launch.mockImplementation(() => {
+			throw new Error('osascript timed out')
+		})
+		await expect(listApps()).rejects.toMatchObject({
+			body: { message: 'Could not list terminal applications: osascript timed out' },
 			status: 500,
 		})
 	})

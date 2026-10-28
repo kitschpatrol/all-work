@@ -43,6 +43,16 @@ describe('saved project identity', () => {
 		}
 	})
 
+	it('keeps a saved terminal app only when it is a bundle identifier', () => {
+		expect(defaultPreferences().terminalApp).toBe('')
+		expect(parsePreferences({ terminalApp: 'com.mitchellh.ghostty' }).terminalApp).toBe(
+			'com.mitchellh.ghostty',
+		)
+		for (const terminalApp of ['-a Terminal', '../Ghostty.app', 'com example', 42]) {
+			expect(parsePreferences({ terminalApp }).terminalApp).toBe('')
+		}
+	})
+
 	it('normalizes aliases without changing author casing', () => {
 		expect(
 			parseIdentity({

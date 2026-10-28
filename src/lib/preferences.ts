@@ -22,14 +22,19 @@ export type Preferences = {
 	readmeApp: string
 	restoreWorkspace: boolean
 	showRepositoryShortcuts: boolean
+	/**
+	 * Bundle identifier of the app that opens repositories in a terminal, or
+	 * empty for the system default.
+	 */
+	terminalApp: string
 	version: 1
 }
 
-/** An installed application that can open Markdown readmes. */
-export type ReadmeApp = { id: string; name: string }
+/** An installed application, by bundle identifier and the name Finder shows. */
+export type InstalledApp = { id: string; name: string }
 
-/** Applications that can open readmes, and the name of the system default. */
-export type ReadmeApps = { apps: ReadmeApp[]; defaultName: string }
+/** Applications offered for a task, and the name of the system default. */
+export type AppChoices = { apps: InstalledApp[]; defaultName: string }
 
 const separator = /[,\n]/v
 const accountPrefix = /^@/v
@@ -55,6 +60,7 @@ export function defaultPreferences(): Preferences {
 		readmeApp: '',
 		restoreWorkspace: true,
 		showRepositoryShortcuts: false,
+		terminalApp: '',
 		version: 1,
 	}
 }
@@ -107,6 +113,7 @@ export function parsePreferences(value: unknown): Preferences {
 		readmeApp: isBundleId(record?.readmeApp) ? record.readmeApp : defaults.readmeApp,
 		restoreWorkspace: record?.restoreWorkspace !== false,
 		showRepositoryShortcuts: record?.showRepositoryShortcuts === true,
+		terminalApp: isBundleId(record?.terminalApp) ? record.terminalApp : defaults.terminalApp,
 		version: 1,
 	}
 }

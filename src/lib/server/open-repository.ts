@@ -1,4 +1,4 @@
-import type { ReadmeApp, ReadmeApps } from '#lib/preferences.js'
+import type { AppChoices, InstalledApp } from '#lib/preferences.js'
 import type { Repository } from '#lib/workspace.js'
 import { error } from '@sveltejs/kit'
 import { isBundleId, parsePreferences } from '#lib/preferences.js'
@@ -40,6 +40,37 @@ function run([file]) {
 }
 `
 
+// Find which of the given terminal apps are installed. The system default is
+// the UNIX executable handler, which macOS may assign to a non-terminal app.
+const terminalAppsScript = `
+ObjC.import('AppKit')
+function run(ids) {
+	const workspace = $.NSWorkspace.sharedWorkspace
+	const describe = (app) => ({
+		id: ObjC.unwrap($.NSBundle.bundleWithURL(app).bundleIdentifier) ?? '',
+		path: ObjC.unwrap(app.path),
+	})
+	const fallback = workspace.URLForApplicationToOpenURL($.NSURL.fileURLWithPath('/bin/zsh'))
+	return JSON.stringify({
+		apps: ids
+			.map((id) => workspace.URLForApplicationWithBundleIdentifier(id))
+			.filter((app) => !app.isNil())
+			.map(describe),
+		defaultApp: fallback.isNil() ? undefined : describe(fallback),
+	})
+}
+`
+
+// Terminals known to open a new window in a folder passed to `open`
+const terminalBundleIds = [
+	'com.apple.Terminal',
+	'com.github.wez.wezterm',
+	'com.googlecode.iterm2',
+	'com.mitchellh.ghostty',
+	'dev.warp.Warp-Stable',
+	'net.kovidgoyal.kitty',
+]
+
 async function execute(command: string, args: string[]): Promise<string> {
 	return new Promise<string>((resolve, reject) => {
 		execFile(command, args, { timeout: 15_000 }, (cause, stdout) => {
@@ -75,10 +106,22 @@ async function launchArguments(
 		]
 	}
 
-	const targetApp =
-		app === 'Terminal'
-			? await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', defaultTerminalScript])
-			: app
+	if (app === 'Tower') {
+		return ['-a', app, '--', repository.path]
+	}
+
+	const settings = await readSettings()
+	const { terminalApp } = parsePreferences(settings.preferences)
+	if (terminalApp !== '') {
+		return ['-b', terminalApp, '--', repository.path]
+	}
+
+	const targetApp = await execute('/usr/bin/osascript', [
+		'-l',
+		'JavaScript',
+		'-e',
+		defaultTerminalScript,
+	])
 	if (targetApp === '') {
 		throw new Error('No default terminal application is configured in macOS.')
 	}
@@ -88,7 +131,7 @@ async function launchArguments(
 
 /**
  * Open a scanned repository folder in a supported native macOS application, or
- * its readme in the application chosen in preferences.
+ * its readme or a terminal in the application chosen in preferences.
  */
 export async function openRepository(
 	request: Request,
@@ -119,7 +162,7 @@ export async function openRepository(
 	}
 }
 
-function readApp(value: unknown): ReadmeApp | undefined {
+function readApp(value: unknown): InstalledApp | undefined {
 	const app = asRecord(value)
 	return isBundleId(app?.id) && typeof app.path === 'string' && app.path !== ''
 		? { id: app.id, name: path.basename(app.path, '.app') }
@@ -127,13 +170,34 @@ function readApp(value: unknown): ReadmeApp | undefined {
 }
 
 /**
- * List installed applications that can open Markdown readmes, named as Finder
- * names them and sorted by name, with one entry per bundle identifier.
+ * Name apps as Finder names them and sort them by name, with one entry per
+ * bundle identifier.
  */
+function readAppChoices(output: string): AppChoices {
+	const result = asRecord(JSON.parse(output) as unknown)
+	const entries: unknown[] = Array.isArray(result?.apps) ? result.apps : []
+	const apps = new Map<string, InstalledApp>()
+	for (const entry of entries) {
+		const app = readApp(entry)
+		if (app !== undefined && !apps.has(app.id)) {
+			apps.set(app.id, app)
+		}
+	}
+
+	return {
+		apps: apps
+			.values()
+			.toArray()
+			.toSorted((a, b) => a.name.localeCompare(b.name)),
+		defaultName: readApp(result?.defaultApp)?.name ?? '',
+	}
+}
+
+/** List installed applications that can open Markdown readmes. */
 export async function listReadmeApps(request: Request, url: URL): Promise<Response> {
 	await readRequest(request, url)
 	if (process.platform !== 'darwin') {
-		return Response.json({ apps: [], defaultName: '' } satisfies ReadmeApps)
+		return Response.json({ apps: [], defaultName: '' } satisfies AppChoices)
 	}
 
 	// Launch Services only answers for files that exist
@@ -141,26 +205,11 @@ export async function listReadmeApps(request: Request, url: URL): Promise<Respon
 	try {
 		const sample = path.join(directory, 'readme.md')
 		await writeFile(sample, '# Readme\n')
-		const output: unknown = JSON.parse(
-			await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', markdownAppsScript, sample]),
+		return Response.json(
+			readAppChoices(
+				await execute('/usr/bin/osascript', ['-l', 'JavaScript', '-e', markdownAppsScript, sample]),
+			),
 		)
-		const result = asRecord(output)
-		const entries: unknown[] = Array.isArray(result?.apps) ? result.apps : []
-		const apps = new Map<string, ReadmeApp>()
-		for (const entry of entries) {
-			const app = readApp(entry)
-			if (app !== undefined && !apps.has(app.id)) {
-				apps.set(app.id, app)
-			}
-		}
-
-		return Response.json({
-			apps: apps
-				.values()
-				.toArray()
-				.toSorted((a, b) => a.name.localeCompare(b.name)),
-			defaultName: readApp(result?.defaultApp)?.name ?? '',
-		} satisfies ReadmeApps)
 	} catch (error_) {
 		error(
 			500,
@@ -168,5 +217,32 @@ export async function listReadmeApps(request: Request, url: URL): Promise<Respon
 		)
 	} finally {
 		await rm(directory, { force: true, recursive: true })
+	}
+}
+
+/** List the installed terminal applications that repositories can open in. */
+export async function listTerminalApps(request: Request, url: URL): Promise<Response> {
+	await readRequest(request, url)
+	if (process.platform !== 'darwin') {
+		return Response.json({ apps: [], defaultName: '' } satisfies AppChoices)
+	}
+
+	try {
+		return Response.json(
+			readAppChoices(
+				await execute('/usr/bin/osascript', [
+					'-l',
+					'JavaScript',
+					'-e',
+					terminalAppsScript,
+					...terminalBundleIds,
+				]),
+			),
+		)
+	} catch (error_) {
+		error(
+			500,
+			`Could not list terminal applications: ${error_ instanceof Error ? error_.message : String(error_)}`,
+		)
 	}
 }

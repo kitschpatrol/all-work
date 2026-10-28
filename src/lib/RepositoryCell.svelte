@@ -150,9 +150,9 @@
 			</button>
 			<button
 				class="repository-action"
-				aria-label="Open {repository.name} in default terminal"
+				aria-label="Open {repository.name} in terminal"
 				onclick={async () => onOpen(repository, 'terminal')}
-				title="Open in default terminal"
+				title="Open in terminal"
 				type="button"
 			>
 				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16"
