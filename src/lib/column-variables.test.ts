@@ -124,6 +124,21 @@ describe('column variables', () => {
 		).toEqual([])
 	})
 
+	it('waits for cached values that are refreshing, but not for refreshed ones', () => {
+		const restored = (status: 'loading' | 'queued' | 'ready', cached?: true) => ({
+			...repository,
+			metadata: {
+				groups: { git: { status, ...(cached && { cached }) } },
+				values: {},
+			},
+		})
+		const command = 'git push origin "$ALL_WORK_COLUMN_BRANCH"'
+		expect(getPendingCommandColumns(command, [restored('queued', true)])).toEqual(['Branch'])
+		expect(getPendingCommandColumns(command, [restored('loading', true)])).toEqual(['Branch'])
+		expect(getPendingCommandColumns(command, [restored('ready', true)])).toEqual([])
+		expect(getPendingCommandColumns(command, [restored('loading')])).toEqual([])
+	})
+
 	it('exposes each data column with a shell-safe name and its raw value', () => {
 		expect(getColumnEnvironment(repository)).toMatchObject(
 			Object.fromEntries([

@@ -67,7 +67,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 	if (pendingColumns.length > 0) {
 		error(
 			409,
-			`Metadata is not loaded for: ${pendingColumns.join(', ')}. Load it for the selected rows from the Metadata menu before running.`,
+			`Metadata is still loading for: ${pendingColumns.join(', ')}. Wait for it to finish, or load it for the selected rows from the Metadata menu, before running.`,
 		)
 	}
 

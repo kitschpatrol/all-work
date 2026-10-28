@@ -256,9 +256,11 @@ export function getPendingCommandColumns(
 			return repositories.some((repository) => {
 				const value = column.value(repository)
 				const state = repository.metadata?.groups[column.group]
+				const refreshing = state?.status === 'queued' || state?.status === 'loading'
+				// A value restored from the cache may change once its refresh finishes
 				return (
-					(value === undefined || value === '') &&
-					(state === undefined || state.status === 'queued' || state.status === 'loading')
+					(state === undefined && (value === undefined || value === '')) ||
+					(refreshing && (value === undefined || value === '' || state.cached === true))
 				)
 			})
 		})

@@ -56,14 +56,42 @@ const cacheAges: Partial<Record<MetadataGroup, number>> = {
 	github: 15 * 60_000,
 	registry: 24 * 60 * 60_000,
 }
+// Every group shows its last results at launch. Local and Git results refresh
+// right away, and the rest as their ages or explicit requests call for.
 const persistedGroups = new Set<MetadataGroup>([
 	'ci',
 	'code',
 	'files',
+	'git',
 	'github',
+	'local',
 	'registry',
 	'updates',
 ])
+// Row fields that local and Git sources set outside the metadata values
+const persistedFields: Partial<Record<MetadataGroup, Array<keyof Repository>>> = {
+	git: [
+		'ahead',
+		'behind',
+		'branch',
+		'changedFiles',
+		'gitStatusAvailable',
+		'lastCommit',
+		'lastCommitDate',
+		'upstream',
+		'upstreamGone',
+	],
+	local: [
+		'description',
+		'name',
+		'packageManager',
+		'readme',
+		'remote',
+		'repoName',
+		'repoOwner',
+		'version',
+	],
+}
 const releaseFields = new Set(['Latest Release Date', 'Latest Release Version', 'Releases'])
 
 function cachePath(repository: Repository, group: MetadataGroup, identity?: ProjectIdentity) {
@@ -84,6 +112,17 @@ function isValue(value: unknown): value is MetadataValue {
 		(typeof value === 'number' && Number.isFinite(value)) ||
 		(Array.isArray(value) && value.every((item: unknown) => typeof item === 'string'))
 	)
+}
+
+function restoreFields(repository: Repository, group: MetadataGroup, fields: unknown) {
+	const keys = persistedFields[group] ?? []
+	for (const key of keys) {
+		const value: unknown =
+			typeof fields === 'object' && fields !== null ? Reflect.get(fields, key) : undefined
+		if (typeof value === typeof repository[key]) {
+			Object.assign(repository, { [key]: value })
+		}
+	}
 }
 
 async function restoreCache(repository: Repository, identity?: ProjectIdentity) {
@@ -115,6 +154,8 @@ async function restoreCache(repository: Repository, identity?: ProjectIdentity) 
 					metadata.values[key] = value
 				}
 			}
+
+			restoreFields(repository, group, 'fields' in cached ? cached.fields : undefined)
 
 			metadata.groups[group] = { cached: true, status: 'ready', updatedAt: cached.updatedAt }
 		} catch {
@@ -150,7 +191,13 @@ async function saveCache(repository: Repository, group: MetadataGroup, identity?
 		await mkdir(cacheDirectory('metadata'), { mode: 0o700, recursive: true })
 		await writeFile(
 			temporaryFile,
-			JSON.stringify({ updatedAt: metadata.groups[group]?.updatedAt, values }),
+			JSON.stringify({
+				fields: Object.fromEntries(
+					(persistedFields[group] ?? []).map((key) => [key, repository[key]]),
+				),
+				updatedAt: metadata.groups[group]?.updatedAt,
+				values,
+			}),
 			{ mode: 0o600 },
 		)
 		await rename(temporaryFile, file)

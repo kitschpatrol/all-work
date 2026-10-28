@@ -82,6 +82,20 @@ async function ready(workspace: Workspace) {
 	)
 }
 
+type CacheRecord = Partial<Record<'fields' | 'values', Record<string, unknown>>>
+
+// One key's value in each cache record, which are named by hashes
+async function cached(kind: keyof CacheRecord, key: string): Promise<unknown[]> {
+	const directory = path.join(temporaryDirectory, 'cache')
+	const files = await readdir(directory)
+	const records = await Promise.all(
+		files.map(
+			async (file) => JSON.parse(await readFile(path.join(directory, file), 'utf8')) as CacheRecord,
+		),
+	)
+	return records.map((record) => record[kind]?.[key])
+}
+
 beforeEach(async () => {
 	temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'all-work-metadata-'))
 	vi.stubEnv('ALL_WORK_CACHE_DIRECTORY', path.join(temporaryDirectory, 'cache'))
@@ -159,12 +173,7 @@ describe('progressive Metascope metadata', () => {
 		expect(workspace.repositories[0]?.metadata?.values['Total Files']).toBe(42)
 		// Let the atomic cache write finish before simulating another workspace.
 		await vi.waitFor(async () => {
-			const files = await readdir(path.join(temporaryDirectory, 'cache'))
-			expect(files).toHaveLength(1)
-			const saved: unknown = JSON.parse(
-				await readFile(path.join(temporaryDirectory, 'cache', files[0] ?? ''), 'utf8'),
-			)
-			expect(saved).toMatchObject({ values: { 'Total Files': 42 } })
+			expect(await cached('values', 'Total Files')).toContain(42)
 		})
 		totalFiles = 84
 		const restored: number[] = []
@@ -187,6 +196,44 @@ describe('progressive Metascope metadata', () => {
 			expect(reloaded.repositories[0]?.metadata?.groups.files?.status).toBe('error'),
 		)
 		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(84)
+	})
+
+	it('shows cached local and Git fields while they refresh', async () => {
+		const workspace = fixture()
+		const repository = workspace.repositories[0]
+		await mkdir(repository?.path ?? '')
+		await writeFile(path.join(repository?.path ?? '', 'README.md'), '# Fixture\n')
+		begin(workspace)
+		await ready(workspace)
+		expect(repository).toMatchObject({ branch: 'main', readme: 'README.md' })
+		await vi.waitFor(async () => {
+			expect(await cached('fields', 'readme')).toContain('README.md')
+			expect(await cached('fields', 'branch')).toContain('main')
+		})
+
+		await rm(path.join(repository?.path ?? '', 'README.md'))
+		const scan = Promise.withResolvers<MetadataContext>()
+		vi.mocked(extractMetadata).mockReturnValueOnce(scan.promise)
+		const reloaded = fixture()
+		const restored = reloaded.repositories[0]
+		const notify = vi.fn<(repository: Repository) => void>()
+		const controller = startWorkspaceMetadata(reloaded, notify, async (target) => {
+			target.gitStatusAvailable = true
+			target.branch = 'next'
+			await Promise.resolve()
+		})
+		controllers.push(controller)
+		await vi.waitFor(() => expect(restored?.metadata?.groups.local?.status).toBe('loading'))
+		expect(restored).toMatchObject({
+			branch: 'main',
+			gitStatusAvailable: true,
+			readme: 'README.md',
+		})
+		expect(restored?.metadata?.groups.git).toMatchObject({ cached: true, status: 'queued' })
+		scan.resolve(context())
+		await ready(reloaded)
+		expect(restored).toMatchObject({ branch: 'next', readme: '' })
+		expect(restored?.metadata?.groups.git?.cached).toBeUndefined()
 	})
 
 	it('rechecks the readme whenever local metadata refreshes', async () => {
@@ -288,12 +335,7 @@ describe('progressive Metascope metadata', () => {
 		expect(metadata?.groups.github?.updatedAt).toBe(updatedAt)
 		expect(metadata?.groups.github?.cached).toBe(true)
 		await vi.waitFor(async () => {
-			const files = await readdir(path.join(temporaryDirectory, 'cache'))
-			expect(files).toHaveLength(1)
-			const saved: unknown = JSON.parse(
-				await readFile(path.join(temporaryDirectory, 'cache', files[0] ?? ''), 'utf8'),
-			)
-			expect(saved).toMatchObject({ values: { 'Latest Release Version': '2.0.0' } })
+			expect(await cached('values', 'Latest Release Version')).toContain('2.0.0')
 		})
 		// A cached published version must survive the later local-tag fallback.
 		vi.mocked(extractMetadata)
@@ -353,9 +395,7 @@ describe('progressive Metascope metadata', () => {
 		)
 		controller.request(['fixture'], ['github'], true)
 		await vi.waitFor(() => expect(workspace.repositories[0]?.metadata?.values.Stars).toBe(7))
-		await vi.waitFor(async () =>
-			expect(await readdir(path.join(temporaryDirectory, 'cache'))).toHaveLength(1),
-		)
+		await vi.waitFor(async () => expect(await cached('values', 'Stars')).toContain(7))
 		const reloaded = fixture()
 		reloaded.identity = { authorNames: ['Second'], githubAccounts: ['second'] }
 		begin(reloaded)
