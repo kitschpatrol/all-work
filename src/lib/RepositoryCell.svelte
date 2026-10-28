@@ -34,12 +34,34 @@
 				hasGithubRemote: githubUrl !== undefined,
 				hasReadme: repository.readme !== '',
 			})
-			if (choice === 'github' || choice === 'vscode') {
-				openRepositoryLink(repository, choice)
-			} else if (choice === 'refresh') {
-				await onRefresh(repository)
-			} else if (choice !== undefined) {
-				await onOpen(repository, choice)
+			switch (choice) {
+				case 'copyPath': {
+					await navigator.clipboard.writeText(repository.path)
+					break
+				}
+
+				case 'finder':
+				case 'readme':
+				case 'terminal':
+				case 'tower': {
+					await onOpen(repository, choice)
+					break
+				}
+
+				case 'github':
+				case 'vscode': {
+					openRepositoryLink(repository, choice)
+					break
+				}
+
+				case 'refresh': {
+					await onRefresh(repository)
+					break
+				}
+
+				case undefined: {
+					break
+				}
 			}
 		} catch (error) {
 			menuError = error instanceof Error ? error.message : String(error)

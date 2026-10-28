@@ -53,8 +53,17 @@ describe('menu requests arriving over IPC', () => {
 		}
 	})
 
-	it('narrows repository menu choices to open targets and refresh', () => {
-		for (const choice of ['readme', 'refresh', 'finder', 'github', 'terminal', 'tower', 'vscode']) {
+	it('narrows repository menu choices to open targets, copy path, and refresh', () => {
+		for (const choice of [
+			'copyPath',
+			'readme',
+			'refresh',
+			'finder',
+			'github',
+			'terminal',
+			'tower',
+			'vscode',
+		]) {
 			expect(isRepositoryMenuChoice(choice)).toBe(true)
 		}
 

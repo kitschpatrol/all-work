@@ -54,7 +54,7 @@ const openTargets = ['finder', 'github', 'readme', 'terminal', 'tower', 'vscode'
 export type OpenTarget = (typeof openTargets)[number]
 
 /** An item chosen from a repository's context menu. */
-export type RepositoryMenuChoice = 'refresh' | OpenTarget
+export type RepositoryMenuChoice = 'copyPath' | 'refresh' | OpenTarget
 
 /** Which of a repository's context menu items can be used. */
 export type RepositoryMenuRequest = { hasGithubRemote: boolean; hasReadme: boolean }
@@ -201,7 +201,7 @@ export function isOpenTarget(value: unknown): value is OpenTarget {
 
 /** Narrow the item returned by a repository's context menu. */
 export function isRepositoryMenuChoice(value: unknown): value is RepositoryMenuChoice {
-	return value === 'refresh' || isOpenTarget(value)
+	return value === 'copyPath' || value === 'refresh' || isOpenTarget(value)
 }
 
 /** Validate a repository context menu request arriving over IPC. */

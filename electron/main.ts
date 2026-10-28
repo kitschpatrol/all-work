@@ -341,6 +341,8 @@ async function main(): Promise<void> {
 					['Open in Terminal', 'terminal', true],
 					['Reveal in Finder', 'finder', true],
 					'separator',
+					['Copy Path', 'copyPath', true],
+					'separator',
 					['Refresh Metadata', 'refresh', true],
 				]
 				Menu.buildFromTemplate(
