@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Repository, Workspace } from '../workspace.js'
+import type { MetadataChange, Repository, Workspace } from '../workspace.js'
 import { metadataColumns } from '../metadata-columns.js'
 import { resolveGithubToken } from './github-token.js'
 import { extractMetadata } from './metascope-process.js'
@@ -56,7 +56,10 @@ function fixture(): Workspace {
 	}
 }
 
-function begin(workspace: Workspace, notify = vi.fn<(repository: Repository) => void>()) {
+function begin(
+	workspace: Workspace,
+	notify = vi.fn<(repository: Repository, change: MetadataChange) => void>(),
+) {
 	const controller = startWorkspaceMetadata(workspace, notify, async (repository) => {
 		repository.gitStatusAvailable = true
 		repository.branch = 'main'
@@ -196,6 +199,18 @@ describe('progressive Metascope metadata', () => {
 			expect(reloaded.repositories[0]?.metadata?.groups.files?.status).toBe('error'),
 		)
 		expect(reloaded.repositories[0]?.metadata?.values['Total Files']).toBe(84)
+	})
+
+	it('reports loading states apart from changed rows', async () => {
+		const notify = vi.fn<(repository: Repository, change: MetadataChange) => void>()
+		const workspace = fixture()
+		begin(workspace, notify)
+		await ready(workspace)
+		const changes = notify.mock.calls.map(([, change]) => change)
+		// The cache restore and each of the local, Git, code, and files extractions
+		expect(changes.filter((change) => change === 'row')).toHaveLength(5)
+		// Queuing and starting each of those four extractions
+		expect(changes.filter((change) => change === 'status')).toHaveLength(8)
 	})
 
 	it('shows cached local and Git fields while they refresh', async () => {

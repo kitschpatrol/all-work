@@ -65,6 +65,7 @@
 	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
+	import { mergeGroups, mergeRepository } from '#lib/repository-merge.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
@@ -630,19 +631,28 @@
 	function watchMetadata(workspaceId: string) {
 		metadataStream = watchWorkspaceMetadata(
 			workspaceId,
-			(rows, snapshot) => {
+			(event) => {
 				if (workspace?.id !== workspaceId) {
 					return
 				}
 
-				if (snapshot) {
-					workspace.repositories = rows
+				if (event.snapshot) {
+					workspace.repositories = event.repositories
 				} else {
-					const replacements = new Map(rows.map((repository) => [repository.id, repository]))
-					for (const repository of workspace.repositories) {
-						const update = replacements.get(repository.id)
-						if (update !== undefined) {
-							Object.assign(repository, update)
+					const rows = new Map(
+						workspace.repositories.map((repository) => [repository.id, repository]),
+					)
+					for (const update of event.repositories) {
+						const row = rows.get(update.id)
+						if (row !== undefined) {
+							mergeRepository(row, update)
+						}
+					}
+
+					for (const { groups, id } of event.statuses) {
+						const row = rows.get(id)
+						if (row !== undefined) {
+							mergeGroups(row, groups)
 						}
 					}
 

@@ -1,5 +1,6 @@
 import type { ProjectIdentity } from '#lib/preferences.js'
 import type {
+	MetadataChange,
 	MetadataGroup,
 	MetadataState,
 	MetadataValue,
@@ -407,7 +408,7 @@ function normalizeContext(extracted: unknown): MetadataContext {
  */
 export function startWorkspaceMetadata(
 	workspace: Workspace,
-	notify: (repository: Repository) => void,
+	notify: (repository: Repository, change: MetadataChange) => void,
 	supplementGit: (repository: Repository) => Promise<void>,
 ) {
 	type Job = { group: MetadataGroup; priority: number; repository: Repository }
@@ -427,7 +428,7 @@ export function startWorkspaceMetadata(
 		}
 
 		metadata.groups[group] = { ...metadata.groups[group], error: undefined, status: 'loading' }
-		notify(repository)
+		notify(repository, 'status')
 		try {
 			const offline = ['code', 'files', 'git', 'local'].includes(group)
 			if (!offline) {
@@ -490,7 +491,7 @@ export function startWorkspaceMetadata(
 			}
 		} finally {
 			if (!disposed) {
-				notify(repository)
+				notify(repository, 'row')
 				if (group === 'local') {
 					request([repository.id], ['git'])
 				}
@@ -569,7 +570,7 @@ export function startWorkspaceMetadata(
 					priority: prioritize ? 1 : backgroundPriorities[group],
 					repository,
 				})
-				notify(repository)
+				notify(repository, 'status')
 			}
 		}
 
@@ -583,7 +584,7 @@ export function startWorkspaceMetadata(
 				return
 			}
 
-			notify(repository)
+			notify(repository, 'row')
 			request([repository.id], ['local', 'git', 'code', 'files'], true)
 		}),
 	)

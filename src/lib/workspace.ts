@@ -20,7 +20,7 @@ export type Repository = {
 	lastCommit: string
 	lastCommitDate: string
 	metadata?: {
-		groups: Partial<Record<MetadataGroup, MetadataState>>
+		groups: MetadataGroups
 		values: Record<string, MetadataValue>
 	}
 	name: string
@@ -43,6 +43,22 @@ export type Repository = {
 	/** Whether the upstream is configured but its ref is missing locally. */
 	upstreamGone: boolean
 	version: string
+}
+
+/** Loading states for each metadata group. */
+export type MetadataGroups = Partial<Record<MetadataGroup, MetadataState>>
+
+/** Whether a repository's row data changed, or only its metadata loading states. */
+export type MetadataChange = 'row' | 'status'
+
+/**
+ * Repository changes streamed to the page: whole rows that changed, and the
+ * loading states of rows whose data did not.
+ */
+export type MetadataEvent = {
+	repositories: Repository[]
+	snapshot: boolean
+	statuses: Array<{ groups: MetadataGroups; id: string }>
 }
 
 export type Workspace = {

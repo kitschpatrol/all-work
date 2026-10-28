@@ -1,5 +1,5 @@
 import type { ProjectIdentity } from '#lib/preferences.js'
-import type { Repository, Workspace } from '#lib/workspace.js'
+import type { MetadataChange, Repository, Workspace } from '#lib/workspace.js'
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { access, readdir, realpath, stat } from 'node:fs/promises'
@@ -30,7 +30,8 @@ const ignoredDirectories = new Set([
 ])
 const workspaces = new Map<string, Workspace>()
 const metadataControllers = new Map<string, ReturnType<typeof startWorkspaceMetadata>>()
-const workspaceListeners = new Map<string, Set<(repository: Repository) => void>>()
+type WorkspaceListener = (repository: Repository, change: MetadataChange) => void
+const workspaceListeners = new Map<string, Set<WorkspaceListener>>()
 
 async function git(directory: string, args: string[]): Promise<string> {
 	const environment = {
@@ -291,10 +292,10 @@ export async function scanWorkspace(
 		workspace.id,
 		startWorkspaceMetadata(
 			workspace,
-			(repository) => {
+			(repository, change) => {
 				const listeners = workspaceListeners.get(workspace.id) ?? []
 				for (const listener of listeners) {
-					listener(repository)
+					listener(repository, change)
 				}
 			},
 			supplementGitMetadata,
@@ -343,10 +344,10 @@ export function requestWorkspaceMetadata(
 }
 
 /**
- * Subscribe to row replacements, with a snapshot supplied by the event
- * endpoint.
+ * Subscribe to changed rows and loading states, with a snapshot supplied by the
+ * event endpoint.
  */
-export function subscribeWorkspace(id: string, listener: (repository: Repository) => void) {
+export function subscribeWorkspace(id: string, listener: WorkspaceListener) {
 	let listeners = workspaceListeners.get(id)
 	if (listeners === undefined) {
 		listeners = new Set()

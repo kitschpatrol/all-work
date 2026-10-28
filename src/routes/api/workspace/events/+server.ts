@@ -1,4 +1,4 @@
-import type { Repository } from '#lib/workspace.js'
+import type { MetadataEvent, Repository } from '#lib/workspace.js'
 import { error } from '@sveltejs/kit'
 import { getWorkspace, subscribeWorkspace } from '#lib/server/repositories.js'
 import type { RequestHandler } from './$types'
@@ -14,41 +14,54 @@ export const GET: RequestHandler = ({ request, url }) => {
 	let unsubscribe: (() => void) | undefined
 	let heartbeat: ReturnType<typeof setInterval> | undefined
 	const encoder = new TextEncoder()
-	const pending = new Map<string, Repository>()
+	const rows = new Map<string, Repository>()
+	const statuses = new Map<string, Repository>()
 	let batchTimer: ReturnType<typeof setTimeout> | undefined
 	function cleanup() {
 		closed = true
 		unsubscribe?.()
 		clearInterval(heartbeat)
 		clearTimeout(batchTimer)
-		pending.clear()
+		rows.clear()
+		statuses.clear()
 		request.signal.removeEventListener('abort', cleanup)
+	}
+
+	function send(controller: ReadableStreamDefaultController<Uint8Array>, event: MetadataEvent) {
+		controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
 	}
 
 	const stream = new ReadableStream<Uint8Array>({
 		cancel: cleanup,
 		start(controller) {
-			unsubscribe = subscribeWorkspace(id, (repository) => {
+			// Loading states change far more often than rows, and need only their groups sent
+			unsubscribe = subscribeWorkspace(id, (repository, change) => {
 				if (closed) {
 					return
 				}
 
-				pending.set(repository.id, repository)
+				if (change === 'row') {
+					rows.set(repository.id, repository)
+				} else {
+					statuses.set(repository.id, repository)
+				}
+
 				batchTimer ??= setTimeout(() => {
 					batchTimer = undefined
-					controller.enqueue(
-						encoder.encode(
-							`data: ${JSON.stringify({ repositories: pending.values().toArray(), snapshot: false })}\n\n`,
-						),
-					)
-					pending.clear()
+					send(controller, {
+						repositories: rows.values().toArray(),
+						snapshot: false,
+						statuses: statuses
+							.values()
+							.filter((entry) => !rows.has(entry.id))
+							.map((entry) => ({ groups: entry.metadata?.groups ?? {}, id: entry.id }))
+							.toArray(),
+					})
+					rows.clear()
+					statuses.clear()
 				}, 120)
 			})
-			controller.enqueue(
-				encoder.encode(
-					`data: ${JSON.stringify({ repositories: workspace.repositories, snapshot: true })}\n\n`,
-				),
-			)
+			send(controller, { repositories: workspace.repositories, snapshot: true, statuses: [] })
 			heartbeat = setInterval(() => {
 				controller.enqueue(encoder.encode(': heartbeat\n\n'))
 			}, 15_000)
