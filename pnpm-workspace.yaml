@@ -14,9 +14,8 @@ minimumReleaseAgeExclude:
   - '@kitschpatrol/stylelint-config@8.14.0'
   - '@kitschpatrol/typescript-config@8.14.0'
   - mdat@3.6.6
+  - metascope@0.13.6
   - remark-mdat@3.1.2
-overrides:
-  metascope: 'file:../metascope'
 peerDependencyRules:
   allowedVersions:
     # Remove once the installed version declares ESLint 10 support.
