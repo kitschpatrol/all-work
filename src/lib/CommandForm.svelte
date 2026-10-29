@@ -6,20 +6,24 @@
 
 	/* eslint-disable ts/no-useless-default-assignment -- $bindable() marks a prop bindable, it is not a default */
 	let {
+		autoClear = $bindable(),
 		command = $bindable(),
 		concurrency = $bindable(),
 		history,
 		loading,
 		onRun,
+		outputLines = $bindable(),
 		starting,
 		targetCount,
 		variables,
 	}: {
+		autoClear: boolean
 		command: string
 		concurrency: number
 		history: string[]
 		loading: boolean
 		onRun: () => Promise<void>
+		outputLines: number
 		starting: boolean
 		targetCount: number
 		variables: Array<{ category: string; id: string; label: string; name: string; preview: string }>
@@ -112,75 +116,97 @@
 	}}
 >
 	<label class="field-label" for="shell-command">Command</label>
-	<div class="command-input">
-		<input
-			bind:this={input}
-			id="shell-command"
-			aria-label="Shell command"
-			autocomplete="off"
-			oninput={() => {
-				historyIndex = -1
-			}}
-			onkeydown={recall}
-			placeholder="git status --short"
-			spellcheck="false"
-			bind:value={command}
-		/>
-		<CommandAutocomplete {input} onComplete={choose} {variables} />
+	<div class="toolbar-row">
+		<div class="command-input">
+			<input
+				bind:this={input}
+				id="shell-command"
+				aria-label="Shell command"
+				autocomplete="off"
+				oninput={() => {
+					historyIndex = -1
+				}}
+				onkeydown={recall}
+				placeholder="git status --short"
+				spellcheck="false"
+				bind:value={command}
+			/>
+			<CommandAutocomplete {input} onComplete={choose} {variables} />
 
-		<select
-			class="command-picker command-variables"
-			aria-label="Column variables"
-			onchange={async (event) => {
-				const name = event.currentTarget.value
-				event.currentTarget.value = ''
-				await insertVariable(name)
-			}}
-			title="Insert a column variable at the cursor"
-			value=""
+			<select
+				class="command-picker command-variables"
+				aria-label="Column variables"
+				onchange={async (event) => {
+					const name = event.currentTarget.value
+					event.currentTarget.value = ''
+					await insertVariable(name)
+				}}
+				title="Insert a column variable at the cursor"
+				value=""
+			>
+				<option disabled value="">Variables</option>
+				{#each categories as category (category)}
+					<optgroup label={category}>
+						{#each variables.filter((variable) => variable.category === category) as variable (variable.id)}
+							<option title={variable.preview} value={variable.name}>{variable.label}</option>
+						{/each}
+					</optgroup>
+				{/each}
+			</select>
+			<select
+				class="command-picker command-presets"
+				aria-label="Command presets"
+				onchange={async (event) => {
+					const { value } = event.currentTarget
+					event.currentTarget.value = ''
+					await choose(value)
+				}}
+				title="Choose a preset command"
+				value=""
+			>
+				<option disabled value="">Presets</option>
+				{#each commandPresets as preset (preset.label)}
+					<option title={preset.command} value={preset.command}>{preset.label}</option>
+				{/each}
+			</select>
+		</div>
+		<button
+			class="button primary run-button"
+			disabled={targetCount === 0 || command.trim() === '' || starting || loading}
+			type="submit">▶ {starting ? 'Starting…' : `Run in ${targetCount}`}</button
 		>
-			<option disabled value="">Variables</option>
-			{#each categories as category (category)}
-				<optgroup label={category}>
-					{#each variables.filter((variable) => variable.category === category) as variable (variable.id)}
-						<option title={variable.preview} value={variable.name}>{variable.label}</option>
-					{/each}
-				</optgroup>
-			{/each}
-		</select>
-		<select
-			class="command-picker command-presets"
-			aria-label="Command presets"
-			onchange={async (event) => {
-				const { value } = event.currentTarget
-				event.currentTarget.value = ''
-				await choose(value)
-			}}
-			title="Choose a preset command"
-			value=""
+	</div>
+	<div class="toolbar-row command-options">
+		<div class="number-option">
+			<label for="parallel-jobs">Jobs</label>
+			<NumberField
+				id="parallel-jobs"
+				label="Parallel jobs"
+				max={32}
+				onChange={(value: number) => {
+					concurrency = value
+				}}
+				required
+				value={concurrency}
+			/>
+		</div>
+		<div class="number-option">
+			<label for="output-lines">Output lines</label>
+			<NumberField
+				id="output-lines"
+				label="Output lines"
+				onChange={(value: number) => {
+					outputLines = value
+				}}
+				value={outputLines}
+			/>
+		</div>
+		<label
+			class="auto-clear-option"
+			title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
 		>
-			<option disabled value="">Presets</option>
-			{#each commandPresets as preset (preset.label)}
-				<option title={preset.command} value={preset.command}>{preset.label}</option>
-			{/each}
-		</select>
+			<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
+			Auto clear
+		</label>
 	</div>
-	<div class="parallel-label">
-		<label for="parallel-jobs">Jobs</label>
-		<NumberField
-			id="parallel-jobs"
-			label="Parallel jobs"
-			max={32}
-			onChange={(value: number) => {
-				concurrency = value
-			}}
-			required
-			value={concurrency}
-		/>
-	</div>
-	<button
-		class="button primary run-button"
-		disabled={targetCount === 0 || command.trim() === '' || starting || loading}
-		type="submit">▶ {starting ? 'Starting…' : `Run in ${targetCount}`}</button
-	>
 </form>

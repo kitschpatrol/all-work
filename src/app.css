@@ -147,7 +147,7 @@ pre,
 
 code,
 pre,
-.directory-form > input,
+.directory-input,
 .command-input input,
 .sync-value,
 .cell-text.monospace {
@@ -155,7 +155,7 @@ pre,
 }
 
 .app-shell {
-	--toolbar-height: 46px;
+	--toolbar-height: 66px;
 	min-width: 760px;
 	height: 100dvh;
 }
@@ -176,7 +176,7 @@ h1 {
 	display: grid;
 	grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
 	gap: 16px;
-	align-items: center;
+	align-items: stretch;
 	min-width: 760px;
 	height: var(--toolbar-height);
 	padding: 6px 8px;
@@ -269,18 +269,26 @@ main {
 
 .directory-form,
 .command-form {
-	display: flex;
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
 	flex: 1;
+	gap: 6px;
+	align-items: center;
+	min-width: 0;
+}
+
+.toolbar-row {
+	display: flex;
+	grid-column: 2;
 	flex-wrap: nowrap;
 	gap: 6px;
 	align-items: center;
 	min-width: 0;
 }
 
-.directory-form > input,
+.directory-input,
 .command-input,
-.parallel-label .number-field,
-.selection-tools .number-field {
+.number-option .number-field {
 	min-width: 0;
 	height: 24px;
 	border: 1px solid #ababab;
@@ -291,7 +299,7 @@ main {
 	box-shadow: var(--field-shadow);
 }
 
-.directory-form > input {
+.directory-input {
 	flex: 1;
 	width: 0;
 	padding: 2px 6px;
@@ -453,7 +461,11 @@ select {
 	color: #a0a4ab;
 }
 
-.parallel-label {
+.command-options {
+	gap: 10px;
+}
+
+.number-option {
 	display: flex;
 	flex-shrink: 0;
 	flex-wrap: nowrap;
@@ -462,8 +474,8 @@ select {
 	font-size: 11px;
 }
 
-.parallel-label .number-field {
-	width: 40px;
+.number-option .number-field {
+	width: 42px;
 }
 
 .number-field input {
@@ -725,8 +737,7 @@ h2 {
 	box-shadow: inset 0 1px #fff;
 }
 
-.filters,
-.selection-tools {
+.filters {
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 8px;
@@ -967,22 +978,6 @@ input[type='search']::-webkit-search-cancel-button {
 .filter-round-button:active {
 	background: linear-gradient(#e0e0e0, #ebebeb);
 	box-shadow: inset 0 1px 2px #00000026;
-}
-
-.selection-tools {
-	margin-left: auto;
-}
-
-.output-lines-control {
-	display: flex;
-	flex-wrap: nowrap;
-	gap: 5px;
-	align-items: center;
-}
-
-.selection-tools .number-field {
-	width: 42px;
-	height: 22px;
 }
 
 .button:active:enabled {
@@ -2100,17 +2095,5 @@ tr.selected
 
 	.table-title-actions {
 		margin-left: auto;
-	}
-}
-
-@media (width <= 1100px) {
-	.field-label,
-	.recursive-option > span,
-	.parallel-label > label {
-		display: none;
-	}
-
-	.command-form {
-		gap: 5px;
 	}
 }

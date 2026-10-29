@@ -61,7 +61,6 @@
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
-	import NumberField from '#lib/NumberField.svelte'
 	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
@@ -1176,37 +1175,42 @@
 				}}
 			>
 				<label class="field-label" for="workspace-directory">Workspace</label>
-				<input
-					id="workspace-directory"
-					aria-label="Workspace directory"
-					disabled={loading || activeRuns.length > 0}
-					placeholder="/path/to/your/projects"
-					bind:value={directory}
-				/>
-				<label
-					class="recursive-option"
-					title="Search all nested folders. Uncheck to scan only this folder and its immediate children."
-				>
+				<div class="toolbar-row">
 					<input
-						aria-label="Recursive repository discovery"
+						id="workspace-directory"
+						class="directory-input"
+						aria-label="Workspace directory"
 						disabled={loading || activeRuns.length > 0}
-						type="checkbox"
-						bind:checked={recursive}
+						placeholder="/path/to/your/projects"
+						bind:value={directory}
 					/>
-					<span>Recursive</span>
-				</label>
-				{#if typeof window !== 'undefined' && globalThis._allWork !== undefined}<button
-						class="button subtle"
-						disabled={loading || activeRuns.length > 0}
-						onclick={async () => browseDirectory()}
-						type="button">Browse…</button
-					>{/if}
-				<button
-					class="button subtle workspace-load-button"
-					disabled={directory.trim() === '' || loading || activeRuns.length > 0}
-					type="submit"
-					>{loading ? 'Scanning…' : workspace === undefined ? 'Load' : 'Reload ↻'}</button
-				>
+					{#if typeof window !== 'undefined' && globalThis._allWork !== undefined}<button
+							class="button subtle"
+							disabled={loading || activeRuns.length > 0}
+							onclick={async () => browseDirectory()}
+							type="button">Browse…</button
+						>{/if}
+				</div>
+				<div class="toolbar-row">
+					<button
+						class="button subtle workspace-load-button"
+						disabled={directory.trim() === '' || loading || activeRuns.length > 0}
+						type="submit"
+						>{loading ? 'Scanning…' : workspace === undefined ? 'Load' : 'Reload ↻'}</button
+					>
+					<label
+						class="recursive-option"
+						title="Search all nested folders. Uncheck to scan only this folder and its immediate children."
+					>
+						<input
+							aria-label="Recursive repository discovery"
+							disabled={loading || activeRuns.length > 0}
+							type="checkbox"
+							bind:checked={recursive}
+						/>
+						<span>Recursive</span>
+					</label>
+				</div>
 			</form>
 		</div>
 		<CommandForm
@@ -1220,8 +1224,10 @@
 				...variable,
 				preview: getVariablePreviewTooltip(previewRepository, variable.id, runs),
 			}))}
+			bind:autoClear
 			bind:command
 			bind:concurrency
+			bind:outputLines
 		/>
 	</header>
 	<main>
@@ -1266,26 +1272,6 @@
 						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
 						only</label
 					>
-				</div>
-				<div class="selection-tools">
-					<label
-						class="auto-clear-option"
-						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
-					>
-						<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
-						Auto clear
-					</label>
-					<div class="output-lines-control">
-						<label for="output-lines">Output lines</label>
-						<NumberField
-							id="output-lines"
-							label="Output lines"
-							onChange={(value: number) => {
-								outputLines = value
-							}}
-							value={outputLines}
-						/>
-					</div>
 				</div>
 				<div class="table-title-actions">
 					{#if activeRuns.length > 0}<span class="running-indicator"
