@@ -173,8 +173,8 @@ importers:
         specifier: ^16.1.0
         version: 16.1.0
       lognow:
-        specifier: ^0.8.6
-        version: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+        specifier: ^0.8.7
+        version: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       metascope:
         specifier: file:../metascope
         version: file:../metascope(electron@44.9.3(supports-color@10.2.2))(supports-color@10.2.2)
@@ -4683,8 +4683,8 @@ packages:
     resolution: {integrity: sha512-abAZY0TkGw1LOA8n0yGJbRi9R0upRWymYBZItWfiktXMTHqdgCpHukONoX/Byfbt1RfRdw/GjT/PwrztePYOcw==}
     engines: {node: '>=18'}
 
-  lognow@0.8.6:
-    resolution: {integrity: sha512-XsfUs51McmzAH3peTg9kdJ4JaEpojB4cdYsnW+8/Q0fQq0hFlYYT+NACvxqntmrgjtIf8XRTuIaTXoIP5vHu3w==}
+  lognow@0.8.7:
+    resolution: {integrity: sha512-Z+WRIkE1cJ+Hu9Uoj2e9M9H0YEpEcAy+XBnaU6YRraRg6k7jNU5uewk8pCls/1lttbCuaonYFapRtwIUlUUZow==}
     engines: {node: ^20.19.0 || ^22.0.0 || ^24.0.0 || >=26.0.0}
     peerDependencies:
       electron: '>=39.8.10'
@@ -11853,7 +11853,7 @@ snapshots:
       '@loglayer/shared': 4.4.0
       '@loglayer/transport': 3.3.0
 
-  lognow@0.8.6(electron@44.9.3(supports-color@10.2.2)):
+  lognow@0.8.7(electron@44.9.3(supports-color@10.2.2)):
     dependencies:
       '@kitschpatrol/node-inspect-extracted': 3.3.3-fork.1
       '@kitschpatrol/safe-stable-stringify': 2.5.0-fork.2
@@ -12131,7 +12131,7 @@ snapshots:
       deepmerge-ts: 8.0.2
       globby: 16.2.4
       gray-matter-es: 0.2.1
-      lognow: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+      lognow: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       mdast-util-toc: 7.1.0
       metascope: 0.13.7(electron@44.9.3(supports-color@10.2.2))(supports-color@10.2.2)
       path-type: 6.0.0
@@ -12184,7 +12184,7 @@ snapshots:
       git-url-parse: 16.1.0
       gray-matter-es: 0.2.1
       jiti: 2.7.0
-      lognow: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+      lognow: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       package-json: 10.0.1
       picomatch: 4.0.7
       pkg-types: 2.4.0
@@ -12227,7 +12227,7 @@ snapshots:
       git-url-parse: 16.1.0
       gray-matter-es: 0.2.1
       jiti: 2.7.0
-      lognow: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+      lognow: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       package-json: 10.0.1
       picomatch: 4.0.7
       pkg-types: 2.4.0
@@ -13180,7 +13180,7 @@ snapshots:
 
   read-pyproject@0.4.1(electron@44.9.3(supports-color@10.2.2)):
     dependencies:
-      lognow: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+      lognow: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       smol-toml: 1.9.1
       spdx-correct: 3.2.0
       spdx-expression-validate: 2.0.0
@@ -13568,7 +13568,7 @@ snapshots:
       gray-matter-es: 0.2.1
       hast-util-from-html: 2.0.3
       json5: 2.2.3
-      lognow: 0.8.6(electron@44.9.3(supports-color@10.2.2))
+      lognow: 0.8.7(electron@44.9.3(supports-color@10.2.2))
       picocolors: 1.1.1
       remark: 15.0.1(supports-color@10.2.2)
       remark-gfm: 4.0.1(supports-color@10.2.2)

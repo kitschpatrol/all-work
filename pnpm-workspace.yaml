@@ -13,7 +13,7 @@ minimumReleaseAgeExclude:
   - '@kitschpatrol/shared-config@8.14.0'
   - '@kitschpatrol/stylelint-config@8.14.0'
   - '@kitschpatrol/typescript-config@8.14.0'
-  - lognow@0.8.6
+  - lognow@0.8.7
   - mdat@3.6.6
   - metascope@0.13.7
   - remark-mdat@3.1.2
