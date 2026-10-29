@@ -44,7 +44,7 @@
 	"dependencies": {
 		"execa": "^10.1.1",
 		"git-url-parse": "^16.1.0",
-		"lognow": "^0.8.5",
+		"lognow": "^0.8.6",
 		"metascope": "file:../metascope"
 	},
 	"devDependencies": {
