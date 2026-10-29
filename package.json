@@ -37,7 +37,7 @@
 		"prepare": "svelte-kit sync",
 		"preview": "vite preview",
 		"release1": "bumpp --commit 'Release: %s' && pnpm build",
-		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && electron-builder build --publish always",
+		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && export APPLE_KEYCHAIN_PROFILE=notarytool && electron-builder build --publish always",
 		"start": "node out/main/server.js",
 		"test": "vitest run"
 	},

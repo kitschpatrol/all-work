@@ -95,6 +95,14 @@ pnpm lint
 pnpm build
 ```
 
+`pnpm release2` notarizes the macOS app with the `notarytool` Keychain profile. Store your credentials in it once before the first release:
+
+```sh
+xcrun notarytool store-credentials notarytool --apple-id <apple-id-email> --team-id <team-id>
+```
+
+The command prompts for an app-specific password, which you can create at [account.apple.com](https://account.apple.com). Your team ID is listed in the [Apple Developer account](https://developer.apple.com/account) membership details.
+
 <!-- contributing -->
 
 ## Contributing
