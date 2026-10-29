@@ -5,6 +5,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - lognow@0.8.7
   - metascope@0.13.8
+  - '@kitschpatrol/electron-vite@6.0.0-fork.1'
 peerDependencyRules:
   allowedVersions:
     # Remove once the installed version declares ESLint 10 support.
