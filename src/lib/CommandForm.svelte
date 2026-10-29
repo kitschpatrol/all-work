@@ -6,24 +6,20 @@
 
 	/* eslint-disable ts/no-useless-default-assignment -- $bindable() marks a prop bindable, it is not a default */
 	let {
-		autoClear = $bindable(),
 		command = $bindable(),
 		concurrency = $bindable(),
 		history,
 		loading,
 		onRun,
-		outputLines = $bindable(),
 		starting,
 		targetCount,
 		variables,
 	}: {
-		autoClear: boolean
 		command: string
 		concurrency: number
 		history: string[]
 		loading: boolean
 		onRun: () => Promise<void>
-		outputLines: number
 		starting: boolean
 		targetCount: number
 		variables: Array<{ category: string; id: string; label: string; name: string; preview: string }>
@@ -170,13 +166,6 @@
 				{/each}
 			</select>
 		</div>
-		<button
-			class="button primary run-button"
-			disabled={targetCount === 0 || command.trim() === '' || starting || loading}
-			type="submit">▶ {starting ? 'Starting…' : `Run in ${targetCount}`}</button
-		>
-	</div>
-	<div class="toolbar-row command-options">
 		<div class="number-option">
 			<label for="parallel-jobs">Jobs</label>
 			<NumberField
@@ -190,23 +179,10 @@
 				value={concurrency}
 			/>
 		</div>
-		<div class="number-option">
-			<label for="output-lines">Output lines</label>
-			<NumberField
-				id="output-lines"
-				label="Output lines"
-				onChange={(value: number) => {
-					outputLines = value
-				}}
-				value={outputLines}
-			/>
-		</div>
-		<label
-			class="auto-clear-option"
-			title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
+		<button
+			class="button primary run-button"
+			disabled={targetCount === 0 || command.trim() === '' || starting || loading}
+			type="submit">▶ {starting ? 'Starting…' : `Run in ${targetCount}`}</button
 		>
-			<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
-			Auto clear
-		</label>
 	</div>
 </form>

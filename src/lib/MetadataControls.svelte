@@ -51,7 +51,7 @@
 />
 
 <div class="menu-control">
-	<span class="field-label">Columns</span>
+	<span style:anchor-name="--{menuId}-label" class="field-label">Columns</span>
 	<div class="split-control">
 		<select
 			class="split-select"
@@ -72,7 +72,12 @@
 		>
 			<ColumnPresetOptions {columnPresets} />
 		</select>
-		<details bind:this={columnMenu} style:--menu-anchor="--{menuId}-menu" class="column-menu">
+		<details
+			bind:this={columnMenu}
+			style:--menu-anchor="--{menuId}-menu"
+			style:--menu-label-anchor="--{menuId}-label"
+			class="column-menu"
+		>
 			<summary class="menu-summary" aria-label="Choose columns" title="Choose which columns to show"
 			></summary>
 			<div class="column-options">

@@ -61,6 +61,7 @@
 	import { watchWorkspaceMetadata } from '#lib/metadata-stream.js'
 	import MetadataControls from '#lib/MetadataControls.svelte'
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
+	import NumberField from '#lib/NumberField.svelte'
 	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
 	import { defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
@@ -1189,14 +1190,6 @@
 							onclick={async () => browseDirectory()}
 							type="button">Browse…</button
 						>{/if}
-				</div>
-				<div class="toolbar-row">
-					<button
-						class="button subtle workspace-load-button"
-						disabled={directory.trim() === '' || loading || activeRuns.length > 0}
-						type="submit"
-						>{loading ? 'Scanning…' : workspace === undefined ? 'Load' : 'Reload ↻'}</button
-					>
 					<label
 						class="recursive-option"
 						title="Search all nested folders. Uncheck to scan only this folder and its immediate children."
@@ -1209,6 +1202,12 @@
 						/>
 						<span>Recursive</span>
 					</label>
+					<button
+						class="button subtle workspace-load-button"
+						disabled={directory.trim() === '' || loading || activeRuns.length > 0}
+						type="submit"
+						>{loading ? 'Scanning…' : workspace === undefined ? 'Load' : 'Reload ↻'}</button
+					>
 				</div>
 			</form>
 		</div>
@@ -1223,10 +1222,8 @@
 				...variable,
 				preview: getVariablePreviewTooltip(previewRepository, variable.id, runs),
 			}))}
-			bind:autoClear
 			bind:command
 			bind:concurrency
-			bind:outputLines
 		/>
 	</header>
 	<main>
@@ -1289,6 +1286,24 @@
 							setColumnsVisible(optionalColumnIds, visible)}
 						onVisibilityMany={setColumnsVisible}
 					/>
+					<div class="number-option">
+						<label for="output-lines">Output lines</label>
+						<NumberField
+							id="output-lines"
+							label="Output lines"
+							onChange={(value: number) => {
+								outputLines = value
+							}}
+							value={outputLines}
+						/>
+					</div>
+					<label
+						class="auto-clear-option"
+						title="Delete the preceding output column when this run finishes. Active commands finish before their output is cleared."
+					>
+						<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
+						Auto clear
+					</label>
 				</div>
 			</div>
 			<div
