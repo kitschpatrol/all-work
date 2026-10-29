@@ -3,7 +3,6 @@ import type { ColumnPreset } from './column-presets.js'
 import {
 	allColumnPreset,
 	defaultColumnPreset,
-	findColumnPreset,
 	isColumnPresetId,
 	matchesColumns,
 	parseColumnPresets,
@@ -30,12 +29,6 @@ describe('column presets', () => {
 		expect(matchesColumns(review, new Set(['branch', 'name', 'version']), available)).toBe(false)
 		// Columns outside the available set, such as command runs, never affect the match
 		expect(matchesColumns(review, new Set(['name', 'run-1', 'version']), available)).toBe(true)
-	})
-
-	it('finds the first preset showing exactly the visible columns', () => {
-		const presets = [review, { ...review, id: 'custom:copy' as const, label: 'Copy' }]
-		expect(findColumnPreset(new Set(['name', 'version']), available, presets)).toBe('custom:review')
-		expect(findColumnPreset(new Set(['name']), available, presets)).toBeUndefined()
 	})
 
 	it('trims names, drops duplicate and blank columns, and keeps the latest duplicate ID', () => {

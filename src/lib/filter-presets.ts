@@ -84,16 +84,3 @@ export function getPresetFilter(
 	const preset = presets.find((entry) => entry.id === id)
 	return parseFilter(preset?.filter)
 }
-
-/**
- * Find the preset a filter matches exactly.
- *
- * @param filter A filter normalized by `parseFilter`, so key order is stable.
- */
-export function findFilterPreset(
-	filter: FilterGroup,
-	presets: readonly FilterPreset[] = filterPresets,
-): FilterPresetId | undefined {
-	const serialized = JSON.stringify(parseFilter(filter))
-	return presets.find((preset) => JSON.stringify(parseFilter(preset.filter)) === serialized)?.id
-}

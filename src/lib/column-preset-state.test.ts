@@ -47,13 +47,13 @@ function setup(savedPresets: ColumnPreset[] = []) {
 }
 
 describe('column preset state', () => {
-	it('recognizes Defaults until a column is changed by hand', () => {
+	it('selects a preset only when chosen and leaves a built-in once a column is changed by hand', () => {
 		const { state, toggle } = setup()
+		expect(state.selected).toBeUndefined()
+		state.restore('defaults')
 		expect(state.selected?.id).toBe('defaults')
-		expect(state.matched).toBe('defaults')
 		toggle('remote')
 		expect(state.selected).toBeUndefined()
-		expect(state.matched).toBeUndefined()
 	})
 
 	it('treats columns changed with nothing selected as a custom set', () => {
@@ -138,7 +138,6 @@ describe('column preset state', () => {
 		state.newSet()
 		expect(visible()).toEqual(['repoName'])
 		expect(state.selected).toBeUndefined()
-		expect(state.matched).toBeUndefined()
 	})
 
 	it('replaces a preset in place by ID or by a matching name', async () => {
@@ -204,9 +203,9 @@ describe('column preset state', () => {
 		expect(visible()).toEqual(columns)
 	})
 
-	it('falls back to the matching preset when the selected one no longer exists', () => {
+	it('shows a custom set when the selected preset no longer exists', () => {
 		const { state } = setup()
 		state.restore('custom:gone')
-		expect(state.selected?.id).toBe('defaults')
+		expect(state.selected).toBeUndefined()
 	})
 })

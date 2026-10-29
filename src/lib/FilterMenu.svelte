@@ -34,13 +34,6 @@
 	const userPresets = $derived(
 		rowFilter.presets.filter((preset) => preset.id.startsWith('custom:')),
 	)
-	const summary = $derived(
-		selected === undefined
-			? hasRules
-				? 'Custom'
-				: 'None'
-			: `${selected.label}${rowFilter.modified ? ' *' : ''}`,
-	)
 	const saved = $derived(selected?.id.startsWith('custom:') === true)
 	let menu: HTMLDetailsElement
 	let altHeld = $state(false)
@@ -184,168 +177,180 @@
 	}}
 />
 
-<div class="menu-control">
-	<span id="{editorId}-label" class="field-label">Filter</span>
-	<details
-		bind:this={menu}
-		style:--menu-anchor="--{editorId}-menu"
-		class="column-menu"
-		bind:open={rowFilter.open}
-	>
-		<summary
-			class="menu-summary"
-			aria-labelledby="{editorId}-label {editorId}-summary"
-			title={rowFilter.open ? 'Hide filter rules' : 'Show filter rules'}
-			><span id="{editorId}-summary" class="menu-summary-text">{summary}</span></summary
-		>
-		<div class="column-options filter-options">
-			<div class="column-search">
-				{#if naming}
-					<form
-						class="preset-row"
-						onsubmit={async (event) => {
-							event.preventDefault()
-							if (await save(name, renaming ? selected?.id : undefined)) {
-								await endSave()
-							}
-						}}
-					>
-						<input
-							bind:this={nameInput}
-							class="preset-name"
-							aria-label="Preset name"
-							disabled={busy}
-							maxlength="80"
-							onkeydown={async (event) => {
-								if (event.key !== 'Escape') {
-									return
-								}
+{#snippet presetOptions()}
+	<option value="all">None</option>
+	{#if selection === 'custom'}<option value="custom">Custom filter</option>{/if}
+	<optgroup label="Presets">
+		{#each builtinPresets as preset (preset.id)}<option value={preset.id}>{preset.label}</option
+			>{/each}
+	</optgroup>
+	{#if userPresets.length > 0}<optgroup label="User">
+			{#each userPresets as preset (preset.id)}<option value={preset.id}
+					>{preset.label}{preset.id === selected?.id && rowFilter.modified ? ' *' : ''}</option
+				>{/each}
+		</optgroup>{/if}
+	<hr />
+	<option value="new">New filter…</option>
+{/snippet}
 
-								// Leave the Filter popover open
+<div class="menu-control">
+	<span style:anchor-name="--{editorId}-label" class="field-label">Filter</span>
+	<div class="split-control">
+		<select
+			class="split-select"
+			aria-label="Filter preset"
+			disabled={busy}
+			onchange={async (event) => choose(event.currentTarget)}
+			value={selection}
+		>
+			{@render presetOptions()}
+		</select>
+		<details
+			bind:this={menu}
+			style:--menu-anchor="--{editorId}-menu"
+			style:--menu-label-anchor="--{editorId}-label"
+			class="column-menu"
+			bind:open={rowFilter.open}
+		>
+			<summary
+				class="menu-summary"
+				aria-label="Filter rules"
+				title={rowFilter.open ? 'Hide filter rules' : 'Show filter rules'}
+			></summary>
+			<div class="column-options filter-options">
+				<div class="column-search">
+					{#if naming}
+						<form
+							class="preset-row"
+							onsubmit={async (event) => {
 								event.preventDefault()
-								event.stopPropagation()
-								await endSave()
+								if (await save(name, renaming ? selected?.id : undefined)) {
+									await endSave()
+								}
 							}}
-							placeholder="Name this filter"
-							required
-							type="text"
-							bind:value={name}
+						>
+							<input
+								bind:this={nameInput}
+								class="preset-name"
+								aria-label="Preset name"
+								disabled={busy}
+								maxlength="80"
+								onkeydown={async (event) => {
+									if (event.key !== 'Escape') {
+										return
+									}
+
+									// Leave the Filter popover open
+									event.preventDefault()
+									event.stopPropagation()
+									await endSave()
+								}}
+								placeholder="Name this filter"
+								required
+								type="text"
+								bind:value={name}
+							/>
+							<button class="button primary" disabled={busy || name.trim() === ''} type="submit"
+								>{renaming ? 'Rename' : existingName ? 'Replace' : 'Save'}</button
+							>
+							<button class="button subtle" disabled={busy} onclick={endSave} type="button"
+								>Cancel</button
+							>
+						</form>
+					{:else}
+						<div class="preset-row">
+							<select
+								bind:this={picker}
+								class="preset-picker"
+								aria-label="Filter preset"
+								disabled={busy}
+								onchange={async (event) => choose(event.currentTarget)}
+								value={selection}
+							>
+								{@render presetOptions()}
+							</select>
+							{#if !hasRules}
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={startFilter}
+									title="Start a filter with one rule"
+									type="button">Add rule</button
+								>
+							{:else if selected === undefined}
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={beginSave}
+									title="Save these rules as a preset"
+									type="button">Save…</button
+								>
+							{:else if saved && rowFilter.modified}
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={saveChanges}
+									title="Save these rules to “{selected.label}”"
+									type="button">Save</button
+								>
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={revert}
+									title="Discard edits to “{selected.label}”"
+									type="button">Revert</button
+								>
+							{:else if saved}
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={beginRename}
+									title="Rename “{selected.label}”"
+									type="button">Rename…</button
+								>
+								<button
+									class="button subtle"
+									disabled={busy}
+									onclick={removePreset}
+									title="Delete “{selected.label}”. The rules stay in effect."
+									type="button">Delete</button
+								>
+							{/if}
+						</div>
+					{/if}
+					{#if message !== ''}<p class="preset-error" role="alert">{message}</p>{/if}
+				</div>
+				{#if hasRules}
+					<div id={editorId} class="filter-bar" aria-label="Filter rules" role="group">
+						<div class="filter-row">
+							<span class="filter-text">Show repositories where</span>
+							<select
+								aria-label="Match"
+								onchange={(event) => {
+									const { value } = event.currentTarget
+									const match = matchModes.find((mode) => mode === value)
+									if (match !== undefined) {
+										rowFilter.set({ ...rowFilter.filter, match })
+									}
+								}}
+								value={rowFilter.filter.match}
+							>
+								{#each matchModes as mode (mode)}<option value={mode}>{mode}</option>{/each}
+							</select>
+							<span class="filter-text">of the following are true</span>
+						</div>
+						<FilterGroupEditor
+							{altHeld}
+							columns={rowFilter.columns}
+							group={rowFilter.filter}
+							onChange={rowFilter.set}
+							{repositories}
+							{runs}
 						/>
-						<button class="button primary" disabled={busy || name.trim() === ''} type="submit"
-							>{renaming ? 'Rename' : existingName ? 'Replace' : 'Save'}</button
-						>
-						<button class="button subtle" disabled={busy} onclick={endSave} type="button"
-							>Cancel</button
-						>
-					</form>
-				{:else}
-					<div class="preset-row">
-						<select
-							bind:this={picker}
-							class="preset-picker"
-							aria-label="Filter preset"
-							disabled={busy}
-							onchange={async (event) => choose(event.currentTarget)}
-							value={selection}
-						>
-							<option value="all">None</option>
-							{#if selection === 'custom'}<option value="custom">Custom filter</option>{/if}
-							<optgroup label="Presets">
-								{#each builtinPresets as preset (preset.id)}<option value={preset.id}
-										>{preset.label}</option
-									>{/each}
-							</optgroup>
-							{#if userPresets.length > 0}<optgroup label="User">
-									{#each userPresets as preset (preset.id)}<option value={preset.id}
-											>{preset.label}{preset.id === selected?.id && rowFilter.modified
-												? ' *'
-												: ''}</option
-										>{/each}
-								</optgroup>{/if}
-							<hr />
-							<option value="new">New filter…</option>
-						</select>
-						{#if !hasRules}
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={startFilter}
-								title="Start a filter with one rule"
-								type="button">Add rule</button
-							>
-						{:else if selected === undefined}
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={beginSave}
-								title="Save these rules as a preset"
-								type="button">Save…</button
-							>
-						{:else if saved && rowFilter.modified}
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={saveChanges}
-								title="Save these rules to “{selected.label}”"
-								type="button">Save</button
-							>
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={revert}
-								title="Discard edits to “{selected.label}”"
-								type="button">Revert</button
-							>
-						{:else if saved}
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={beginRename}
-								title="Rename “{selected.label}”"
-								type="button">Rename…</button
-							>
-							<button
-								class="button subtle"
-								disabled={busy}
-								onclick={removePreset}
-								title="Delete “{selected.label}”. The rules stay in effect."
-								type="button">Delete</button
-							>
-						{/if}
 					</div>
 				{/if}
-				{#if message !== ''}<p class="preset-error" role="alert">{message}</p>{/if}
 			</div>
-			{#if hasRules}
-				<div id={editorId} class="filter-bar" aria-label="Filter rules" role="group">
-					<div class="filter-row">
-						<span class="filter-text">Show repositories where</span>
-						<select
-							aria-label="Match"
-							onchange={(event) => {
-								const { value } = event.currentTarget
-								const match = matchModes.find((mode) => mode === value)
-								if (match !== undefined) {
-									rowFilter.set({ ...rowFilter.filter, match })
-								}
-							}}
-							value={rowFilter.filter.match}
-						>
-							{#each matchModes as mode (mode)}<option value={mode}>{mode}</option>{/each}
-						</select>
-						<span class="filter-text">of the following are true</span>
-					</div>
-					<FilterGroupEditor
-						{altHeld}
-						columns={rowFilter.columns}
-						group={rowFilter.filter}
-						onChange={rowFilter.set}
-						{repositories}
-						{runs}
-					/>
-				</div>
-			{/if}
-		</div>
-		<span class="menu-caret" aria-hidden="true"></span>
-	</details>
+			<span class="menu-caret" aria-hidden="true"></span>
+		</details>
+	</div>
 </div>

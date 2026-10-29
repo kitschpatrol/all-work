@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { FilterPreset } from './filter-presets.js'
 import {
 	filterPresets,
-	findFilterPreset,
 	getPresetFilter,
 	isFilterPresetId,
 	parseFilterPresets,
@@ -30,8 +29,7 @@ describe('saved filter presets', () => {
 		const copy = getPresetFilter('changed')
 		copy.rules.shift()
 		expect(getPresetFilter('changed')).toEqual(original)
-		expect(findFilterPreset(original)).toBe('changed')
-		expect(findFilterPreset(copy)).toBeUndefined()
+		expect(copy.rules).toHaveLength(0)
 	})
 
 	it('normalizes persisted filters, trims names, and keeps the latest duplicate ID', () => {

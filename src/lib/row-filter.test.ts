@@ -8,7 +8,7 @@ import type {
 	MetadataValue,
 	Repository,
 } from './workspace.js'
-import { findFilterPreset, getPresetFilter } from './filter-presets.js'
+import { getPresetFilter } from './filter-presets.js'
 import {
 	changeOperator,
 	compileFilter,
@@ -427,14 +427,6 @@ describe('saved filters', () => {
 		}
 
 		expect(depth).toBe(33)
-	})
-
-	it('recognizes a preset after a save and reload', () => {
-		const filter = getPresetFilter('changed')
-		expect(findFilterPreset(parseFilter(structuredClone(filter)))).toBe('changed')
-		filter.rules.push(rule('branch', 'is', 'main'))
-		expect(findFilterPreset(parseFilter(filter))).toBeUndefined()
-		expect(findFilterPreset(getPresetFilter('changed'))).toBe('changed')
 	})
 
 	it('filters working trees like the presets describe', () => {

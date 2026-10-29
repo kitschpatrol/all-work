@@ -452,7 +452,7 @@
 		selectedOnly = false
 		resizedColumns.clear()
 		table.resetColumnVisibility()
-		columnPresets.restore()
+		columnPresets.restore(defaultColumnPreset.id)
 		table.resetColumnSizing()
 		table.resetSorting()
 		table.setGlobalFilter('')
@@ -1122,10 +1122,10 @@
 			!loading &&
 			targets.length > 0 &&
 			command.trim() !== '',
-		columnPreset: columnPresets.matched,
+		columnPreset: columnPresets.selected?.id,
 		columnPresets: columnPresets.presets.map(({ id, label }) => ({ id, label })),
 		filterActive: rowFilter.activeRules > 0,
-		filterPreset: rowFilter.preset,
+		filterPreset: rowFilter.selectedPreset?.id,
 		filterPresets: rowFilter.presets.map(({ id, label }) => ({ id, label })),
 		hasActiveRuns: activeRuns.length > 0,
 		hasFinishedRuns: runs.some((run) => run.finished),

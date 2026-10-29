@@ -26,7 +26,7 @@ describe('shared JSON view persistence', () => {
 			'custom:fixture',
 		)
 		expect(parseSavedView({ columnPreset: 'changed' }, '/projects').columnPreset).toBeUndefined()
-		expect(parseSavedView(undefined, '/projects').columnPreset).toBeUndefined()
+		expect(parseSavedView(undefined, '/projects').columnPreset).toBe('defaults')
 	})
 
 	it('loads identity and view data from the server without accessing browser storage', async () => {

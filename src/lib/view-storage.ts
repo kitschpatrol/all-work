@@ -70,7 +70,12 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		),
 		clearedRunIds: strings(record.clearedRunIds).slice(-1000),
 		columnOrder: strings(record.columnOrder),
-		columnPreset: isColumnPresetId(record.columnPreset) ? record.columnPreset : undefined,
+		// A view saved before presets existed, or a fresh one, starts on Default
+		columnPreset: isColumnPresetId(record.columnPreset)
+			? record.columnPreset
+			: record.columnPreset === undefined
+				? 'defaults'
+				: undefined,
 		columnSizing: Object.fromEntries(
 			Object.entries(asRecord(record.columnSizing) ?? {}).filter(
 				(entry): entry is [string, number] =>

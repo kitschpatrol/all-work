@@ -1,7 +1,7 @@
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
 import type { FilterGroup } from './row-filter.js'
 import type { CommandRun, Repository } from './workspace.js'
-import { findFilterPreset, getPresetFilter, resolveFilterPresets } from './filter-presets.js'
+import { getPresetFilter, resolveFilterPresets } from './filter-presets.js'
 import {
 	compileFilter,
 	countActiveRules,
@@ -45,13 +45,13 @@ export function createRowFilter(options: RowFilterOptions) {
 	const predicate = $derived(compileFilter(filter, ruleRuns))
 	// Blank or invalid rules take no part in filtering
 	const activeRules = $derived(countActiveRules(filter, ruleRuns))
-	const preset = $derived(findFilterPreset(filter, presets))
-	// A saved preset stays selected while its rules are edited; a built-in only while they match exactly
+	// Only an explicit choice selects a preset. A saved preset stays selected while
+	// its rules are edited; a built-in only while they match exactly.
 	const selectedPreset = $derived.by(() => {
 		const chosen = presets.find((entry) => entry.id === selectedId)
 		return chosen !== undefined && (chosen.id.startsWith('custom:') || sameRules(chosen.filter))
 			? chosen
-			: presets.find((entry) => entry.id === preset)
+			: undefined
 	})
 	const modified = $derived(selectedPreset !== undefined && !sameRules(selectedPreset.filter))
 	const groups = $derived(getFilterMetadataGroups(filter, ruleRuns))
@@ -175,7 +175,7 @@ export function createRowFilter(options: RowFilterOptions) {
 
 	// Choosing the applied preset again clears it, like a checked menu item
 	function togglePreset(id: FilterPresetId) {
-		if (id === preset) {
+		if (id === selectedPreset?.id) {
 			clear()
 		} else {
 			applyPreset(id)
@@ -219,9 +219,6 @@ export function createRowFilter(options: RowFilterOptions) {
 		// The popover opens and closes without changing the applied filter
 		set open(value: boolean) {
 			open = value
-		},
-		get preset() {
-			return preset
 		},
 		get presets() {
 			return presets

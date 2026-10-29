@@ -181,13 +181,13 @@ describe('row filter state', () => {
 	it('applies presets without expanding and clears one when chosen again in the menu', () => {
 		const { rows, state } = setup()
 		state.togglePreset('changed')
-		expect(state.preset).toBe('changed')
+		expect(state.selectedPreset?.id).toBe('changed')
 		expect(state.open).toBe(false)
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['dirty'])
 		state.togglePreset('clean')
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['clean'])
 		state.togglePreset('clean')
-		expect(state.preset).toBeUndefined()
+		expect(state.selectedPreset).toBeUndefined()
 		expect(rows.every((row) => state.matches(row))).toBe(true)
 	})
 
@@ -224,7 +224,6 @@ describe('row filter state', () => {
 		const { state } = setup()
 		state.applyPreset('changed')
 		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
-		expect(state.preset).toBeUndefined()
 		expect(state.selectedPreset).toBeUndefined()
 		state.applyPreset('changed')
 		expect(state.selectedPreset?.id).toBe('changed')
@@ -353,9 +352,12 @@ describe('row filter state', () => {
 
 	it('restores saved rules without reporting a change', () => {
 		const { onChange, state } = setup()
-		state.restore({ match: 'all', rules: [{ column: 'changedFiles', operator: 'is', value: '0' }] })
+		state.restore(
+			{ match: 'all', rules: [{ column: 'changedFiles', operator: 'is', value: '0' }] },
+			'clean',
+		)
 		expect(onChange).not.toHaveBeenCalled()
-		expect(state.preset).toBe('clean')
+		expect(state.selectedPreset?.id).toBe('clean')
 		expect(state.open).toBe(false)
 	})
 

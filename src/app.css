@@ -546,11 +546,13 @@ h2 {
 	font-weight: 600;
 }
 
+/* Inset so the Columns chevron and its caret sit within the popover below, clear of the scroll bar */
 .table-title-actions {
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 6px;
 	align-items: center;
+	margin-right: 16px;
 }
 
 /* Popovers anchor to the toolbar so they fit at any width; each caret anchors to its own summary */
@@ -571,15 +573,29 @@ h2 {
 	align-items: center;
 }
 
-.menu-summary {
-	anchor-name: var(--menu-anchor);
-	min-width: 90px;
-	max-width: 240px;
+/* A select for switching presets joined to a chevron that opens the popover */
+.split-control {
+	display: inline-flex;
+	flex-wrap: nowrap;
+	align-items: center;
 }
 
-.menu-summary-text {
+.split-select {
 	overflow: hidden;
+	justify-content: flex-start;
+	min-width: 90px;
+	max-width: 240px;
+	border-radius: 7px 0 0 7px;
 	text-overflow: ellipsis;
+}
+
+/* Outranks the shared button rule so the joined edge stays square */
+.column-menu .menu-summary {
+	anchor-name: var(--menu-anchor);
+	width: 24px;
+	margin-left: -1px;
+	padding: 0;
+	border-radius: 0 7px 7px 0;
 }
 
 .menu-caret {
@@ -847,12 +863,19 @@ input[type='search']::-webkit-search-cancel-button {
 	align-items: center;
 }
 
+/* Lines up with the Filter label; a window too narrow for that falls back to the toolbar's right edge */
 .filter-options {
 	right: auto;
-	left: 8px;
+	left: anchor(var(--menu-label-anchor) left);
+	position-try-fallbacks: --toolbar-right;
 	min-width: 360px;
 	max-width: calc(100% - 16px);
 	max-height: min(70vh, 600px);
+}
+
+@position-try --toolbar-right {
+	right: 8px;
+	left: auto;
 }
 
 .filter-bar {

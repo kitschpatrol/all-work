@@ -112,12 +112,3 @@ export function matchesColumns(
 	const current = new Set(visible)
 	return available.every((id) => shown.has(id) === current.has(id))
 }
-
-/** Find the first preset that shows exactly the visible columns. */
-export function findColumnPreset(
-	visible: Iterable<string>,
-	available: readonly string[],
-	presets: readonly ColumnPreset[],
-): ColumnPresetId | undefined {
-	return presets.find((preset) => matchesColumns(preset, visible, available))?.id
-}

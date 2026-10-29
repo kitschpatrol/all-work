@@ -3,6 +3,7 @@
 	import type { createColumnPresets } from './column-preset-state.svelte.js'
 	import type { ColumnPresetId } from './column-presets.js'
 	import { isColumnPresetId } from './column-presets.js'
+	import ColumnPresetOptions from './ColumnPresetOptions.svelte'
 	import { nextCustomName } from './preset-name.js'
 
 	/**
@@ -15,12 +16,6 @@
 	const selected = $derived(columnPresets.selected)
 	const saved = $derived(selected?.id.startsWith('custom:') === true)
 	const selection = $derived(selected?.id ?? 'custom')
-	const builtinPresets = $derived(
-		columnPresets.presets.filter((preset) => !preset.id.startsWith('custom:')),
-	)
-	const userPresets = $derived(
-		columnPresets.presets.filter((preset) => preset.id.startsWith('custom:')),
-	)
 	let naming = $state(false)
 	let renaming = $state(false)
 	let name = $state('')
@@ -162,20 +157,7 @@
 			}}
 			value={selection}
 		>
-			{#if selected === undefined}<option value="custom">Custom</option>{/if}
-			<optgroup label="Presets">
-				{#each builtinPresets as preset (preset.id)}<option value={preset.id}>{preset.label}</option
-					>{/each}
-			</optgroup>
-			{#if userPresets.length > 0}<optgroup label="User">
-					{#each userPresets as preset (preset.id)}<option value={preset.id}
-							>{preset.label}{preset.id === selected?.id && columnPresets.modified
-								? ' *'
-								: ''}</option
-						>{/each}
-				</optgroup>{/if}
-			<hr />
-			<option value="new">New column set…</option>
+			<ColumnPresetOptions {columnPresets} />
 		</select>
 		{#if selected === undefined}
 			<button

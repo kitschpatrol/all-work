@@ -1,5 +1,5 @@
 import type { ColumnPreset, ColumnPresetId } from './column-presets.js'
-import { findColumnPreset, matchesColumns, resolveColumnPresets } from './column-presets.js'
+import { matchesColumns, resolveColumnPresets } from './column-presets.js'
 
 type ColumnPresetOptions = {
 	/** Merge visibility changes for the available columns into the table. */
@@ -30,14 +30,14 @@ export function createColumnPresets(options: ColumnPresetOptions) {
 		const visibility = options.visibility()
 		return options.available().filter((id) => visibility[id] !== false)
 	})
-	const matched = $derived(findColumnPreset(visible, options.available(), presets))
-	// A saved preset stays selected while its columns are edited; a built-in only while they match exactly
+	// Only an explicit choice selects a preset. A saved preset stays selected while
+	// its columns are edited; a built-in only while they match exactly.
 	const selected = $derived.by(() => {
 		const chosen = presets.find((preset) => preset.id === selectedId)
 		return chosen !== undefined &&
 			(chosen.id.startsWith('custom:') || matchesColumns(chosen, visible, options.available()))
 			? chosen
-			: presets.find((preset) => preset.id === matched)
+			: undefined
 	})
 	const modified = $derived(
 		selected !== undefined && !matchesColumns(selected, visible, options.available()),
@@ -134,10 +134,6 @@ export function createColumnPresets(options: ColumnPresetOptions) {
 		applyPreset,
 		deletePreset,
 		edit,
-		// The preset showing exactly the visible columns, for menu check marks
-		get matched() {
-			return matched
-		},
 		get modified() {
 			return modified
 		},
