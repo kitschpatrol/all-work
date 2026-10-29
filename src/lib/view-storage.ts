@@ -22,7 +22,6 @@ export type SavedView = {
 	concurrency: number
 	directory: string
 	filter: FilterGroup
-	filterOpen: boolean
 	filterPreset: FilterPresetId | undefined
 	nextRunNumber: number
 	outputLines: number
@@ -87,7 +86,6 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		concurrency: integer(record.concurrency, 6, 1, 32),
 		directory: typeof record.directory === 'string' ? record.directory : defaultDirectory,
 		filter: parseFilter(record.filter),
-		filterOpen: record.filterOpen === true,
 		filterPreset: isFilterPresetId(record.filterPreset) ? record.filterPreset : undefined,
 		nextRunNumber: integer(record.nextRunNumber, 1, 1),
 		outputLines: integer(record.outputLines, 3, 1),

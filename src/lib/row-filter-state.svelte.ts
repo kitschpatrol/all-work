@@ -22,12 +22,11 @@ type RowFilterOptions = {
 	onChange: () => void
 	onPresetsChange?: (presets: FilterPreset[]) => Promise<void>
 	presets?: () => readonly FilterPreset[]
-	repositories: () => Repository[]
 	runs: () => CommandRun[]
 }
 
 /**
- * Own the filter rules and whether the rule editor is showing, and derive
+ * Own the filter rules and whether the Filter popover is showing, and derive
  * everything the table, toolbar, and menu need from them.
  *
  * @param options Sources for the rows and runs that rules evaluate against.
@@ -47,21 +46,24 @@ export function createRowFilter(options: RowFilterOptions) {
 	// Blank or invalid rules take no part in filtering
 	const activeRules = $derived(countActiveRules(filter, ruleRuns))
 	const preset = $derived(findFilterPreset(filter, presets))
-	const selectedPreset = $derived(presets.find((entry) => entry.id === (selectedId ?? preset)))
-	const modified = $derived(
-		selectedPreset !== undefined &&
-			JSON.stringify(parseFilter(filter)) !== JSON.stringify(parseFilter(selectedPreset.filter)),
-	)
+	// A saved preset stays selected while its rules are edited; a built-in only while they match exactly
+	const selectedPreset = $derived.by(() => {
+		const chosen = presets.find((entry) => entry.id === selectedId)
+		return chosen !== undefined && (chosen.id.startsWith('custom:') || sameRules(chosen.filter))
+			? chosen
+			: presets.find((entry) => entry.id === preset)
+	})
+	const modified = $derived(selectedPreset !== undefined && !sameRules(selectedPreset.filter))
 	const groups = $derived(getFilterMetadataGroups(filter, ruleRuns))
-	// Rows hidden only because metadata a rule reads has not loaded
-	const undecided = $derived(
-		predicate === undefined
-			? 0
-			: options.repositories().filter((repository) => predicate(repository) === undefined).length,
-	)
 
+	function sameRules(other: FilterGroup) {
+		return JSON.stringify(parseFilter(other)) === JSON.stringify(parseFilter(filter))
+	}
+
+	// Editing keeps a saved preset selected; editing a built-in starts a custom filter
 	function set(next: FilterGroup) {
-		selectedId ??= preset
+		const current = selectedPreset
+		selectedId = current?.id.startsWith('custom:') ? current.id : undefined
 		filter = next
 		options.onChange()
 	}
@@ -71,8 +73,8 @@ export function createRowFilter(options: RowFilterOptions) {
 			return
 		}
 
-		selectedId = id
 		set(getPresetFilter(id, presets))
+		selectedId = id
 	}
 
 	function clear() {
@@ -103,7 +105,18 @@ export function createRowFilter(options: RowFilterOptions) {
 		const existing = presets.find((entry) =>
 			id === undefined ? entry.label.toLowerCase() === name.toLowerCase() : entry.id === id,
 		)
-		if (savedPresets.every((entry) => entry.id !== existing?.id) && savedPresets.length >= 100) {
+		if (existing !== undefined && !existing.id.startsWith('custom:')) {
+			throw new Error('Built-in presets can’t be changed. Choose another name.')
+		}
+
+		if (
+			id !== undefined &&
+			presets.some((entry) => entry.id !== id && entry.label.toLowerCase() === name.toLowerCase())
+		) {
+			throw new Error(`A preset named “${name}” already exists.`)
+		}
+
+		if (existing === undefined && savedPresets.length >= 100) {
 			throw new Error('Delete a saved preset before adding another. You can keep up to 100.')
 		}
 
@@ -116,17 +129,19 @@ export function createRowFilter(options: RowFilterOptions) {
 		selectedId = saved.id
 	}
 
+	// Only saved presets can be deleted; the rules stay in effect as a custom filter
 	async function deletePreset() {
 		const selected = selectedPreset
-		if (selected === undefined || options.onPresetsChange === undefined) {
+		if (
+			selected === undefined ||
+			!selected.id.startsWith('custom:') ||
+			options.onPresetsChange === undefined
+		) {
 			return
 		}
 
 		await options.onPresetsChange(savedPresets.filter((entry) => entry.id !== selected.id))
 		selectedId = undefined
-		if (!selected.id.startsWith('custom:')) {
-			applyPreset(selected.id)
-		}
 	}
 
 	function addColumnRule(columnId: string) {
@@ -152,16 +167,10 @@ export function createRowFilter(options: RowFilterOptions) {
 		)
 	}
 
-	// Replace the rules and editor visibility without side effects, as when restoring a view
-	function restore(next: FilterGroup, nextOpen: boolean, sourceId?: FilterPresetId) {
+	// Replace the rules without side effects, as when restoring a view
+	function restore(next: FilterGroup, sourceId?: FilterPresetId) {
 		filter = next
-		open = nextOpen
 		selectedId = sourceId
-	}
-
-	// Disclosure changes the editor visibility without changing the applied filter
-	function toggle() {
-		open = !open
 	}
 
 	// Choosing the applied preset again clears it, like a checked menu item
@@ -207,6 +216,10 @@ export function createRowFilter(options: RowFilterOptions) {
 		get open() {
 			return open
 		},
+		// The popover opens and closes without changing the applied filter
+		set open(value: boolean) {
+			open = value
+		},
 		get preset() {
 			return preset
 		},
@@ -221,13 +234,6 @@ export function createRowFilter(options: RowFilterOptions) {
 			return selectedPreset
 		},
 		set,
-		get storedPreset() {
-			return savedPresets.some((entry) => entry.id === selectedPreset?.id)
-		},
-		toggle,
 		togglePreset,
-		get undecided() {
-			return undecided
-		},
 	}
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ColumnPreset } from './column-presets.js'
 import {
+	allColumnPreset,
 	defaultColumnPreset,
 	findColumnPreset,
 	isColumnPresetId,
@@ -13,12 +14,13 @@ const available = ['name', 'description', 'branch', 'version']
 const review: ColumnPreset = { columns: ['name', 'version'], id: 'custom:review', label: 'Review' }
 
 describe('column presets', () => {
-	it('lists Defaults first and ignores a saved entry that tries to replace it', () => {
-		const resolved = resolveColumnPresets([
-			{ columns: [], id: 'defaults', label: 'Defaults' },
-			review,
-		])
-		expect(resolved).toEqual([defaultColumnPreset, review])
+	it('lists the built-ins first and ignores a saved entry that tries to replace one', () => {
+		const resolved = resolveColumnPresets(
+			[{ columns: [], id: 'defaults', label: 'Defaults' }, review],
+			['name', 'version'],
+		)
+		expect(resolved).toEqual([defaultColumnPreset, allColumnPreset(['name', 'version']), review])
+		expect(allColumnPreset(['name', 'version']).columns).toEqual(['name', 'version'])
 	})
 
 	it('matches the visible set exactly, ignoring columns that no longer exist', () => {
@@ -45,12 +47,13 @@ describe('column presets', () => {
 		).toEqual([review])
 	})
 
-	it('ignores damaged entries, saved copies of Defaults, and oversized IDs and names', () => {
+	it('ignores damaged entries, saved copies of built-ins, and oversized IDs and names', () => {
 		expect(parseColumnPresets('broken')).toEqual([])
 		expect(
 			parseColumnPresets([
 				undefined,
 				{ columns: [], id: 'defaults', label: 'Defaults' },
+				{ columns: [], id: 'all', label: 'All' },
 				{ columns: [], id: 'unknown', label: 'Invalid ID' },
 				{ columns: [], id: 'custom:blank', label: ' ' },
 				{ columns: [], id: 'custom:long', label: 'a'.repeat(81) },
@@ -58,6 +61,7 @@ describe('column presets', () => {
 			]),
 		).toEqual([])
 		expect(isColumnPresetId('defaults')).toBe(true)
+		expect(isColumnPresetId('all')).toBe(true)
 		expect(isColumnPresetId('custom:')).toBe(false)
 		expect(isColumnPresetId(`custom:${'a'.repeat(100)}`)).toBe(false)
 	})

@@ -12,11 +12,13 @@ export const initialMenuState: MenuState = {
 	canReload: false,
 	canRun: false,
 	columnPreset: defaultColumnPreset.id,
-	columnPresets: [{ id: defaultColumnPreset.id, label: defaultColumnPreset.label }],
+	columnPresets: [
+		{ id: defaultColumnPreset.id, label: defaultColumnPreset.label },
+		{ id: 'all', label: 'All' },
+	],
 	filterActive: false,
 	filterPreset: undefined,
 	filterPresets: filterPresets.map(({ id, label }) => ({ id, label })),
-	filterShown: false,
 	hasActiveRuns: false,
 	hasFinishedRuns: false,
 	loading: false,
@@ -186,11 +188,7 @@ function buildTemplate(
 			{
 				label: 'Filter',
 				submenu: [
-					item('Show Filter Rules', 'view.toggleFilter', {
-						accelerator: 'Alt+CmdOrCtrl+F',
-						checked: state.filterShown,
-						type: 'checkbox',
-					}),
+					item('Show Filter Rules', 'view.showFilter', { accelerator: 'Alt+CmdOrCtrl+F' }),
 					separator,
 					...state.filterPresets.map((preset) =>
 						item(preset.label, 'view.filterPreset', {

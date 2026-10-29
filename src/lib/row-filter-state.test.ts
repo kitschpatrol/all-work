@@ -46,28 +46,27 @@ function setup(
 		onChange,
 		onPresetsChange,
 		presets: () => savedPresets,
-		repositories: () => rows,
 		runs: () => runs,
 	})
 	return { onChange, onPresetsChange, rows, savedPresets, state }
 }
 
 describe('row filter state', () => {
-	it('expands and collapses the editor without changing the filter', () => {
+	it('opens and closes the popover without changing the filter', () => {
 		const { onChange, state } = setup()
 		expect(state.open).toBe(false)
-		state.toggle()
+		state.open = true
 		expect(state.open).toBe(true)
 		expect(state.filter.rules).toHaveLength(0)
 		expect(state.activeRules).toBe(0)
 		expect(onChange).not.toHaveBeenCalled()
-		state.toggle()
+		state.open = false
 		expect(state.open).toBe(false)
 	})
 
-	it('keeps the editor open once its last rule is removed', () => {
+	it('keeps the popover open once its last rule is removed', () => {
 		const { state } = setup()
-		state.toggle()
+		state.open = true
 		state.set(emptyFilter())
 		expect(state.open).toBe(true)
 	})
@@ -82,20 +81,17 @@ describe('row filter state', () => {
 		expect(state.activeRules).toBe(0)
 	})
 
-	it('appends a column rule and opens the editor without replacing existing groups', () => {
+	it('appends a column rule and opens the popover without replacing existing groups', () => {
 		const { onChange, state } = setup()
-		state.restore(
-			{
-				match: 'any',
-				rules: [
-					{
-						match: 'none',
-						rules: [{ column: 'changedFiles', operator: 'is', value: '0' }],
-					},
-				],
-			},
-			false,
-		)
+		state.restore({
+			match: 'any',
+			rules: [
+				{
+					match: 'none',
+					rules: [{ column: 'changedFiles', operator: 'is', value: '0' }],
+				},
+			],
+		})
 		const existing = state.filter
 		state.addColumnRule('branch')
 		expect(state.open).toBe(true)
@@ -195,27 +191,43 @@ describe('row filter state', () => {
 		expect(rows.every((row) => state.matches(row))).toBe(true)
 	})
 
-	it('keeps filtering when the editor is collapsed and cleared while expanded', () => {
+	it('keeps filtering while the popover is closed and clears while it is open', () => {
 		const { rows, state } = setup()
 		state.applyPreset('changed')
 		expect(state.open).toBe(false)
 		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['dirty'])
-		state.toggle()
+		state.open = true
 		state.clear()
 		expect(state.open).toBe(true)
 		expect(state.selectedPreset).toBeUndefined()
 		expect(rows.every((row) => state.matches(row))).toBe(true)
 	})
 
-	it('retains the preset being edited and can revert to its saved rules', () => {
+	it('keeps a saved preset selected while editing it and reverts by applying it again', async () => {
+		const { savedPresets, state } = setup()
+		state.applyPreset('clean')
+		await state.savePreset('Spotless')
+		const id = savedPresets[0]?.id
+		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
+		expect(state.selectedPreset?.id).toBe(id)
+		expect(state.modified).toBe(true)
+		await state.savePreset('Spotless', id)
+		expect(savedPresets).toHaveLength(1)
+		expect(state.modified).toBe(false)
+		state.set({ match: 'any', rules: [{ column: 'branch', operator: 'is', value: 'dev' }] })
+		state.applyPreset(id!)
+		expect(state.modified).toBe(false)
+		expect(state.filter.rules[0]).toEqual({ column: 'branch', operator: 'is', value: 'main' })
+	})
+
+	it('makes the filter custom when a built-in preset is edited and restores it when applied again', () => {
 		const { state } = setup()
 		state.applyPreset('changed')
 		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
 		expect(state.preset).toBeUndefined()
-		expect(state.selectedPreset?.id).toBe('changed')
-		expect(state.modified).toBe(true)
+		expect(state.selectedPreset).toBeUndefined()
 		state.applyPreset('changed')
-		expect(state.modified).toBe(false)
+		expect(state.selectedPreset?.id).toBe('changed')
 		expect(state.filter.rules[0]).toEqual({
 			column: 'changedFiles',
 			operator: 'greaterThan',
@@ -238,7 +250,6 @@ describe('row filter state', () => {
 		])
 		expect(state.selectedPreset?.label).toBe('Main branch')
 		expect(state.selectedPreset?.id.startsWith('custom:')).toBe(true)
-		expect(state.modified).toBe(false)
 		state.applyPreset('changed')
 		expect(state.filter.rules[0]).toEqual({
 			column: 'changedFiles',
@@ -247,33 +258,36 @@ describe('row filter state', () => {
 		})
 	})
 
-	it('updates a preset in place and restores a built-in default', async () => {
+	it('renames a saved preset by id and refuses a name another preset uses', async () => {
+		const { savedPresets, state } = setup()
+		state.applyPreset('clean')
+		await state.savePreset('First')
+		state.applyPreset('changed')
+		await state.savePreset('Second')
+		const id = savedPresets[1]?.id
+		await expect(state.savePreset('first', id)).rejects.toThrow('already exists')
+		await state.savePreset('Renamed', id)
+		expect(savedPresets.map((preset) => preset.label)).toEqual(['First', 'Renamed'])
+		expect(state.selectedPreset?.id).toBe(id)
+	})
+
+	it('keeps built-in presets read-only', async () => {
 		const { savedPresets, state } = setup()
 		state.applyPreset('changed')
 		state.set({
 			match: 'all',
 			rules: [{ column: 'changedFiles', operator: 'atLeast', value: '5' }],
 		})
-		await state.savePreset('With Changes', 'changed')
-		expect(savedPresets).toHaveLength(1)
-		expect(state.selectedPreset?.id).toBe('changed')
-		expect(state.modified).toBe(false)
-		expect(state.storedPreset).toBe(true)
-		state.clear()
-		state.applyPreset('changed')
+		await expect(state.savePreset('with changes')).rejects.toThrow('Built-in presets')
+		await expect(state.savePreset('Mine', 'changed')).rejects.toThrow('Built-in presets')
+		await state.deletePreset()
+		expect(savedPresets).toHaveLength(0)
+		expect(state.selectedPreset).toBeUndefined()
 		expect(state.filter.rules[0]).toEqual({
 			column: 'changedFiles',
 			operator: 'atLeast',
 			value: '5',
 		})
-		await state.deletePreset()
-		expect(savedPresets).toHaveLength(0)
-		expect(state.filter.rules[0]).toEqual({
-			column: 'changedFiles',
-			operator: 'greaterThan',
-			value: '0',
-		})
-		expect(state.modified).toBe(false)
 	})
 
 	it('updates a matching name and keeps the rules when deleting a custom preset', async () => {
@@ -292,14 +306,13 @@ describe('row filter state', () => {
 		expect(state.selectedPreset).toBeUndefined()
 	})
 
-	it('keeps the draft and preset identity when saving fails', async () => {
+	it('keeps the draft when saving fails', async () => {
 		const { onPresetsChange, state } = setup()
 		state.applyPreset('changed')
 		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
 		onPresetsChange.mockRejectedValueOnce(new Error('Disk unavailable'))
 		await expect(state.savePreset('Unsaved copy')).rejects.toThrow('Disk unavailable')
-		expect(state.selectedPreset?.id).toBe('changed')
-		expect(state.modified).toBe(true)
+		expect(state.selectedPreset).toBeUndefined()
 		expect(state.filter.rules[0]).toEqual({ column: 'branch', operator: 'is', value: 'main' })
 	})
 
@@ -321,28 +334,29 @@ describe('row filter state', () => {
 		expect(saved).toHaveLength(100)
 	})
 
-	it('restores the source of an edited preset even when its rules differ', () => {
-		const { onChange, state } = setup()
+	it('ignores a restored built-in whose rules no longer match but keeps an edited saved preset', async () => {
+		const { onChange, savedPresets, state } = setup()
 		state.restore(
 			{ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] },
-			false,
 			'changed',
 		)
-		expect(state.selectedPreset?.id).toBe('changed')
-		expect(state.modified).toBe(true)
-		expect(state.open).toBe(false)
+		expect(state.selectedPreset).toBeUndefined()
 		expect(onChange).not.toHaveBeenCalled()
+		await state.savePreset('Mine')
+		state.restore(
+			{ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'dev' }] },
+			savedPresets[0]?.id,
+		)
+		expect(state.selectedPreset?.label).toBe('Mine')
+		expect(state.modified).toBe(true)
 	})
 
 	it('restores saved rules without reporting a change', () => {
 		const { onChange, state } = setup()
-		state.restore(
-			{ match: 'all', rules: [{ column: 'changedFiles', operator: 'is', value: '0' }] },
-			true,
-		)
+		state.restore({ match: 'all', rules: [{ column: 'changedFiles', operator: 'is', value: '0' }] })
 		expect(onChange).not.toHaveBeenCalled()
 		expect(state.preset).toBe('clean')
-		expect(state.open).toBe(true)
+		expect(state.open).toBe(false)
 	})
 
 	it('drops rules on runs that are gone', () => {
@@ -358,30 +372,26 @@ describe('row filter state', () => {
 			},
 		]
 		const { state } = setup(runs)
-		state.restore(
-			{
-				match: 'all',
-				rules: [
-					{ column: 'run-1', operator: 'statusIs', value: 'notIncluded' },
-					{ column: 'branch', operator: 'is', value: 'main' },
-				],
-			},
-			true,
-		)
+		state.restore({
+			match: 'all',
+			rules: [
+				{ column: 'run-1', operator: 'statusIs', value: 'notIncluded' },
+				{ column: 'branch', operator: 'is', value: 'main' },
+			],
+		})
 		expect(state.activeRules).toBe(2)
 		runs.length = 0
 		state.prune()
 		expect(state.filter.rules).toEqual([{ column: 'branch', operator: 'is', value: 'main' }])
 	})
 
-	it('counts rows waiting on metadata a rule reads', () => {
+	it('hides rows waiting on metadata a rule reads', () => {
 		const { rows, state } = setup()
-		state.restore(
-			{ match: 'all', rules: [{ column: 'metadata:Stars', operator: 'atLeast', value: '1' }] },
-			true,
-		)
+		state.restore({
+			match: 'all',
+			rules: [{ column: 'metadata:Stars', operator: 'atLeast', value: '1' }],
+		})
 		expect(state.groups).toEqual(['github'])
-		expect(state.undecided).toBe(rows.length)
 		expect(rows.some((row) => state.matches(row))).toBe(false)
 	})
 })

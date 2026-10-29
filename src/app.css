@@ -553,13 +553,50 @@ h2 {
 	align-items: center;
 }
 
+/* Popovers anchor to the toolbar so they fit at any width; each caret anchors to its own summary */
 .column-menu {
-	position: relative;
+	position: static;
 }
 
 .column-menu summary {
 	gap: 8px;
 	list-style: '';
+}
+
+.menu-control {
+	display: flex;
+	flex-shrink: 0;
+	flex-wrap: nowrap;
+	gap: 6px;
+	align-items: center;
+}
+
+.menu-summary {
+	anchor-name: var(--menu-anchor);
+	min-width: 90px;
+	max-width: 240px;
+}
+
+.menu-summary-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.menu-caret {
+	position: absolute;
+	z-index: 11;
+	top: calc(100% + 1px);
+	left: calc(anchor(var(--menu-anchor) center) - 7px);
+	transform: rotate(45deg);
+	width: 14px;
+	height: 14px;
+	border-top: 1px solid #0000001f;
+	border-left: 1px solid #0000001f;
+	border-radius: 2px 0 0;
+	background: #f6f6f6;
+
+	/* Keep the half above the popover plus a sliver that covers its edge line. The edge is a border because the clip would remove a shadow. */
+	clip-path: polygon(0 0, 100% 0, 100% 15%, 15% 100%, 0 100%);
 }
 
 .column-menu summary::after {
@@ -580,8 +617,10 @@ h2 {
 .column-options {
 	position: absolute;
 	z-index: 10;
-	top: 27px;
-	right: 0;
+	top: calc(100% + 8px);
+
+	/* Clear of the table's vertical scroll bar */
+	right: 24px;
 	overflow: hidden;
 	display: flex;
 	flex-flow: column nowrap;
@@ -602,9 +641,10 @@ h2 {
 	visibility: hidden;
 }
 
+/* The padding sets the popover width: the checkbox gutter on the left plus room to breathe on the right */
 .column-width-reference span {
 	grid-area: 1 / 1;
-	padding-inline: 45px 23px;
+	padding-inline: 70px 50px;
 	white-space: nowrap;
 }
 
@@ -647,8 +687,17 @@ h2 {
 	background: #f6f6f6;
 }
 
+/* With no rules the Filter popover is only its header */
+.column-search:last-child {
+	border-bottom: 0;
+}
+
+/* A full-width rule separates the preset row from the search field and actions */
 .column-search-field {
 	position: relative;
+	margin: 8px -8px 0;
+	padding: 8px 8px 0;
+	border-top: 1px solid #e2e2e2;
 }
 
 .column-search-field input {
@@ -674,28 +723,27 @@ h2 {
 	flex: 1;
 }
 
-.column-presets {
+.preset-row {
 	display: flex;
 	flex-wrap: nowrap;
 	gap: 6px;
 	align-items: center;
-	margin-bottom: 8px;
 }
 
-.column-preset-picker,
-.column-preset-name {
+.preset-picker,
+.preset-name {
 	flex: 1;
 	width: 0;
 	min-width: 0;
 }
 
-.column-preset-picker {
+.preset-picker {
 	overflow: hidden;
 	justify-content: flex-start;
 	text-overflow: ellipsis;
 }
 
-.column-preset-name {
+.preset-name {
 	height: 22px;
 	padding: 2px 6px;
 	border: 1px solid #ababab;
@@ -705,8 +753,8 @@ h2 {
 	box-shadow: var(--field-shadow);
 }
 
-.column-preset-error {
-	margin: -2px 0 8px;
+.preset-error {
+	margin: 6px 0 0;
 	font-size: 11px;
 	color: #b82b20;
 }
@@ -726,6 +774,7 @@ h2 {
 }
 
 .table-toolbar {
+	position: relative;
 	display: flex;
 	flex-shrink: 0;
 	flex-wrap: wrap;
@@ -798,88 +847,19 @@ input[type='search']::-webkit-search-cancel-button {
 	align-items: center;
 }
 
-.filter-panel {
-	flex-shrink: 0;
-	border-top: 1px solid #d4d4d4;
-	background: #f6f6f6;
-}
-
-.filter-toolbar,
-.filter-save,
-.filter-empty {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	align-items: center;
-}
-
-.filter-toolbar {
-	min-height: 32px;
-	padding: 4px 8px;
-}
-
-.filter-disclosure {
-	display: inline-flex;
-	flex-shrink: 0;
-	flex-wrap: nowrap;
-	gap: 5px;
-	align-items: center;
-	height: 22px;
-	padding: 0 4px 0 0;
-	border: 0;
-	font-weight: 600;
-	color: var(--text-secondary);
-	background: transparent;
-}
-
-.filter-disclosure.filtering {
-	color: var(--accent);
-}
-
-.filter-disclosure-icon.expanded {
-	transform: rotate(90deg);
-}
-
-.filter-preset-picker {
-	overflow: hidden;
-	justify-content: flex-start;
-	width: 190px;
-	text-overflow: ellipsis;
-}
-
-.filter-edited,
-.filter-results {
-	font-size: 11px;
-	color: var(--text-secondary);
-}
-
-.filter-edited {
-	font-style: italic;
-}
-
-.filter-results {
-	margin-left: auto;
-	white-space: nowrap;
-}
-
-.filter-error {
-	margin: 0;
-	padding: 3px 8px 6px;
-	color: #b82b20;
-}
-
-.filter-empty {
-	min-height: 32px;
-	color: var(--text-secondary);
+.filter-options {
+	right: auto;
+	left: 8px;
+	min-width: 360px;
+	max-width: calc(100% - 16px);
+	max-height: min(70vh, 600px);
 }
 
 .filter-bar {
 	overflow: auto;
-	flex-shrink: 0;
-	max-height: min(32vh, 300px);
+	flex: 1;
+	min-height: 0;
 	padding: 3px 8px 5px;
-	border-top: 1px solid #d4d4d4;
-	background: #f6f6f6;
 }
 
 .filter-row {
@@ -908,12 +888,6 @@ input[type='search']::-webkit-search-cancel-button {
 	flex-wrap: nowrap;
 	gap: 6px;
 	align-items: center;
-}
-
-.filter-undecided {
-	font-size: 11px;
-	color: var(--text-tertiary);
-	white-space: nowrap;
 }
 
 .filter-bar select {

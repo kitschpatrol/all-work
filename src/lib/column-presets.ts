@@ -4,7 +4,7 @@ import { asRecord } from './record.js'
  * Identifies a column preset in the Columns popover, View menu, and saved
  * settings.
  */
-export type ColumnPresetId = 'defaults' | `custom:${string}`
+export type ColumnPresetId = 'all' | 'defaults' | `custom:${string}`
 
 /**
  * A named set of visible columns. Applying it hides every other optional
@@ -13,8 +13,8 @@ export type ColumnPresetId = 'defaults' | `custom:${string}`
 export type ColumnPreset = { columns: string[]; id: ColumnPresetId; label: string }
 
 /**
- * The starter columns, shown on first launch and after Reset View. It can't be
- * edited.
+ * The starter columns, shown on first launch and after Reset View. Built-in
+ * presets can't be edited.
  */
 export const defaultColumnPreset: ColumnPreset = {
 	columns: [
@@ -28,14 +28,20 @@ export const defaultColumnPreset: ColumnPreset = {
 		'lastCommitDate',
 	],
 	id: 'defaults',
-	label: 'Defaults',
+	label: 'Default',
+}
+
+/** Every optional column the table offers, in table order. */
+export function allColumnPreset(available: readonly string[]): ColumnPreset {
+	return { columns: [...available], id: 'all', label: 'All' }
 }
 
 /** Narrow a menu payload or saved value to a column preset. */
 export function isColumnPresetId(value: unknown): value is ColumnPresetId {
 	return (
 		typeof value === 'string' &&
-		(value === 'defaults' ||
+		(value === 'all' ||
+			value === 'defaults' ||
 			(value.startsWith('custom:') && value.length > 7 && value.length <= 100))
 	)
 }
@@ -52,7 +58,7 @@ export function parseColumnPresets(value: unknown): ColumnPreset[] {
 		if (
 			record === undefined ||
 			!isColumnPresetId(record.id) ||
-			record.id === defaultColumnPreset.id ||
+			!record.id.startsWith('custom:') ||
 			typeof record.label !== 'string' ||
 			record.label.trim() === '' ||
 			record.label.length > 80 ||
@@ -77,9 +83,19 @@ export function parseColumnPresets(value: unknown): ColumnPreset[] {
 	return presets.values().toArray()
 }
 
-/** List Defaults first, then saved presets in the order they were added. */
-export function resolveColumnPresets(saved: readonly ColumnPreset[] = []): ColumnPreset[] {
-	return [defaultColumnPreset, ...saved.filter((preset) => preset.id !== defaultColumnPreset.id)]
+/**
+ * List the built-in presets first, then saved presets in the order they were
+ * added.
+ */
+export function resolveColumnPresets(
+	saved: readonly ColumnPreset[],
+	available: readonly string[],
+): ColumnPreset[] {
+	return [
+		defaultColumnPreset,
+		allColumnPreset(available),
+		...saved.filter((preset) => preset.id.startsWith('custom:')),
+	]
 }
 
 /**

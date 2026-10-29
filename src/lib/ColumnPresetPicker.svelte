@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { tick } from 'svelte'
 	import type { createColumnPresets } from './column-preset-state.svelte.js'
+	import type { ColumnPresetId } from './column-presets.js'
 	import { isColumnPresetId } from './column-presets.js'
+	import { nextCustomName } from './preset-name.js'
 
 	/**
 	 * Choose, save, and delete column presets at the top of the Columns popover.
@@ -13,7 +15,14 @@
 	const selected = $derived(columnPresets.selected)
 	const saved = $derived(selected?.id.startsWith('custom:') === true)
 	const selection = $derived(selected?.id ?? 'custom')
+	const builtinPresets = $derived(
+		columnPresets.presets.filter((preset) => !preset.id.startsWith('custom:')),
+	)
+	const userPresets = $derived(
+		columnPresets.presets.filter((preset) => preset.id.startsWith('custom:')),
+	)
 	let naming = $state(false)
+	let renaming = $state(false)
 	let name = $state('')
 	let nameInput = $state<HTMLInputElement>()
 	let picker = $state<HTMLSelectElement>()
@@ -26,41 +35,38 @@
 		),
 	)
 
-	async function choose(select: HTMLSelectElement) {
+	function choose(select: HTMLSelectElement) {
 		const { value } = select
-		// Commands at the end of the picker run without becoming its selection
-		select.value = selection
 		message = ''
-		switch (value) {
-			case 'remove': {
-				await removePreset()
-				break
-			}
-
-			case 'revert': {
-				if (selected !== undefined) {
-					columnPresets.applyPreset(selected.id)
-				}
-
-				break
-			}
-
-			case 'save': {
-				await beginSave()
-				break
-			}
-
-			default: {
-				if (isColumnPresetId(value)) {
-					columnPresets.applyPreset(value)
-				}
-			}
+		if (value === 'new') {
+			columnPresets.newSet()
+		} else if (isColumnPresetId(value)) {
+			columnPresets.applyPreset(value)
 		}
+
+		// A command does not become the selection
+		select.value = selection
 	}
 
+	// Proposes the next free "Custom N"; an existing user preset's name replaces that preset
 	async function beginSave() {
-		name = saved && selected !== undefined ? `${selected.label} copy` : ''
+		name = nextCustomName(columnPresets.presets.map((preset) => preset.label))
 		naming = true
+		message = ''
+		await tick()
+		nameInput?.focus()
+		nameInput?.select()
+	}
+
+	// Renaming saves the selected preset under a new name, keeping its id
+	async function beginRename() {
+		if (selected === undefined) {
+			return
+		}
+
+		name = selected.label
+		naming = true
+		renaming = true
 		message = ''
 		await tick()
 		nameInput?.focus()
@@ -69,12 +75,13 @@
 
 	async function endSave() {
 		naming = false
+		renaming = false
 		message = ''
 		await tick()
 		picker?.focus()
 	}
 
-	async function save(label: string, id?: `custom:${string}`) {
+	async function save(label: string, id?: ColumnPresetId) {
 		busy = true
 		message = ''
 		try {
@@ -89,7 +96,7 @@
 	}
 
 	async function saveChanges() {
-		if (selected !== undefined && selected.id !== 'defaults') {
+		if (selected !== undefined) {
 			await save(selected.label, selected.id)
 		}
 	}
@@ -109,17 +116,17 @@
 
 {#if naming}
 	<form
-		class="column-presets"
+		class="preset-row"
 		onsubmit={async (event) => {
 			event.preventDefault()
-			if (await save(name)) {
+			if (await save(name, renaming ? selected?.id : undefined)) {
 				await endSave()
 			}
 		}}
 	>
 		<input
 			bind:this={nameInput}
-			class="column-preset-name"
+			class="preset-name"
 			aria-label="Preset name"
 			disabled={busy}
 			maxlength="80"
@@ -139,51 +146,78 @@
 			bind:value={name}
 		/>
 		<button class="button primary" disabled={busy || name.trim() === ''} type="submit"
-			>{replacing ? 'Replace' : 'Save'}</button
+			>{renaming ? 'Rename' : replacing ? 'Replace' : 'Save'}</button
 		>
 		<button class="button subtle" disabled={busy} onclick={endSave} type="button">Cancel</button>
 	</form>
 {:else}
-	<div class="column-presets">
+	<div class="preset-row">
 		<select
 			bind:this={picker}
-			class="column-preset-picker"
+			class="preset-picker"
 			aria-label="Column preset"
 			disabled={busy}
-			onchange={async (event) => choose(event.currentTarget)}
+			onchange={(event) => {
+				choose(event.currentTarget)
+			}}
 			value={selection}
 		>
 			{#if selected === undefined}<option value="custom">Custom</option>{/if}
-			{#each columnPresets.presets as preset (preset.id)}<option value={preset.id}
-					>{preset.label}{preset.id === selected?.id && columnPresets.modified
-						? ' (edited)'
-						: ''}</option
-				>{/each}
+			<optgroup label="Presets">
+				{#each builtinPresets as preset (preset.id)}<option value={preset.id}>{preset.label}</option
+					>{/each}
+			</optgroup>
+			{#if userPresets.length > 0}<optgroup label="User">
+					{#each userPresets as preset (preset.id)}<option value={preset.id}
+							>{preset.label}{preset.id === selected?.id && columnPresets.modified
+								? ' *'
+								: ''}</option
+						>{/each}
+				</optgroup>{/if}
 			<hr />
-			<option value="save">Save as preset…</option>
-			{#if selected !== undefined && columnPresets.modified}<option value="revert"
-					>Revert to “{selected.label}”</option
-				>{/if}
-			{#if saved && selected !== undefined}<option value="remove">Delete “{selected.label}”</option
-				>{/if}
+			<option value="new">New column set…</option>
 		</select>
-		{#if saved && columnPresets.modified}
+		{#if selected === undefined}
+			<button
+				class="button subtle"
+				disabled={busy}
+				onclick={beginSave}
+				title="Save these columns as a preset"
+				type="button">Save…</button
+			>
+		{:else if saved && columnPresets.modified}
 			<button
 				class="button subtle"
 				disabled={busy}
 				onclick={saveChanges}
-				title="Save these columns to “{selected?.label}”"
+				title="Save these columns to “{selected.label}”"
 				type="button">Save</button
 			>
-		{:else}
 			<button
 				class="button subtle"
-				disabled={busy || (selected !== undefined && !columnPresets.modified)}
-				onclick={beginSave}
-				title="Save these columns as a new preset"
-				type="button">Save…</button
+				disabled={busy}
+				onclick={() => {
+					columnPresets.applyPreset(selected.id)
+				}}
+				title="Discard changes to “{selected.label}”"
+				type="button">Revert</button
+			>
+		{:else if saved}
+			<button
+				class="button subtle"
+				disabled={busy}
+				onclick={beginRename}
+				title="Rename “{selected.label}”"
+				type="button">Rename…</button
+			>
+			<button
+				class="button subtle"
+				disabled={busy}
+				onclick={removePreset}
+				title="Delete “{selected.label}”. The columns stay as they are."
+				type="button">Delete</button
 			>
 		{/if}
 	</div>
 {/if}
-{#if message !== ''}<p class="column-preset-error" role="alert">{message}</p>{/if}
+{#if message !== ''}<p class="preset-error" role="alert">{message}</p>{/if}

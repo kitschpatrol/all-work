@@ -47,15 +47,13 @@ function setup(savedPresets: ColumnPreset[] = []) {
 }
 
 describe('column preset state', () => {
-	it('recognizes Defaults until a column is changed by hand, then marks it edited', () => {
+	it('recognizes Defaults until a column is changed by hand', () => {
 		const { state, toggle } = setup()
 		expect(state.selected?.id).toBe('defaults')
 		expect(state.matched).toBe('defaults')
-		expect(state.modified).toBe(false)
 		toggle('remote')
-		expect(state.selected?.id).toBe('defaults')
+		expect(state.selected).toBeUndefined()
 		expect(state.matched).toBeUndefined()
-		expect(state.modified).toBe(true)
 	})
 
 	it('treats columns changed with nothing selected as a custom set', () => {
@@ -64,7 +62,6 @@ describe('column preset state', () => {
 		toggle('remote')
 		state.restore()
 		expect(state.selected).toBeUndefined()
-		expect(state.modified).toBe(false)
 	})
 
 	it('saves the visible columns as a new preset and selects it', async () => {
@@ -82,25 +79,49 @@ describe('column preset state', () => {
 			},
 		])
 		expect(state.selected?.label).toBe('Remotes')
-		expect(state.modified).toBe(false)
 	})
 
-	it('applies a preset and reverts edits by applying it again', async () => {
+	it('applies a preset and restores its columns by applying it again', async () => {
 		const { apply, state, toggle, visible } = setup()
 		toggle('remote')
 		await state.savePreset('Remotes')
 		const saved = visible()
 		state.applyPreset('defaults')
 		expect(visible()).toEqual(defaultColumnPreset.columns.toSorted())
-		const id = state.presets[1]?.id
+		const id = state.presets[2]?.id
 		expect(id).toBeDefined()
 		state.applyPreset(id!)
 		toggle('version')
+		expect(state.selected?.id).toBe(id)
 		expect(state.modified).toBe(true)
 		state.applyPreset(id!)
 		expect(visible()).toEqual(saved)
 		expect(state.modified).toBe(false)
 		expect(apply).toHaveBeenCalledTimes(3)
+	})
+
+	it('renames a saved preset and refuses a name another preset uses', async () => {
+		const { savedPresets, state, toggle } = setup()
+		toggle('remote')
+		await state.savePreset('First')
+		toggle('version')
+		await state.savePreset('Second')
+		const id = savedPresets[1]?.id
+		await expect(state.savePreset('FIRST', id)).rejects.toThrow('already exists')
+		await state.savePreset('Renamed', id)
+		expect(savedPresets.map((preset) => preset.label)).toEqual(['First', 'Renamed'])
+		expect(state.selected?.id).toBe(id)
+	})
+
+	it('saves edits to a saved preset in place', async () => {
+		const { savedPresets, state, toggle, visible } = setup()
+		toggle('remote')
+		await state.savePreset('Remotes')
+		toggle('version')
+		await state.savePreset('Remotes', savedPresets[0]?.id)
+		expect(savedPresets).toHaveLength(1)
+		expect(savedPresets[0]?.columns.toSorted()).toEqual(visible())
+		expect(state.modified).toBe(false)
 	})
 
 	it('changes only repository columns when applying a preset', () => {
@@ -109,7 +130,15 @@ describe('column preset state', () => {
 		state.applyPreset('defaults')
 		expect(Object.keys(apply.mock.calls[0]?.[0] ?? {})).toEqual(available)
 		expect(visibility()['run-1']).toBe(false)
-		expect(state.modified).toBe(false)
+		expect(state.selected?.id).toBe('defaults')
+	})
+
+	it('starts a new set with only the repo name showing', () => {
+		const { state, visible } = setup()
+		state.newSet()
+		expect(visible()).toEqual(['repoName'])
+		expect(state.selected).toBeUndefined()
+		expect(state.matched).toBeUndefined()
 	})
 
 	it('replaces a preset in place by ID or by a matching name', async () => {
@@ -129,14 +158,15 @@ describe('column preset state', () => {
 		expect(savedPresets[1]?.columns).toEqual(['name', 'branch'])
 	})
 
-	it('refuses to change Defaults, blank names, or a 101st preset', async () => {
+	it('refuses to change built-ins, blank names, or a 101st preset', async () => {
 		const full = Array.from({ length: 100 }, (_, index) => ({
 			columns: ['name'],
 			id: `custom:${index}` as const,
 			label: `Preset ${index}`,
 		}))
 		const { onPresetsChange, state } = setup(full)
-		await expect(state.savePreset('defaults')).rejects.toThrow('Defaults can’t be changed')
+		await expect(state.savePreset('default')).rejects.toThrow('Built-in presets')
+		await expect(state.savePreset('All')).rejects.toThrow('Built-in presets')
 		await expect(state.savePreset(' '.repeat(3))).rejects.toThrow('between 1 and 80')
 		await expect(state.savePreset('One more')).rejects.toThrow('up to 100')
 		await state.savePreset('Preset 0')
@@ -152,24 +182,31 @@ describe('column preset state', () => {
 		expect(savedPresets).toEqual([])
 		expect(visible()).toEqual(before)
 		expect(state.selected).toBeUndefined()
-		state.applyPreset('defaults')
+		state.applyPreset('all')
 		await state.deletePreset()
-		expect(state.presets.map((preset) => preset.id)).toEqual(['defaults'])
+		expect(state.presets.map((preset) => preset.id)).toEqual(['defaults', 'all'])
 	})
 
-	it('keeps the selection when saving fails', async () => {
-		const { onPresetsChange, state, toggle } = setup()
+	it('shows every optional column with All', () => {
+		const { state, visible } = setup()
+		state.applyPreset('all')
+		expect(visible()).toEqual(available.toSorted())
+		expect(state.selected?.id).toBe('all')
+	})
+
+	it('keeps the columns when saving fails', async () => {
+		const { onPresetsChange, state, toggle, visible } = setup()
 		toggle('remote')
+		const columns = visible()
 		onPresetsChange.mockRejectedValueOnce(new Error('Disk unavailable'))
 		await expect(state.savePreset('Remotes')).rejects.toThrow('Disk unavailable')
-		expect(state.selected?.id).toBe('defaults')
-		expect(state.modified).toBe(true)
+		expect(state.selected).toBeUndefined()
+		expect(visible()).toEqual(columns)
 	})
 
 	it('falls back to the matching preset when the selected one no longer exists', () => {
 		const { state } = setup()
 		state.restore('custom:gone')
 		expect(state.selected?.id).toBe('defaults')
-		expect(state.modified).toBe(false)
 	})
 })

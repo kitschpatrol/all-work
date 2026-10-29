@@ -40,7 +40,7 @@ export type MenuCommand =
 	| 'view.fitColumns'
 	| 'view.focusSearch'
 	| 'view.reset'
-	| 'view.toggleFilter'
+	| 'view.showFilter'
 	| 'view.toggleRepositoryShortcuts'
 	| 'view.toggleSelectedOnly'
 	| 'workspace.browse'
@@ -72,7 +72,6 @@ export type MenuState = {
 	filterActive: boolean
 	filterPreset: FilterPresetId | undefined
 	filterPresets: Array<Pick<FilterPreset, 'id' | 'label'>>
-	filterShown: boolean
 	hasActiveRuns: boolean
 	hasFinishedRuns: boolean
 	loading: boolean
@@ -244,7 +243,6 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.filterActive === 'boolean' &&
 		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
 		isPresetList(state.filterPresets, isFilterPresetId) &&
-		typeof state.filterShown === 'boolean' &&
 		typeof state.hasActiveRuns === 'boolean' &&
 		typeof state.hasFinishedRuns === 'boolean' &&
 		typeof state.loading === 'boolean' &&

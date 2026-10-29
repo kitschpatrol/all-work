@@ -54,7 +54,7 @@
 	import { isOpenTarget } from '#lib/electron-api.js'
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
-	import FilterBar from '#lib/FilterBar.svelte'
+	import FilterMenu from '#lib/FilterMenu.svelte'
 	import { titleOnHover } from '#lib/hover-titles.js'
 	import { refreshGroups } from '#lib/metadata-columns.js'
 	import { planMetadataRequests, sendMetadataRequests } from '#lib/metadata-requests.js'
@@ -194,7 +194,6 @@
 			preferences = await savePreferenceChanges(preferences, { filterPresets: presets })
 		},
 		presets: () => preferences.filterPresets,
-		repositories: () => workspace?.repositories ?? [],
 		runs: () => runs,
 	})
 	const runHistory = createRunHistory((runId) => rowFilter.references(runId))
@@ -319,7 +318,6 @@
 		concurrency,
 		directory,
 		filter: rowFilter.filter,
-		filterOpen: rowFilter.open,
 		filterPreset: rowFilter.selectedPreset?.id,
 		nextRunNumber:
 			workspace === undefined ? (savedView?.nextRunNumber ?? 1) : runHistory.nextNumber,
@@ -361,7 +359,7 @@
 		command = view.command
 		commandHistory = view.commandHistory
 		concurrency = view.concurrency
-		rowFilter.restore(view.filter, view.filterOpen, view.filterPreset)
+		rowFilter.restore(view.filter, view.filterPreset)
 		outputLines = view.outputLines
 		recursive = view.recursive
 		rowSelection = Object.fromEntries(
@@ -449,7 +447,7 @@
 		commandForm.resetRecall()
 		rowSelection = {}
 		search = ''
-		rowFilter.restore(emptyFilter(), false)
+		rowFilter.restore(emptyFilter())
 		void runHistory.reset(runs).catch(showError)
 		selectedOnly = false
 		resizedColumns.clear()
@@ -1081,7 +1079,9 @@
 		'view.reset'() {
 			void resetView()
 		},
-		'view.toggleFilter': rowFilter.toggle,
+		'view.showFilter'() {
+			rowFilter.open = true
+		},
 		'view.toggleRepositoryShortcuts'() {
 			void applyPreferences(
 				{ ...preferences, showRepositoryShortcuts: !preferences.showRepositoryShortcuts },
@@ -1127,7 +1127,6 @@
 		filterActive: rowFilter.activeRules > 0,
 		filterPreset: rowFilter.preset,
 		filterPresets: rowFilter.presets.map(({ id, label }) => ({ id, label })),
-		filterShown: rowFilter.open,
 		hasActiveRuns: activeRuns.length > 0,
 		hasFinishedRuns: runs.some((run) => run.finished),
 		loading,
@@ -1268,6 +1267,7 @@
 							bind:value={search}
 						/>
 					</div>
+					<FilterMenu repositories={workspace?.repositories ?? []} {rowFilter} {runs} />
 					<label class="selected-filter"
 						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
 						only</label
@@ -1284,22 +1284,13 @@
 					<MetadataControls
 						{columnPresets}
 						columns={optionalColumns}
-						disabled={loading || targets.length === 0}
-						onRefresh={refreshMetadata}
 						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
 						onVisibilityAll={async (visible: boolean) =>
 							setColumnsVisible(optionalColumnIds, visible)}
 						onVisibilityMany={setColumnsVisible}
-						selectedCount={targets.length}
 					/>
 				</div>
 			</div>
-			<FilterBar
-				repositories={workspace?.repositories ?? []}
-				{rowFilter}
-				{runs}
-				visibleCount={visibleRepositories.length}
-			/>
 			<div
 				bind:this={tableScroll}
 				class="table-scroll"

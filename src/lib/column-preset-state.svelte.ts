@@ -13,8 +13,9 @@ type ColumnPresetOptions = {
 }
 
 /**
- * Track which column preset is showing, whether its columns were changed by
- * hand, and save or delete named column sets.
+ * Track which column preset is showing and save or delete named column sets. A
+ * saved preset can be edited in place; changing a built-in's columns by hand
+ * starts a custom set instead.
  *
  * @param options Sources for the current columns and saved presets.
  *
@@ -23,25 +24,36 @@ type ColumnPresetOptions = {
 export function createColumnPresets(options: ColumnPresetOptions) {
 	let selectedId = $state<ColumnPresetId>()
 	const saved = $derived(options.presets?.() ?? [])
-	const presets = $derived(resolveColumnPresets(saved))
+	const presets = $derived(resolveColumnPresets(saved, options.available()))
 	// Available columns that are showing, in table order
 	const visible = $derived.by(() => {
 		const visibility = options.visibility()
 		return options.available().filter((id) => visibility[id] !== false)
 	})
 	const matched = $derived(findColumnPreset(visible, options.available(), presets))
-	// A preset that was deleted elsewhere falls back to the one matching the columns
-	const selected = $derived(
-		presets.find((preset) => preset.id === selectedId) ??
-			presets.find((preset) => preset.id === matched),
-	)
+	// A saved preset stays selected while its columns are edited; a built-in only while they match exactly
+	const selected = $derived.by(() => {
+		const chosen = presets.find((preset) => preset.id === selectedId)
+		return chosen !== undefined &&
+			(chosen.id.startsWith('custom:') || matchesColumns(chosen, visible, options.available()))
+			? chosen
+			: presets.find((preset) => preset.id === matched)
+	})
 	const modified = $derived(
 		selected !== undefined && !matchesColumns(selected, visible, options.available()),
 	)
 
-	// Call before showing or hiding columns by hand so the preset reads as edited
+	// Call before changing columns by hand: a saved preset stays selected, a built-in gives way to a custom set
 	function edit() {
-		selectedId = selected?.id
+		selectedId = selected?.id.startsWith('custom:') ? selected.id : undefined
+	}
+
+	// Start a custom set from the repo name alone
+	function newSet() {
+		selectedId = undefined
+		options.apply(
+			Object.fromEntries(options.available().map((column) => [column, column === 'repoName'])),
+		)
 	}
 
 	function applyPreset(id: ColumnPresetId) {
@@ -71,8 +83,15 @@ export function createColumnPresets(options: ColumnPresetOptions) {
 		const existing = presets.find((entry) =>
 			id === undefined ? entry.label.toLowerCase() === name.toLowerCase() : entry.id === id,
 		)
-		if (existing?.id === 'defaults') {
-			throw new Error('Defaults can’t be changed. Choose another name.')
+		if (existing !== undefined && !existing.id.startsWith('custom:')) {
+			throw new Error('Built-in presets can’t be changed. Choose another name.')
+		}
+
+		if (
+			id !== undefined &&
+			presets.some((entry) => entry.id !== id && entry.label.toLowerCase() === name.toLowerCase())
+		) {
+			throw new Error(`A preset named “${name}” already exists.`)
 		}
 
 		if (existing === undefined && saved.length >= 100) {
@@ -94,7 +113,11 @@ export function createColumnPresets(options: ColumnPresetOptions) {
 
 	async function deletePreset() {
 		const preset = selected
-		if (preset === undefined || preset.id === 'defaults' || options.onPresetsChange === undefined) {
+		if (
+			preset === undefined ||
+			!preset.id.startsWith('custom:') ||
+			options.onPresetsChange === undefined
+		) {
 			return
 		}
 
@@ -118,6 +141,7 @@ export function createColumnPresets(options: ColumnPresetOptions) {
 		get modified() {
 			return modified
 		},
+		newSet,
 		get presets() {
 			return presets
 		},
