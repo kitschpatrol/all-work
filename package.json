@@ -45,7 +45,7 @@
 		"execa": "^10.1.1",
 		"git-url-parse": "^16.1.0",
 		"lognow": "^0.8.7",
-		"metascope": "file:../metascope"
+		"metascope": "^0.13.8"
 	},
 	"devDependencies": {
 		"@kitschpatrol/electron-vite": "6.0.0-beta.4",
