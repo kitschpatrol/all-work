@@ -1207,6 +1207,17 @@ th.column-dragged {
 	background: linear-gradient(#f3f3f3, #e3e3e3);
 }
 
+/* Cells draw only their right border, so the dragged column carries away its neighbor's left edge */
+td.column-dragged + td:not(.last-output-cell) {
+	box-shadow: inset 1px 0 #eceef1;
+}
+
+th.column-dragged + th:not(.last-output-cell) {
+	box-shadow:
+		inset 1px 0 #d3d3d3,
+		inset 2px 0 #fff;
+}
+
 /* Hover states and tooltips would flicker beneath the pointer while a column moves */
 .column-dragging {
 	user-select: none;
