@@ -12,7 +12,7 @@ const config: Configuration = {
 		entitlementsInherit: 'electron/resources/mac/entitlements.mac.plist',
 		gatekeeperAssess: false,
 		hardenedRuntime: true,
-		icon: 'electron/resources/icons/mac/icon.icns',
+		icon: 'electron/resources/icons/mac/icon.icon',
 		target: 'zip',
 	},
 	nsis: { allowToChangeInstallationDirectory: true, oneClick: false },

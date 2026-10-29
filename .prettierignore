@@ -10,3 +10,4 @@ skills-lock.json
 
 # Customizations
 electron/resources/mac/entitlements.mac.plist
+*.icon/
