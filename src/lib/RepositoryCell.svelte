@@ -3,6 +3,7 @@
 	import type { Repository } from './workspace.js'
 	import FolderIcon from './FolderIcon.svelte'
 	import GithubIcon from './GithubIcon.svelte'
+	import { inView } from './in-view.js'
 	import { getGithubUrl, openRepositoryLink } from './repository-links.js'
 	import { metadataActivity, vscodeUrl } from './table-formatting.js'
 	const {
@@ -18,6 +19,8 @@
 	} = $props()
 	const githubUrl = $derived(getGithubUrl(repository.remote))
 	const activity = $derived(metadataActivity(repository))
+	// Each spinning icon is its own compositor layer, so only rows on screen spin
+	let onScreen = $state(false)
 	let menuError = $state('')
 
 	async function showMenu(event: MouseEvent) {
@@ -186,8 +189,10 @@
 			</button>
 			<button
 				class="repository-action"
-				class:queued={activity === 'queued'}
-				class:refreshing={activity === 'loading'}
+				class:refreshing={activity !== undefined && onScreen}
+				{@attach inView((visible) => {
+					onScreen = visible
+				})}
 				aria-label="Refresh metadata for {repository.name}"
 				onclick={async () => onRefresh(repository)}
 				title={activity === 'loading'
