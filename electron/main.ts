@@ -281,9 +281,19 @@ async function main(): Promise<void> {
 				['Clear Finished to Left', 'column.clearFinishedLeft', request.hasFinishedRunsLeft],
 				['Clear Finished to Right', 'column.clearFinishedRight', request.hasFinishedRunsRight],
 			]
+			const sortItems: ColumnMenuItem[] = request.isRun
+				? [
+						['Sort Output Ascending', 'column.sortAscending', request.canSort],
+						['Sort Output Descending', 'column.sortDescending', request.canSort],
+						['Sort Exit Code Ascending', 'column.sortExitCodeAscending', request.canSort],
+						['Sort Exit Code Descending', 'column.sortExitCodeDescending', request.canSort],
+					]
+				: [
+						['Sort Ascending', 'column.sortAscending', request.canSort],
+						['Sort Descending', 'column.sortDescending', request.canSort],
+					]
 			const items: ColumnMenuItem[] = [
-				['Sort Ascending', 'column.sortAscending', request.canSort],
-				['Sort Descending', 'column.sortDescending', request.canSort],
+				...sortItems,
 				['Hide Column', 'column.hide', request.canHide],
 				['Filter By…', 'column.filter', request.canFilter],
 				'separator',

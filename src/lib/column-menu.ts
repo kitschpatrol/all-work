@@ -39,12 +39,15 @@ type ColumnMenuOptions = {
 	onShow: (id: string) => Promise<void>
 	onSort: () => void
 	pinned: () => PinnedColumns
+	/** Sort a run column by its commands' exit codes, or by their output. */
+	sortByExitCode: (runId: string, byExitCode: boolean) => void
 }
 
 /**
  * Connect a column's native menu to sorting, visibility, filter rules, copying
- * its plain text or shell variable, and clearing finished runs beside a run
- * column, and the empty header space's menu to showing hidden columns.
+ * its plain text or shell variable, and, for a run column, sorting by exit code
+ * and clearing finished runs beside it, and the empty header space's menu to
+ * showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -87,10 +90,18 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		await focusLastFilterRule()
 	}
 
-	function sort(id: string | undefined, descending: boolean) {
+	function isRun(id: string) {
+		return options.getRuns().some((run) => run.id === id)
+	}
+
+	function sort(id: string | undefined, descending: boolean, byExitCode = false) {
 		const column = getColumn(id)
-		if (!column?.getCanSort()) {
+		if (!column?.getCanSort() || (byExitCode && !isRun(column.id))) {
 			return
+		}
+
+		if (isRun(column.id)) {
+			options.sortByExitCode(column.id, byExitCode)
 		}
 
 		options.beforeSort()
@@ -175,6 +186,12 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		'column.sortDescending'(payload) {
 			sort(payload, true)
 		},
+		'column.sortExitCodeAscending'(payload) {
+			sort(payload, false, true)
+		},
+		'column.sortExitCodeDescending'(payload) {
+			sort(payload, true, true)
+		},
 	}
 
 	return {
@@ -196,7 +213,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					hasFinishedRunsRight: getFinishedRunsBeside(columnId, 'right').length > 0,
 					hasSelection: options.getRows(true).length > 0,
 					hasVariable: getColumnVariableName(columnId, options.getRuns()) !== undefined,
-					isRun: options.getRuns().some((run) => run.id === columnId),
+					isRun: isRun(columnId),
 				})
 			} catch (error) {
 				options.onError(error)

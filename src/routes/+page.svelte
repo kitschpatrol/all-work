@@ -70,6 +70,7 @@
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
 	import { createRunHistory } from '#lib/run-history.svelte.js'
+	import { createRunSorting } from '#lib/run-sorting.js'
 	import RunHeader from '#lib/RunHeader.svelte'
 	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
 	import { createTableRows } from '#lib/table-rows.svelte.js'
@@ -121,6 +122,7 @@
 	let metadataTimer: ReturnType<typeof setTimeout> | undefined
 	let sizingTimer: ReturnType<typeof setTimeout> | undefined
 	const requestedMetadata: RequestedMetadata = new SvelteMap()
+	const runSorting = createRunSorting()
 	const repositoryColumnIds = new SvelteSet(repositoryColumns.map((column) => column.id))
 	const autoClearPredecessors = new SvelteMap<string, string>()
 	const resizedColumns = new SvelteSet<string>()
@@ -164,13 +166,16 @@
 			sortUndefined: 'last',
 		})),
 		...runs.map((run): ColumnDef<typeof features, Repository> => ({
-			accessorFn: (repository: Repository) => run.results[repository.id]?.output ?? '',
+			accessorFn: (repository: Repository) => runSorting.value(run, repository.id),
 			enableGlobalFilter: false,
 			header: run.command,
 			id: run.id,
 			minSize: 240,
 			size: 240,
-			sortFn: 'text',
+			sortFn: (rowA, rowB, columnId) =>
+				(runSorting.sortsByExitCode(run.id) ? sortFn_basic : sortFn_text)(rowA, rowB, columnId),
+			// Rows without an exit code stay last in either direction
+			sortUndefined: 'last',
 		})),
 	])
 	const pinnedColumns = $derived({
@@ -282,6 +287,7 @@
 		},
 		onSort: scheduleMetadata,
 		pinned: () => pinnedColumns,
+		sortByExitCode: runSorting.set,
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
 	// Spare width opens up before the pinned run column, which keeps it at the table's right edge
@@ -328,6 +334,7 @@
 		resizedColumns: [...resizedColumns],
 		rowSelection,
 		runIds: workspace === undefined ? (savedView?.runIds ?? []) : runs.map((run) => run.id),
+		runsSortedByExitCode: runSorting.runIds,
 		scroll: pendingScroll ?? scrollPosition,
 		search,
 		selectedOnly,
@@ -384,6 +391,7 @@
 
 		table.setColumnSizing(view.columnSizing)
 		table.setSorting(view.sorting.filter((sort) => columns.some((column) => column.id === sort.id)))
+		runSorting.restore(view.runsSortedByExitCode)
 		table.setGlobalFilter(search)
 		pendingScroll = view.scroll
 	}
@@ -458,6 +466,7 @@
 		columnPresets.restore(defaultColumnPreset.id)
 		table.resetColumnSizing()
 		table.resetSorting()
+		runSorting.restore([])
 		table.setGlobalFilter('')
 		await tick()
 		fitColumns()
@@ -538,8 +547,11 @@
 	}
 
 	function sortOutput(runId: string, multiple: boolean) {
+		// Switching from exit codes to output starts over at ascending
+		const byExitCode = runSorting.sortsByExitCode(runId)
+		runSorting.set(runId, false)
 		tableRows.refresh()
-		table.getColumn(runId)?.toggleSorting(undefined, multiple)
+		table.getColumn(runId)?.toggleSorting(byExitCode ? false : undefined, multiple)
 		scheduleMetadata()
 	}
 
@@ -598,6 +610,7 @@
 				resizedColumns.clear()
 				table.resetColumnSizing()
 				table.resetSorting()
+				runSorting.restore([])
 				table.setGlobalFilter('')
 			}
 
@@ -884,6 +897,7 @@
 		try {
 			await runHistory.clear(runId, runs)
 			table.setSorting((previous) => previous.filter((entry) => entry.id !== runId))
+			runSorting.set(runId, false)
 			runs = runs.filter((run) => run.id !== runId)
 			rowFilter.prune()
 			resizedColumns.delete(runId)

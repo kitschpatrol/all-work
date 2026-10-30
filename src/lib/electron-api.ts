@@ -21,6 +21,8 @@ export type MenuCommand =
 	| 'column.show'
 	| 'column.sortAscending'
 	| 'column.sortDescending'
+	| 'column.sortExitCodeAscending'
+	| 'column.sortExitCodeDescending'
 	| 'command.focus'
 	| 'command.preset'
 	| 'command.run'

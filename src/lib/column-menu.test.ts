@@ -52,6 +52,7 @@ function menu(
 		onShow,
 		onSort: vi.fn<() => void>(),
 		pinned: () => ({ start: ['select'], end: [] }),
+		sortByExitCode: vi.fn<(runId: string, byExitCode: boolean) => void>(),
 		...overrides,
 	})
 }
@@ -193,5 +194,55 @@ describe('showing hidden columns from the empty header space', () => {
 		onShow.mockRejectedValueOnce(new Error('Could not show column'))
 		menu(onError).actions['column.show']('sync')
 		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Could not show column')))
+	})
+})
+
+describe('sorting from a column menu', () => {
+	function sortable() {
+		const toggleSorting = vi.fn<(descending: boolean, multiple: boolean) => void>()
+		const sortByExitCode = vi.fn<(runId: string, byExitCode: boolean) => void>()
+		const { actions } = menu(undefined, {
+			getColumn: (id) => ({
+				getCanFilter: () => true,
+				getCanHide: () => true,
+				getCanSort: () => true,
+				id,
+				toggleSorting,
+			}),
+			sortByExitCode,
+		})
+		return { actions, sortByExitCode, toggleSorting }
+	}
+
+	it.each([
+		['column.sortExitCodeAscending', true, false],
+		['column.sortExitCodeDescending', true, true],
+		['column.sortAscending', false, false],
+		['column.sortDescending', false, true],
+	] as const)(
+		'%s sorts a run column by exit code: %s, descending: %s',
+		(action, byExitCode, descending) => {
+			const { actions, sortByExitCode, toggleSorting } = sortable()
+			actions[action]('run-id')
+			expect(sortByExitCode).toHaveBeenCalledExactlyOnceWith('run-id', byExitCode)
+			expect(toggleSorting).toHaveBeenCalledExactlyOnceWith(descending, false)
+		},
+	)
+
+	it('sorts other columns by their values, and never by exit code', () => {
+		const { actions, sortByExitCode, toggleSorting } = sortable()
+		actions['column.sortDescending']('branch')
+		expect(toggleSorting).toHaveBeenCalledExactlyOnceWith(true, false)
+		actions['column.sortExitCodeAscending']('branch')
+		expect(toggleSorting).toHaveBeenCalledOnce()
+		expect(sortByExitCode).not.toHaveBeenCalled()
+	})
+
+	it('offers the run sort items only on run columns', async () => {
+		const columnMenu = menu()
+		const event = { preventDefault: vi.fn<() => void>() } as unknown as MouseEvent
+		await columnMenu.show(event, 'run-id')
+		await columnMenu.show(event, 'branch')
+		expect(showColumnMenu.mock.calls.map(([request]) => request.isRun)).toEqual([true, false])
 	})
 })

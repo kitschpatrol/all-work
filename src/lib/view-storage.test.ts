@@ -106,6 +106,7 @@ describe('shared JSON view persistence', () => {
 					concurrency: 100,
 					outputLines: 0,
 					rowSelection: { invalid: 1, valid: true },
+					runsSortedByExitCode: ['run-1', 2],
 					scroll: { left: -5, top: 20 },
 					sorting: [42, { desc: true, id: 'name' }],
 				},
@@ -117,6 +118,7 @@ describe('shared JSON view persistence', () => {
 			concurrency: 6,
 			outputLines: 3,
 			rowSelection: { valid: true },
+			runsSortedByExitCode: ['run-1'],
 			scroll: { left: 0, top: 20 },
 			sorting: [{ desc: true, id: 'name' }],
 		})

@@ -96,11 +96,11 @@ Column presets affect repository-column visibility, leaving output-column visibi
 
 ### Sorting, sizing, and copying
 
-Click a column heading to change its sort order. Shift-click a heading to add it to the current sort. Run columns sort by their output text, including while output streams.
+Click a column heading to change its sort order. Shift-click a heading to add it to the current sort. Run columns sort by their output text, including while output streams. To group successes and failures instead, right-click a run header and choose **Sort Exit Code Ascending** or **Sort Exit Code Descending**; repositories without an exit code yet, or omitted from the run, stay last. Clicking the heading returns to sorting by output.
 
 Drag headers to reorder movable columns. The selection and Repository columns stay at the left, and the newest run column stays at the right when visible. Drag a column edge to resize it; double-click the edge to fit that column to its contents. **View → Fit Columns to Contents** recalculates the visible widths. Manual widths are otherwise preserved as metadata arrives.
 
-In the desktop app, right-click a header for sorting, **Hide Column** where allowed, **Filter By…**, **Copy**, **Copy Selected**, and **Copy Variable**. Copy actions use matching rows in table order; **Copy Selected** restricts them to selected matches. Run headers also offer **Clear Finished to Left** and **Clear Finished to Right**. Right-click unused header space to show a hidden column at the end of the movable columns.
+In the desktop app, right-click a header for sorting (run headers offer **Sort Output** and **Sort Exit Code**, each ascending or descending), **Hide Column** where allowed, **Filter By…**, **Copy**, **Copy Selected**, and **Copy Variable**. Copy actions use matching rows in table order; **Copy Selected** restricts them to selected matches. Run headers also offer **Clear Finished to Left** and **Clear Finished to Right**. Right-click unused header space to show a hidden column at the end of the movable columns.
 
 Hiding an output column through **Columns** keeps its run. The × in its header clears the run's displayed output instead; see [clearing and retaining output](#clearing-and-retaining-output).
 

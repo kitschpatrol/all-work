@@ -29,6 +29,8 @@ export type SavedView = {
 	resizedColumns: string[]
 	rowSelection: Record<string, boolean>
 	runIds: string[]
+	/** Run columns that sort by exit code rather than output. */
+	runsSortedByExitCode: string[]
 	scroll: { left: number; top: number }
 	search: string
 	selectedOnly: boolean
@@ -98,6 +100,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		resizedColumns: strings(record.resizedColumns),
 		rowSelection: booleanRecord(record.rowSelection),
 		runIds: strings(record.runIds).slice(-1000),
+		runsSortedByExitCode: strings(record.runsSortedByExitCode),
 		scroll: { left: integer(scroll?.left, 0, 0), top: integer(scroll?.top, 0, 0) },
 		search: typeof record.search === 'string' ? record.search : '',
 		selectedOnly: record.selectedOnly === true,
