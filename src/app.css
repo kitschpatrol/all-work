@@ -985,6 +985,19 @@ input[type='search']::-webkit-search-cancel-button {
 
 /* Space below the last row reads as a floor behind the table, darker than the toolbars */
 .table-scroll {
+	--pinned-column-shadow-width: 20px;
+	--column-edge-shadow-width: calc(var(--pinned-column-shadow-width) * 0.5);
+	--dragged-column-shadow-width: calc(var(--pinned-column-shadow-width) * 0.75);
+	--column-shadow-color: #0000001c;
+	--column-slot-shadow: linear-gradient(
+			to right,
+			var(--column-shadow-color),
+			#0000 var(--column-edge-shadow-width),
+			#0000 calc(100% - var(--column-edge-shadow-width)),
+			var(--column-shadow-color)
+		)
+		var(--column-drag-slot-left, 0px) 0 / var(--column-drag-slot-width, 0px) 100% no-repeat;
+
 	overflow: auto;
 	display: flex;
 	flex: 1;
@@ -1020,6 +1033,19 @@ table {
 	visibility: hidden;
 }
 
+/* A separate shade lets both gray and blue headers fade back as soon as the pointer is released */
+@property --column-drag-shade {
+	inherits: false;
+	initial-value: #0000;
+	syntax: '<color>';
+}
+
+@property --column-drag-shadow-opacity {
+	inherits: true;
+	initial-value: 0;
+	syntax: '<number>';
+}
+
 th {
 	position: sticky;
 	z-index: 3;
@@ -1032,7 +1058,9 @@ th {
 	font-weight: 500;
 	color: #3a3e44;
 	text-align: left;
-	background: linear-gradient(#fdfdfd, #efefef);
+	background:
+		linear-gradient(var(--column-drag-shade), var(--column-drag-shade)),
+		linear-gradient(#fdfdfd, #efefef);
 	box-shadow: inset 1px 0 #fff;
 }
 
@@ -1126,6 +1154,7 @@ th.last-output-cell {
 
 /* Filler cells are transparent, so the row paints the space beyond the last column and a dragged column's slot alike */
 .table-scroll td.table-filler {
+	position: relative;
 	border-bottom: 0;
 	background: none;
 }
@@ -1147,25 +1176,37 @@ th.last-output-cell {
 	box-shadow: 1px 0 #aeb6c2;
 }
 
-/* Pinned columns cast a continuous shadow over the columns scrolling beneath them */
+/* Column shadows join across rows, with the pinned columns casting the widest shadows */
 .repository-cell::after,
-.last-output-cell::after {
+.last-output-cell::after,
+:where(:not(.repository-cell) + .table-filler)::before,
+.column-dragged::before,
+.column-dragged::after {
 	pointer-events: none;
 	content: '';
 	position: absolute;
 	top: 0;
 	bottom: -1px;
-	width: 20px;
+	width: var(--pinned-column-shadow-width);
 }
 
-.repository-cell::after {
+.repository-cell::after,
+.column-dragged::after {
 	left: calc(100% + 1px);
-	background: linear-gradient(to right, #0000001c, #0000);
+	background: linear-gradient(to right, var(--column-shadow-color), #0000);
 }
 
-.last-output-cell::after {
+.last-output-cell::after,
+.column-dragged::before {
 	right: calc(100% + 1px);
-	background: linear-gradient(to left, #0000001c, #0000);
+	background: linear-gradient(to left, var(--column-shadow-color), #0000);
+}
+
+/* The resting edge shadow stays on the filler while the dragged column's shadows fade away */
+:where(:not(.repository-cell) + .table-filler)::before {
+	left: 0;
+	width: var(--column-edge-shadow-width);
+	background: linear-gradient(to right, var(--column-shadow-color), #0000);
 }
 
 th.selection-cell,
@@ -1197,7 +1238,35 @@ td.column-dragged {
 
 th.column-dragged {
 	z-index: 4;
-	background: linear-gradient(#f3f3f3, #e3e3e3);
+}
+
+.column-dragging .column-dragged {
+	--column-drag-shadow-opacity: 1;
+}
+
+.column-dragging th.column-dragged {
+	--column-drag-shade: #0000000a;
+
+	transition: none;
+}
+
+.column-dragged::before,
+.column-dragged::after {
+	width: var(--dragged-column-shadow-width);
+	opacity: var(--column-drag-shadow-opacity);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	th {
+		transition:
+			--column-drag-shade 150ms ease-out,
+			--column-drag-shadow-opacity 300ms ease-out;
+	}
+
+	td.column-dragged,
+	.column-dragging th.column-dragged {
+		transition: --column-drag-shadow-opacity 300ms ease-out;
+	}
 }
 
 /* Cells draw only their right border, so the dragged column carries away its neighbor's left edge */
@@ -1222,24 +1291,24 @@ th.column-dragged + th:not(.last-output-cell) {
  * after the drop.
  */
 tbody tr {
-	background: linear-gradient(to top, #e6e8eb 1px, #f4f5f7 1px);
+	background: var(--column-slot-shadow), linear-gradient(to top, #e6e8eb 1px, #f4f5f7 1px);
 }
 
 /* The header row sticks along with its cells, so its painted slot stays under them while scrolled */
-thead tr {
+thead {
 	position: sticky;
 	z-index: 3;
 	top: 0;
 }
 
 /* A real border, so the line snaps to device pixels exactly like the cells' borders beside it */
-thead tr::after {
+thead::after {
 	content: '';
 	position: absolute;
 	z-index: -1;
 	inset: 0;
 	border-bottom: 1px solid #b9b9b9;
-	background: linear-gradient(#f8f8f8, #ebebeb);
+	background: var(--column-slot-shadow), linear-gradient(#f8f8f8, #ebebeb);
 }
 
 .column-dragging table {
@@ -1292,7 +1361,9 @@ thead tr::after {
 th[aria-sort='ascending'],
 th[aria-sort='descending'] {
 	color: #1b3f73;
-	background: linear-gradient(#f1f6fe, #dce8f9);
+	background:
+		linear-gradient(var(--column-drag-shade), var(--column-drag-shade)),
+		linear-gradient(#f1f6fe, #dce8f9);
 }
 
 .resize-handle {

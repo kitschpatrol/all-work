@@ -194,6 +194,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		const resting = current.startWidth + totalWidth(others.slice(0, slot))
 		if (slot !== index || left - resting !== offset) {
+			scroller.style.setProperty('--column-drag-slot-left', `${resting}px`)
 			setOffset(left - resting)
 		}
 
@@ -208,7 +209,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		const current = layout()
 		const index = current.columns.findIndex((column) => column.id === id)
-		if (index === -1) {
+		const column = current.columns[index]
+		if (column === undefined) {
 			return
 		}
 
@@ -216,6 +218,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		drag = latestDrag
 		bounds = scroller.getBoundingClientRect()
 		originLeft = current.startWidth + totalWidth(current.columns.slice(0, index))
+		scroller.style.setProperty('--column-drag-slot-left', `${originLeft}px`)
+		scroller.style.setProperty('--column-drag-slot-width', `${column.width}px`)
 		document.documentElement.classList.add('column-dragging')
 		options.onDragging(id)
 		frame = requestAnimationFrame(update)
@@ -242,11 +246,26 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		const settling = offset
 		setOffset(0)
 		const animations = settling === 0 ? [] : slide(scroller, id, settling)
-		void Promise.allSettled(animations.map(async (animation) => animation.finished)).then(() => {
+		// The header's shadow transition represents every cell, including a drop with no slide.
+		const shadows =
+			columnElements(scroller, id)[0]
+				?.getAnimations()
+				.filter(
+					(animation) =>
+						animation instanceof CSSTransition &&
+						animation.transitionProperty === '--column-drag-shadow-opacity',
+				) ?? []
+		void Promise.allSettled(
+			[...animations, ...shadows].map(async (animation) => animation.finished),
+		).then(() => {
 			// A newer drag owns the dragging state now
-			if (settled === latestDrag) {
-				options.onDragging(undefined)
+			if (settled !== latestDrag) {
+				return
 			}
+
+			scroller.style.removeProperty('--column-drag-slot-left')
+			scroller.style.removeProperty('--column-drag-slot-width')
+			options.onDragging(undefined)
 		})
 	}
 
