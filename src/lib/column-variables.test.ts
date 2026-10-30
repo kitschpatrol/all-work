@@ -6,7 +6,6 @@ import {
 	getCellTooltip,
 	getColumnDisplay,
 	getColumnEnvironment,
-	getColumnPreviewTooltip,
 	getColumnTooltip,
 	getColumnVariableName,
 	getColumnVariables,
@@ -264,15 +263,7 @@ describe('column variables', () => {
 		expect(getColumnVariableName('removed-run', runs)).toBeUndefined()
 	})
 
-	it('previews header values without the variable, which the variable picker still shows', () => {
-		const runs = [outputRun('first', 'clean')]
-		expect(getColumnPreviewTooltip(repository, 'branch').split('\n', 1)[0]).toBe('feature/example')
-		expect(getColumnPreviewTooltip(repository, 'first', runs)).toBe(
-			'clean\nRepository: project with spaces',
-		)
-		expect(getColumnPreviewTooltip(repository, 'description')).not.toContain('ALL_WORK_COLUMN')
-		expect(getColumnPreviewTooltip(undefined, 'branch')).toBe('')
-		expect(getColumnPreviewTooltip(repository, 'select')).toBe('')
+	it('previews a variable with one repository value in the variable picker', () => {
 		expect(getVariablePreviewTooltip(repository, 'branch').split('\n', 1)[0]).toBe(
 			'$ALL_WORK_COLUMN_BRANCH = feature/example',
 		)

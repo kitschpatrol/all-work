@@ -329,20 +329,6 @@ function previewLines(
 }
 
 /**
- * Preview a column header with one repository's value, availability, and
- * meaning.
- */
-export function getColumnPreviewTooltip(
-	repository: Repository | undefined,
-	columnId: string,
-	runs: readonly CommandRun[] = [],
-): string {
-	return repository === undefined || findVariable(columnId, runs) === undefined
-		? ''
-		: previewLines(repository, columnId, runs, (value) => value)
-}
-
-/**
  * Preview the shell variable a column provides and the value a command
  * receives.
  */

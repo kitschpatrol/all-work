@@ -45,7 +45,7 @@
 		describeOptionalColumn,
 		getCellTooltip,
 		getColumnDisplay,
-		getColumnPreviewTooltip,
+		getColumnVariableName,
 		getColumnVariables,
 		getVariablePreviewTooltip,
 		repositoryColumns,
@@ -874,12 +874,13 @@
 		}
 	}
 
-	// Headers preview the first selected or visible repository
+	// Headers name the shell variable that passes their column to commands
 	function describeCell(cell: HTMLElement) {
 		const columnId = cell.dataset.columnId ?? ''
 		const repositoryId = cell.closest<HTMLElement>('tr')?.dataset.repositoryId
 		if (repositoryId === undefined) {
-			return getColumnPreviewTooltip(previewRepository, columnId, runs)
+			const name = getColumnVariableName(columnId, runs)
+			return name === undefined ? '' : `$${name}`
 		}
 
 		const repository = workspace?.repositories.find((entry) => entry.id === repositoryId)
