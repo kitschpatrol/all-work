@@ -988,15 +988,20 @@ input[type='search']::-webkit-search-cancel-button {
 	--pinned-column-shadow-width: 20px;
 	--column-edge-shadow-width: calc(var(--pinned-column-shadow-width) * 0.5);
 	--dragged-column-shadow-width: calc(var(--pinned-column-shadow-width) * 0.75);
-	--column-shadow-color: #0000001c;
-	--column-slot-shadow: linear-gradient(
-			to right,
-			var(--column-shadow-color),
-			#0000 var(--column-edge-shadow-width),
-			#0000 calc(100% - var(--column-edge-shadow-width)),
-			var(--column-shadow-color)
-		)
-		var(--column-drag-slot-left, 0px) 0 / var(--column-drag-slot-width, 0px) 100% no-repeat;
+	--column-shadow-stops: #00000016, #0000000c 25%, #00000005 55%, #0000;
+	--column-slot-shadow-width: min(
+		var(--column-edge-shadow-width),
+		var(--column-drag-slot-width, 0px)
+	);
+	--column-slot-shadow:
+		linear-gradient(to right, var(--column-shadow-stops)) var(--column-drag-slot-left, 0px) 0 /
+			var(--column-slot-shadow-width) 100% no-repeat,
+		linear-gradient(to left, var(--column-shadow-stops))
+			calc(
+				var(--column-drag-slot-left, 0px) + var(--column-drag-slot-width, 0px) -
+					var(--column-slot-shadow-width)
+			)
+			0 / var(--column-slot-shadow-width) 100% no-repeat;
 
 	overflow: auto;
 	display: flex;
@@ -1018,8 +1023,8 @@ table {
 	flex-shrink: 0;
 	background: #fff;
 	box-shadow:
-		0 1px 2px #0000001f,
-		0 10px 28px #00000029;
+		0 1px 3px #00000014,
+		0 8px 32px #0000001a;
 }
 
 .column-measurement {
@@ -1131,7 +1136,7 @@ td.output-cell[data-run-status='running'] {
 	position: sticky;
 	z-index: 2;
 	right: 0;
-	box-shadow: -1px 0 #aeb6c2;
+	box-shadow: -1px 0 #00000026;
 }
 
 th.last-output-cell {
@@ -1173,7 +1178,7 @@ th.last-output-cell {
 	position: sticky;
 	z-index: 2;
 	left: 32px;
-	box-shadow: 1px 0 #aeb6c2;
+	box-shadow: 1px 0 #00000026;
 }
 
 /* Column shadows join across rows, with the pinned columns casting the widest shadows */
@@ -1193,20 +1198,20 @@ th.last-output-cell {
 .repository-cell::after,
 .column-dragged::after {
 	left: calc(100% + 1px);
-	background: linear-gradient(to right, var(--column-shadow-color), #0000);
+	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
 .last-output-cell::after,
 .column-dragged::before {
 	right: calc(100% + 1px);
-	background: linear-gradient(to left, var(--column-shadow-color), #0000);
+	background: linear-gradient(to left, var(--column-shadow-stops));
 }
 
 /* The resting edge shadow stays on the filler while the dragged column's shadows fade away */
 :where(:not(.repository-cell) + .table-filler)::before {
 	left: 0;
 	width: var(--column-edge-shadow-width);
-	background: linear-gradient(to right, var(--column-shadow-color), #0000);
+	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
 th.selection-cell,
@@ -1227,8 +1232,8 @@ th.repository-cell {
 /* A dragged column floats over its neighbors but passes beneath the pinned columns */
 .column-dragged {
 	box-shadow:
-		-1px 0 #c5ccd6,
-		1px 0 #c5ccd6;
+		-1px 0 #0000001f,
+		1px 0 #0000001f;
 }
 
 td.column-dragged {
