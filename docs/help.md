@@ -1,6 +1,6 @@
 # All Work Help
 
-_The [readme](../readme.md) is hand-written, but this file provides some AI-generated documentation that might be helpful in a pinch. Apologies for its tortured prose._
+_The [readme](../readme.md) is handwritten, but this file provides some AI-generated documentation that might be helpful in a pinch. Apologies for its tortured prose._
 
 ## Contents
 
