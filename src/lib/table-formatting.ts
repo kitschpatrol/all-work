@@ -1,6 +1,8 @@
 import type { CommandRun, Repository } from './workspace.js'
 import { formatColumnCellValue, getColumnValue } from './column-variables.js'
 
+const breakableWord = /(\S*[^\s\p{L}\p{N}.,:;'"’]\S*)/v
+
 /** Format the latest commit date for a compact table cell. */
 export function formatDate(value: string) {
 	return value === ''
@@ -10,6 +12,16 @@ export function formatDate(value: string) {
 				month: 'short',
 				year: 'numeric',
 			})
+}
+
+/**
+ * Split cell text around the words a browser could wrap inside, such as URLs,
+ * paths, and hyphenated versions, so they can be set unbroken and text wraps
+ * only at whitespace. Those words are at odd indexes; letters, digits, and
+ * sentence punctuation never break, so plain prose stays one part.
+ */
+export function splitBreakableWords(value: string): string[] {
+	return value.split(breakableWord)
 }
 
 /** Build a VS Code link with encoded directory segments. */

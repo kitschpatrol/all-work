@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CommandRun } from './workspace.js'
+	import { wrapRowText } from './row-text-lines.js'
 
 	const {
 		label,
@@ -47,6 +48,7 @@
 
 <button
 	class="output-preview"
+	{@attach wrapRowText}
 	aria-label={label}
 	onclick={(event) => {
 		if (event.detail === 0 || globalThis.getSelection()?.isCollapsed !== false) {

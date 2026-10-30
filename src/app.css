@@ -1028,17 +1028,6 @@ table {
 		0 8px 32px #0000001a;
 }
 
-.column-measurement {
-	pointer-events: none;
-	position: fixed;
-	z-index: -1;
-	top: 0;
-	left: 0;
-	table-layout: auto;
-	width: max-content;
-	visibility: hidden;
-}
-
 /* A separate shade lets both gray and blue headers fade back as soon as the pointer is released */
 @property --column-drag-shade {
 	inherits: false;
@@ -1524,6 +1513,20 @@ th[aria-sort='descending'] {
 	font-size: 11px;
 	color: var(--text-secondary);
 	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Rows that command output makes taller wrap text onto the lines that fit. Line height stays 14px: row-text-lines.ts counts lines with it */
+tr[data-text-lines] .cell-text:not(.cell-link) {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: var(--text-lines);
+	line-height: 14px;
+	white-space: normal;
+}
+
+/* Text wraps only at whitespace, never inside URLs, paths, or hyphenated words */
+.cell-word {
 	white-space: nowrap;
 }
 

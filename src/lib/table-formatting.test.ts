@@ -6,6 +6,7 @@ import {
 	pendingMetadata,
 	runCellStatus,
 	runOutcomes,
+	splitBreakableWords,
 } from './table-formatting.js'
 
 function repository(
@@ -149,5 +150,33 @@ describe('runCellStatus', () => {
 		expect(runCellStatus(run, 'queued')).toBeUndefined()
 		expect(runCellStatus(run, 'cancelled')).toBeUndefined()
 		expect(runCellStatus(run, 'absent')).toBeUndefined()
+	})
+})
+
+describe('splitBreakableWords', () => {
+	it('keeps prose with sentence punctuation in one part', () => {
+		expect(splitBreakableWords("Kitschpatrol's tools: fast, small; done.")).toEqual([
+			"Kitschpatrol's tools: fast, small; done.",
+		])
+		expect(splitBreakableWords('')).toEqual([''])
+	})
+
+	it('separates URLs, paths, and hyphenated words at odd indexes', () => {
+		expect(splitBreakableWords('Loads https://example.com/a?b=1 and merges')).toEqual([
+			'Loads ',
+			'https://example.com/a?b=1',
+			' and merges',
+		])
+		expect(splitBreakableWords('astro, astro-integration, ~/Code/all-work')).toEqual([
+			'astro, ',
+			'astro-integration,',
+			' ',
+			'~/Code/all-work',
+			'',
+		])
+	})
+
+	it('treats a value that is one breakable word as a single word', () => {
+		expect(splitBreakableWords('1.0.0-alpha.1')).toEqual(['', '1.0.0-alpha.1', ''])
 	})
 })

@@ -11,7 +11,7 @@
 	import { parseExternalUrl } from './external-links.js'
 	import OutputPreview from './OutputPreview.svelte'
 	import RepositoryCell from './RepositoryCell.svelte'
-	import { formatDate } from './table-formatting.js'
+	import { formatDate, splitBreakableWords } from './table-formatting.js'
 
 	const {
 		columnId,
@@ -41,6 +41,7 @@
 	const raw = $derived(getColumnValue(repository, columnId, runs))
 	const missing = $derived(raw === undefined || raw === '')
 	const url = $derived(parseExternalUrl(value))
+	const words = $derived(splitBreakableWords(value))
 
 	async function openLink(event: MouseEvent) {
 		if (
@@ -107,5 +108,9 @@
 		target="_blank">{value}</a
 	>
 {:else}<span class="cell-text" class:monospace={display !== 'text'}
-		>{#if missing}{@render placeholder(value)}{:else}{value}{/if}</span
+		>{#if missing}{@render placeholder(
+				value,
+			)}{:else}{#each words as word, index (index)}{#if index % 2 === 1}<span class="cell-word"
+						>{word}</span
+					>{:else}{word}{/if}{/each}{/if}</span
 	>{/if}
