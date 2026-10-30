@@ -182,7 +182,7 @@
 		<button
 			class="button primary run-button"
 			disabled={targetCount === 0 || command.trim() === '' || starting || loading}
-			type="submit">▶ {starting ? 'Starting…' : `Run in ${targetCount}`}</button
+			type="submit">▶ Run in {targetCount}</button
 		>
 	</div>
 </form>
