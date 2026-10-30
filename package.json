@@ -79,5 +79,8 @@
 	"packageManager": "pnpm@12.16.1",
 	"engines": {
 		"node": "^24.16.0 || >=26.3.0"
-	}
+	},
+	"os": [
+		"darwin"
+	]
 }
