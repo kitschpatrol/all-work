@@ -11,7 +11,7 @@ beforeAll(async () => {
 	await writeFile(
 		path.join(directory, 'README.md'),
 		'# Heavy fixture\n\n' +
-			'- A [link](https://example.com) with **bold text** and `code`.\n'.repeat(30_000),
+			'- A [link](https://example.com) with **bold text** and `code`.\n'.repeat(60_000),
 	)
 })
 afterAll(async () => {
@@ -73,7 +73,7 @@ describe('isolated Metascope scans', () => {
 		for (const result of results) {
 			expect(JSON.stringify(result)).toContain('Heavy fixture')
 		}
-	}, 30_000)
+	}, 60_000)
 
 	it('extracts again after cancelling a running extraction', async () => {
 		const controller = new AbortController()
@@ -83,7 +83,7 @@ describe('isolated Metascope scans', () => {
 		expect(JSON.stringify(await extractMetadata({ ...readme, path: directory }))).toContain(
 			'Heavy fixture',
 		)
-	}, 30_000)
+	}, 60_000)
 
 	it('cancels a queued extraction without disturbing the running ones', async () => {
 		const controller = new AbortController()
@@ -97,7 +97,7 @@ describe('isolated Metascope scans', () => {
 		for (const result of results) {
 			expect(JSON.stringify(result)).toContain('Heavy fixture')
 		}
-	}, 30_000)
+	}, 60_000)
 
 	it('rejects right away when already cancelled', async () => {
 		await expect(
@@ -109,5 +109,5 @@ describe('isolated Metascope scans', () => {
 		await expect(
 			extractMetadata({ ...readme, path: path.join(directory, 'missing') }),
 		).rejects.toThrow(missingPath)
-	}, 30_000)
+	}, 60_000)
 })
