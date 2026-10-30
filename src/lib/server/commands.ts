@@ -68,7 +68,10 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 			NO_COLOR: '1',
 		}
 		delete environment.FORCE_COLOR
-		const { args, file } = userShellCommand(job.run.command, repository.path)
+		const { args, file, windowsVerbatimArguments } = userShellCommand(
+			job.run.command,
+			repository.path,
+		)
 		const child = execa(file, args, {
 			all: true,
 			buffer: false,
@@ -80,6 +83,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 			killDescendants: true,
 			reject: false,
 			stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
+			windowsVerbatimArguments,
 		})
 		const output = process.platform === 'win32' ? child.all : child.stdio[3]
 		output.setEncoding('utf8').on('data', (chunk: string) => {

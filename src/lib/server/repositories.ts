@@ -158,7 +158,8 @@ async function createRepository(
 		packageManager: '',
 		path: realPath,
 		readme,
-		relativePath: directory === root ? '.' : path.relative(root, directory),
+		relativePath:
+			directory === root ? '.' : path.relative(root, directory).split(path.sep).join('/'),
 		remote: '',
 		repoName: path.basename(directory),
 		repoOwner: '',
