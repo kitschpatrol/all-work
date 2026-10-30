@@ -23,6 +23,7 @@ function fixture(finished = true): CommandRun {
 		number: 1,
 		results: {
 			fixture: {
+				command: "touch 'fixture/should-not-run'",
 				output: 'cached output',
 				repositoryId: 'fixture',
 				status: finished ? 'success' : 'running',

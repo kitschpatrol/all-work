@@ -144,6 +144,8 @@ const wordStartPattern = /(?<!\p{L})\p{Ll}/gv
 // Metascope reports authorship status as lowercase keywords
 const titleCasedColumns = new Set(['metadata:Status'])
 const commandVariablePattern = /\$\{?(ALL_WORK_COLUMN_\w+)/gv
+// One column variable reference, as `$NAME` or `${NAME}`, read from a set position
+const variableReferencePattern = /\$(?:\{(ALL_WORK_COLUMN_\w+)\}|(ALL_WORK_COLUMN_\w+))/vy
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
 const repositoryVariables = new Map(
 	repositoryColumns.map(({ category, header, id }) => [
@@ -232,6 +234,49 @@ export function getColumnEnvironment(repository: Repository, runs: readonly Comm
 	return Object.fromEntries(
 		getColumnVariables(runs).map(({ id, name }) => [name, values.get(id) ?? '']),
 	)
+}
+
+/**
+ * Show a command as one repository's shell runs it, with each column variable
+ * replaced by the value it receives. References the shell leaves alone, inside
+ * single quotes or after a backslash, stay as typed, as do other variables and
+ * forms such as `${NAME:-default}`.
+ *
+ * @param command The command as typed.
+ * @param environment Column variables from {@link getColumnEnvironment}.
+ */
+export function expandCommandVariables(
+	command: string,
+	environment: Readonly<Record<string, string>>,
+): string {
+	let expanded = ''
+	let doubleQuoted = false
+	let index = 0
+	while (index < command.length) {
+		const character = command[index]
+		let end = index + 1
+		if (character === '\\') {
+			end = Math.min(index + 2, command.length)
+		} else if (character === "'" && !doubleQuoted) {
+			const close = command.indexOf("'", index + 1)
+			end = close === -1 ? command.length : close + 1
+		} else if (character === '"') {
+			doubleQuoted = !doubleQuoted
+		} else if (character === '$') {
+			variableReferencePattern.lastIndex = index
+			const match = variableReferencePattern.exec(command)
+			if (match !== null) {
+				expanded += environment[match[1] ?? match[2] ?? ''] ?? ''
+				index = variableReferencePattern.lastIndex
+				continue
+			}
+		}
+
+		expanded += command.slice(index, end)
+		index = end
+	}
+
+	return expanded
 }
 
 /**

@@ -73,6 +73,11 @@ export type Workspace = {
 }
 
 type CommandResult = {
+	/**
+	 * The command with this repository's column variables filled in, when it
+	 * references any.
+	 */
+	command?: string
 	duration?: number
 	exitCode?: number
 	output: string

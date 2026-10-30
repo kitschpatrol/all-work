@@ -1,5 +1,5 @@
 import type { CommandRun, Repository, RunEvent } from '#lib/workspace.js'
-import { getColumnEnvironment } from '#lib/column-variables.js'
+import { expandCommandVariables, getColumnEnvironment } from '#lib/column-variables.js'
 // eslint-disable-next-line depend/ban-dependencies -- Execa provides streaming, AbortSignal cancellation, and process tree termination.
 import { execa } from 'execa'
 import { randomUUID } from 'node:crypto'
@@ -126,6 +126,9 @@ export function startRun(
 	sourceRuns: readonly CommandRun[] = [],
 	onFinished?: (repository: Repository) => void,
 ): CommandRun {
+	const environments = new Map(
+		repositories.map((repository) => [repository.id, getColumnEnvironment(repository, sourceRuns)]),
+	)
 	const run: CommandRun = {
 		command,
 		concurrency,
@@ -134,27 +137,26 @@ export function startRun(
 		id: randomUUID(),
 		number,
 		results: Object.fromEntries(
-			repositories.map((repository) => [
-				repository.id,
-				{
-					output: '',
-					repositoryId: repository.id,
-					status: 'queued',
-					truncated: false,
-				},
-			]),
+			repositories.map((repository) => {
+				const expanded = expandCommandVariables(command, environments.get(repository.id) ?? {})
+				return [
+					repository.id,
+					{
+						...(expanded !== command && { command: expanded }),
+						output: '',
+						repositoryId: repository.id,
+						status: 'queued',
+						truncated: false,
+					},
+				]
+			}),
 		),
 	}
 	const job: Job = {
 		cancelled: false,
 		controller: new AbortController(),
 		deleted: false,
-		environments: new Map(
-			repositories.map((repository) => [
-				repository.id,
-				getColumnEnvironment(repository, sourceRuns),
-			]),
-		),
+		environments,
 		listeners: new Set(),
 		onFinished,
 		run,

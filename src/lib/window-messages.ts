@@ -21,11 +21,13 @@ function parseOutputTarget(value: unknown): OutputTarget | undefined {
 	return record !== undefined &&
 		isString(record.name) &&
 		isString(record.path) &&
+		isString(record.relativePath) &&
 		isString(record.repositoryId) &&
 		isString(record.runId)
 		? {
 				name: record.name,
 				path: record.path,
+				relativePath: record.relativePath,
 				repositoryId: record.repositoryId,
 				runId: record.runId,
 			}

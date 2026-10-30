@@ -2,7 +2,14 @@ import type { AppWindowRequest } from './electron-api.js'
 import type { CommandRun, Repository } from './workspace.js'
 
 /** One repository's result in a run, as an output window shows it. */
-export type OutputTarget = { name: string; path: string; repositoryId: string; runId: string }
+export type OutputTarget = {
+	name: string
+	path: string
+	/** The Repository column value, which titles the output window. */
+	relativePath: string
+	repositoryId: string
+	runId: string
+}
 
 /** The results before and after an output window's own, in table order. */
 export type OutputNeighbors = { next: OutputTarget | undefined; previous: OutputTarget | undefined }
@@ -15,6 +22,7 @@ export function outputWindowUrl(target: OutputTarget): string {
 	const params = new URLSearchParams({
 		name: target.name,
 		path: target.path,
+		relativePath: target.relativePath,
 		repository: target.repositoryId,
 		run: target.runId,
 	})
@@ -40,7 +48,13 @@ export function getOutputNeighbors(
 	const target = (row: Repository | undefined) =>
 		row === undefined || run === undefined
 			? undefined
-			: { name: row.name, path: row.path, repositoryId: row.id, runId: run.id }
+			: {
+					name: row.name,
+					path: row.path,
+					relativePath: row.relativePath,
+					repositoryId: row.id,
+					runId: run.id,
+				}
 	return index === -1
 		? { next: undefined, previous: undefined }
 		: { next: target(withResults[index + 1]), previous: target(withResults[index - 1]) }

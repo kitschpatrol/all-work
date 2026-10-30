@@ -126,6 +126,7 @@
 					output = { kind: 'output', ...target }
 				}}
 				path={output.path}
+				relativePath={output.relativePath}
 				repositoryId={output.repositoryId}
 				runId={output.runId}
 			/>{/if}

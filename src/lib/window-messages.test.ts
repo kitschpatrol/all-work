@@ -23,7 +23,13 @@ afterEach(() => {
 })
 
 describe('output window messages', () => {
-	const target = { name: 'a', path: '/workspace/a', repositoryId: 'a', runId: 'run' }
+	const target = {
+		name: 'a',
+		path: '/workspace/a',
+		relativePath: 'a',
+		repositoryId: 'a',
+		runId: 'run',
+	}
 
 	it('delivers neighbor requests and replies to other windows', async () => {
 		const received = listen()

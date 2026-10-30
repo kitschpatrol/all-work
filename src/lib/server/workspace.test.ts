@@ -390,6 +390,7 @@ describe('parallel command runs', () => {
 			for (const repository of selected) {
 				const result = run.results[repository.id]
 				expect(result?.status).toBe('success')
+				expect(result?.command).toBeUndefined()
 				const environment: unknown = JSON.parse(result?.output ?? '{}')
 				expect(environment).toMatchObject(
 					Object.fromEntries([
@@ -438,9 +439,35 @@ describe('parallel command runs', () => {
 		deleteRun(source.id)
 		await waitForRun(run)
 		for (const repository of repositories) {
+			expect(source.results[repository.id]?.command).toBe(
+				String.raw`printf '%s\n' "${repository.relativePath}"`,
+			)
 			expect(run.results[repository.id]).toMatchObject({
+				command: `printf '%s' "${repository.relativePath}\n"; sleep 0.2`,
 				output: `${repository.relativePath}\n`,
 				status: 'success',
+			})
+		}
+	})
+
+	it('records each run with the values it ran with', async () => {
+		const command = 'printf \'%s\' "$ALL_WORK_COLUMN_BRANCH"'
+		const before = repositories.map((repository) => ({ ...repository, branch: 'before' }))
+		const after = repositories.map((repository) => ({ ...repository, branch: 'after' }))
+		const first = startRun(command, before, 2, 1)
+		runIds.push(first.id)
+		await waitForRun(first)
+		const second = startRun(command, after, 2, 2)
+		runIds.push(second.id)
+		await waitForRun(second)
+		for (const repository of repositories) {
+			expect(first.results[repository.id]).toMatchObject({
+				command: 'printf \'%s\' "before"',
+				output: 'before',
+			})
+			expect(second.results[repository.id]).toMatchObject({
+				command: 'printf \'%s\' "after"',
+				output: 'after',
 			})
 		}
 	})

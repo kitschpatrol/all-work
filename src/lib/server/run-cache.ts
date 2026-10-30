@@ -42,6 +42,31 @@ export async function saveRunCache(run: CommandRun) {
 	}
 }
 
+type CommandResult = CommandRun['results'][string]
+
+function parseResult(repositoryId: string, raw: unknown): CommandResult | undefined {
+	const result = asRecord(raw)
+	if (
+		result?.repositoryId !== repositoryId ||
+		typeof result.output !== 'string' ||
+		typeof result.truncated !== 'boolean' ||
+		typeof result.status !== 'string' ||
+		!['cancelled', 'failed', 'queued', 'running', 'success'].includes(result.status)
+	) {
+		return undefined
+	}
+
+	return {
+		command: typeof result.command === 'string' ? result.command : undefined,
+		duration: typeof result.duration === 'number' ? result.duration : undefined,
+		exitCode: typeof result.exitCode === 'number' ? result.exitCode : undefined,
+		output: result.output,
+		repositoryId,
+		status: result.status as CommandResult['status'],
+		truncated: result.truncated,
+	}
+}
+
 /** Restore output as data; cached commands are never executed. */
 export async function readRunCache(id: string): Promise<CommandRun | undefined> {
 	if (!runIdPattern.test(id)) {
@@ -64,25 +89,12 @@ export async function readRunCache(id: string): Promise<CommandRun | undefined> 
 		const results: CommandRun['results'] = {}
 		const entries = Object.entries(asRecord(value.results) ?? {})
 		for (const [repositoryId, raw] of entries) {
-			const result = asRecord(raw)
-			if (
-				result?.repositoryId !== repositoryId ||
-				typeof result.output !== 'string' ||
-				typeof result.truncated !== 'boolean' ||
-				typeof result.status !== 'string' ||
-				!['cancelled', 'failed', 'queued', 'running', 'success'].includes(result.status)
-			) {
+			const result = parseResult(repositoryId, raw)
+			if (result === undefined) {
 				return undefined
 			}
 
-			results[repositoryId] = {
-				duration: typeof result.duration === 'number' ? result.duration : undefined,
-				exitCode: typeof result.exitCode === 'number' ? result.exitCode : undefined,
-				output: result.output,
-				repositoryId,
-				status: result.status as CommandRun['results'][string]['status'],
-				truncated: result.truncated,
-			}
+			results[repositoryId] = result
 		}
 
 		return {

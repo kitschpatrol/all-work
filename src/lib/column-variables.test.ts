@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandRun, Repository } from './workspace.js'
 import {
+	expandCommandVariables,
 	formatColumnCellValue,
 	getCellTooltip,
 	getColumnDisplay,
@@ -271,5 +272,41 @@ describe('column variables', () => {
 			'$ALL_WORK_COLUMN_STARS = ""',
 		)
 		expect(getVariablePreviewTooltip(undefined, 'branch')).toBe('$ALL_WORK_COLUMN_BRANCH')
+	})
+})
+
+describe('expandCommandVariables', () => {
+	const environment = {
+		ALL_WORK_COLUMN_BRANCH: 'main',
+		ALL_WORK_COLUMN_REPOSITORY: 'Cinder-ImagingSource',
+	}
+	const expand = (command: string) => expandCommandVariables(command, environment)
+
+	it('fills in quoted, bare, and braced references', () => {
+		expect(expand('echo "$ALL_WORK_COLUMN_REPOSITORY"')).toBe('echo "Cinder-ImagingSource"')
+		expect(expand('git log $ALL_WORK_COLUMN_BRANCH')).toBe('git log main')
+		// eslint-disable-next-line no-template-curly-in-string -- Shell braces, not a JavaScript template
+		expect(expand('echo "${ALL_WORK_COLUMN_BRANCH}-next"')).toBe('echo "main-next"')
+		expect(expand(`echo "it's $ALL_WORK_COLUMN_BRANCH"`)).toBe(`echo "it's main"`)
+	})
+
+	it('leaves references the shell would not expand as typed', () => {
+		for (const command of [
+			"echo '$ALL_WORK_COLUMN_BRANCH'",
+			String.raw`echo \$ALL_WORK_COLUMN_BRANCH`,
+			String.raw`echo "\$ALL_WORK_COLUMN_BRANCH"`,
+			// eslint-disable-next-line no-template-curly-in-string -- Shell braces, not a JavaScript template
+			'echo "${ALL_WORK_COLUMN_BRANCH:-trunk}"',
+			'echo "$HOME"',
+			"echo 'unterminated $ALL_WORK_COLUMN_BRANCH",
+		]) {
+			expect(expand(command)).toBe(command)
+		}
+	})
+
+	it('expands unknown and longer names to nothing, as the shell does', () => {
+		expect(expand('echo "[$ALL_WORK_COLUMN_MISSING]"')).toBe('echo "[]"')
+		expect(expand('echo $ALL_WORK_COLUMN_BRANCHES')).toBe('echo ')
+		expect(expand(String.raw`echo "\\$ALL_WORK_COLUMN_BRANCH"`)).toBe(String.raw`echo "\\main"`)
 	})
 })

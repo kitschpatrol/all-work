@@ -3,7 +3,12 @@ import type { CommandRun, Repository } from './workspace.js'
 import { getOutputNeighbors, outputWindowUrl } from './app-windows.js'
 
 function row(id: string): Repository {
-	return { id, name: `${id} name`, path: `/workspace/${id}` } as unknown as Repository
+	return {
+		id,
+		name: `${id} name`,
+		path: `/workspace/${id}`,
+		relativePath: `${id} folder`,
+	} as unknown as Repository
 }
 
 const run = {
@@ -17,8 +22,20 @@ const rows = [row('d'), row('b'), row('a'), row('c')]
 describe('getOutputNeighbors', () => {
 	it('steps through rows with a result in display order, skipping rows outside the run', () => {
 		expect(getOutputNeighbors(rows, run, 'a')).toEqual({
-			next: { name: 'c name', path: '/workspace/c', repositoryId: 'c', runId: 'run' },
-			previous: { name: 'd name', path: '/workspace/d', repositoryId: 'd', runId: 'run' },
+			next: {
+				name: 'c name',
+				path: '/workspace/c',
+				relativePath: 'c folder',
+				repositoryId: 'c',
+				runId: 'run',
+			},
+			previous: {
+				name: 'd name',
+				path: '/workspace/d',
+				relativePath: 'd folder',
+				repositoryId: 'd',
+				runId: 'run',
+			},
 		})
 	})
 
@@ -37,12 +54,19 @@ describe('getOutputNeighbors', () => {
 
 describe('outputWindowUrl', () => {
 	it('keeps names and paths with spaces and symbols intact', () => {
-		const target = { name: 'a & b', path: '/work space/a?b', repositoryId: 'x/y', runId: 'run 1' }
+		const target = {
+			name: 'a & b',
+			path: '/work space/a?b',
+			relativePath: 'nested/a & b',
+			repositoryId: 'x/y',
+			runId: 'run 1',
+		}
 		const url = new URL(outputWindowUrl(target), 'http://localhost')
 		expect(url.pathname).toBe('/output')
 		expect(Object.fromEntries(url.searchParams)).toEqual({
 			name: 'a & b',
 			path: '/work space/a?b',
+			relativePath: 'nested/a & b',
 			repository: 'x/y',
 			run: 'run 1',
 		})

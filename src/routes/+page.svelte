@@ -982,6 +982,7 @@
 			kind: 'output',
 			name: repository.name,
 			path: repository.path,
+			relativePath: repository.relativePath,
 			repositoryId: repository.id,
 			runId: run.id,
 		})

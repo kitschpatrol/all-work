@@ -46,6 +46,7 @@
 		{neighbors}
 		onNavigate={navigate}
 		path={page.url.searchParams.get('path') ?? ''}
+		relativePath={page.url.searchParams.get('relativePath') ?? ''}
 		{repositoryId}
 		{runId}
 	/>

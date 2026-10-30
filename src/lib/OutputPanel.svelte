@@ -15,6 +15,7 @@
 		onClose,
 		onNavigate,
 		path,
+		relativePath,
 		repositoryId,
 		runId,
 	}: {
@@ -23,6 +24,7 @@
 		onClose?: () => void
 		onNavigate: (target: OutputTarget) => void
 		path: string
+		relativePath: string
 		repositoryId: string
 		runId: string
 	} = $props()
@@ -79,7 +81,7 @@
 </script>
 
 <svelte:head>
-	<title>{name}{run === undefined ? '' : ` — $ ${run.command}`}</title>
+	<title>{run === undefined ? relativePath : `Run ${run.number}: ${relativePath}`}</title>
 </svelte:head>
 
 <div class="output-panel">
@@ -92,7 +94,7 @@
 			>{/if}
 		<div>
 			<span class="eyebrow">{name}</span>
-			<h2><code>$ {run?.command ?? ''}</code></h2>
+			<h2><code>$ {result?.command ?? run?.command ?? ''}</code></h2>
 			<p>{path}</p>
 		</div>
 	</div>
