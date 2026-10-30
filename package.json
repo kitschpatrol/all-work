@@ -44,8 +44,7 @@
 		"move": "shx rm -rf '/Applications/All Work.app' && shx mv './dist/mac-arm64/All Work.app' '/Applications/All Work.app'",
 		"prepare": "svelte-kit sync",
 		"preview": "vite preview",
-		"release1": "bumpp --commit 'Release: %s' && pnpm build",
-		"release2": "export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && export APPLE_KEYCHAIN_PROFILE=notarytool && electron-builder build --publish always",
+		"release": "bumpp --commit 'Release: %s' && pnpm build && export GH_TOKEN=$(op read 'op://Personal/Github Mika/PERSONAL_ACCESS_TOKEN') && export APPLE_KEYCHAIN_PROFILE=notarytool && electron-builder build --publish always",
 		"start": "node out/main/server.js",
 		"test": "vitest run"
 	},

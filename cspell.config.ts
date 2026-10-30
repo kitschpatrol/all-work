@@ -4,6 +4,7 @@ export default cspellConfig({
 	ignorePaths: ['build', 'out'],
 	words: [
 		'fullscreenable',
+		'gita',
 		'googlecode',
 		'iterm',
 		'kovidgoyal',
