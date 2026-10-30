@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeOpenTarget } from './repository-links.js'
 import type { Repository } from './workspace.js'
-import { getGithubUrl, openRepositories } from './repository-links.js'
+import { getGithubUrl, getWebsiteUrl, openRepositories } from './repository-links.js'
 
 describe('GitHub repository links', () => {
 	it.each([
@@ -21,6 +21,41 @@ describe('GitHub repository links', () => {
 		'https://github.com/team',
 	])('does not offer a GitHub link for %s', (remote) => {
 		expect(getGithubUrl(remote)).toBeUndefined()
+	})
+})
+
+describe('repository website links', () => {
+	const repositoryUrl = 'https://github.com/team/project'
+
+	it.each([
+		['https://example.com/docs', 'https://example.com/docs'],
+		['  example.com  ', 'https://example.com/'],
+		['https://example.com/', 'https://example.com/'],
+		['https://team.github.io/project/', 'https://team.github.io/project/'],
+		['https://github.com/team/other', 'https://github.com/team/other'],
+	])('opens the distinct website %s', (website, expected) => {
+		expect(getWebsiteUrl(website, repositoryUrl)).toBe(expected)
+	})
+
+	it.each([
+		repositoryUrl,
+		'https://github.com/TEAM/Project/',
+		'https://github.com/team/project.git/?tab=readme#readme',
+		'github.com/team/project',
+	])('disables a website pointing back to the same GitHub page: %s', (website) => {
+		expect(getWebsiteUrl(website, repositoryUrl)).toBeUndefined()
+	})
+
+	it.each([
+		undefined,
+		'',
+		'  ',
+		'not a URL',
+		// eslint-disable-next-line no-script-url -- Verify that website metadata cannot produce a script link.
+		'javascript:alert(1)',
+		'file:///tmp/project',
+	])('disables a missing or invalid website: %s', (website) => {
+		expect(getWebsiteUrl(website, repositoryUrl)).toBeUndefined()
 	})
 })
 
@@ -46,6 +81,7 @@ describe('opening selected repositories', () => {
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 	}
 
 	it('opens readmes in order and skips repositories without one', async () => {

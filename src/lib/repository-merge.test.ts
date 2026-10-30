@@ -29,6 +29,7 @@ function repository(overrides: Partial<Repository> = {}): Repository {
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 		...overrides,
 	}
 }

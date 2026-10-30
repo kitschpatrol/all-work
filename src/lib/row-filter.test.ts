@@ -67,6 +67,7 @@ function repository(
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 		...fields,
 	}
 }

@@ -430,6 +430,7 @@
 		try {
 			await updatePreferences(preferences, next, workspace, persist)
 			preferences = next
+			scheduleMetadata()
 		} catch (error) {
 			showError(error)
 		}
@@ -708,6 +709,7 @@
 		const orderedIds = [...new Set([...visibleRepositories.map((row) => row.id), ...allIds])]
 		const groups = new Set([
 			...filterGroups,
+			...(preferences.showRepositoryShortcuts ? (['github'] as const) : []),
 			...table
 				.getVisibleLeafColumns()
 				.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)

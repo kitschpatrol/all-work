@@ -82,6 +82,7 @@ const persistedFields: Partial<Record<MetadataGroup, Array<keyof Repository>>> =
 		'upstream',
 		'upstreamGone',
 	],
+	github: ['website'],
 	local: [
 		'description',
 		'name',
@@ -280,6 +281,10 @@ function applyContext(
 	const { metadata } = repository
 	if (metadata === undefined) {
 		return
+	}
+
+	if (project.available.github) {
+		repository.website = project.website
 	}
 
 	for (const column of metadataColumns) {

@@ -7,6 +7,7 @@ export type NativeOpenTarget = Exclude<OpenTarget, 'github' | 'vscode'>
 const githubScpRemote = /^(?:[^\/@:\s]+@)?github\.com:(.+)$/iv
 const trailingSlashes = /\/+$/v
 const gitSuffix = /\.git$/iv
+const urlScheme = /^[a-z][a-z\d+.\-]*:/iv
 
 /** Convert a GitHub clone remote into a credential-free repository browser URL. */
 export function getGithubUrl(remote: string): string | undefined {
@@ -30,18 +31,41 @@ export function getGithubUrl(remote: string): string | undefined {
 	}
 }
 
+/** Return a website link unless it points back to the repository's GitHub page. */
+export function getWebsiteUrl(website = '', repositoryUrl = ''): string | undefined {
+	const text = website.trim()
+	if (text === '') {
+		return undefined
+	}
+
+	try {
+		const url = new URL(urlScheme.test(text) ? text : `https://${text}`)
+		if (!['http:', 'https:'].includes(url.protocol)) {
+			return undefined
+		}
+
+		const githubUrl = getGithubUrl(repositoryUrl)
+		return githubUrl !== undefined &&
+			getGithubUrl(url.href)?.toLowerCase() === githubUrl.toLowerCase()
+			? undefined
+			: url.href
+	} catch {
+		return undefined
+	}
+}
+
 /**
- * Open a repository in GitHub or VS Code through the browser, the same way the
+ * Open a repository in GitHub, VS Code, or its website, the same way the
  * repository cell's links do. Electron hands these to the default browser or
  * app.
  */
 export function openRepositoryLink(
-	repository: { path: string; remote: string },
-	target: 'github' | 'vscode',
+	repository: Pick<Repository, 'path' | 'remote' | 'website'>,
+	target: 'github' | 'vscode' | 'website',
 ): void {
-	if (target === 'github') {
-		const url = getGithubUrl(repository.remote)
-		if (url !== undefined) {
+	if (target === 'github' || target === 'website') {
+		const url = target === 'github' ? getGithubUrl(repository.remote) : repository.website
+		if (url !== undefined && url !== '') {
 			window.open(url, '_blank', 'noopener,noreferrer')
 		}
 

@@ -25,6 +25,7 @@ function repository(id: string, changedFiles: number): Repository {
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 	}
 }
 

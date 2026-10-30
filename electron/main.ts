@@ -336,12 +336,12 @@ async function main(): Promise<void> {
 				const items: Array<'separator' | [string, RepositoryMenuChoice, boolean]> = [
 					['Open Readme', 'readme', request.hasReadme],
 					['Open in Tower', 'tower', true],
-					['Open in GitHub', 'github', request.hasGithubRemote],
 					['Open in VS Code', 'vscode', true],
-					['Open in Terminal', 'terminal', true],
+					['Open in GitHub', 'github', request.hasGithubRemote],
+					['Open Website', 'website', request.hasWebsite],
 					['Reveal in Finder', 'finder', true],
-					'separator',
 					['Copy Path', 'copyPath', true],
+					['Open in Terminal', 'terminal', true],
 					'separator',
 					['Refresh Metadata', 'refresh', true],
 				]

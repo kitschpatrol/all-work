@@ -41,6 +41,7 @@ function repository(
 		upstream: 'origin/main',
 		upstreamGone: false,
 		version: '',
+		website: '',
 	}
 }
 

@@ -35,6 +35,7 @@ const repository: Repository = {
 	upstream: 'origin/main',
 	upstreamGone: false,
 	version: '1.2.3',
+	website: '',
 }
 
 function outputRun(id: string, output: string, number = 1): CommandRun {

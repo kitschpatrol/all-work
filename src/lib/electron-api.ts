@@ -54,10 +54,14 @@ const openTargets = ['finder', 'github', 'readme', 'terminal', 'tower', 'vscode'
 export type OpenTarget = (typeof openTargets)[number]
 
 /** An item chosen from a repository's context menu. */
-export type RepositoryMenuChoice = 'copyPath' | 'refresh' | OpenTarget
+export type RepositoryMenuChoice = 'copyPath' | 'refresh' | 'website' | OpenTarget
 
 /** Which of a repository's context menu items can be used. */
-export type RepositoryMenuRequest = { hasGithubRemote: boolean; hasReadme: boolean }
+export type RepositoryMenuRequest = {
+	hasGithubRemote: boolean
+	hasReadme: boolean
+	hasWebsite: boolean
+}
 
 /**
  * Renderer state the main process needs to enable, disable, and check menu
@@ -200,13 +204,17 @@ export function isOpenTarget(value: unknown): value is OpenTarget {
 
 /** Narrow the item returned by a repository's context menu. */
 export function isRepositoryMenuChoice(value: unknown): value is RepositoryMenuChoice {
-	return value === 'copyPath' || value === 'refresh' || isOpenTarget(value)
+	return value === 'copyPath' || value === 'refresh' || value === 'website' || isOpenTarget(value)
 }
 
 /** Validate a repository context menu request arriving over IPC. */
 export function isRepositoryMenuRequest(value: unknown): value is RepositoryMenuRequest {
 	const request = asRecord(value)
-	return typeof request?.hasGithubRemote === 'boolean' && typeof request.hasReadme === 'boolean'
+	return (
+		typeof request?.hasGithubRemote === 'boolean' &&
+		typeof request.hasReadme === 'boolean' &&
+		typeof request.hasWebsite === 'boolean'
+	)
 }
 
 // Built-in presets plus up to 100 saved ones, each with a short visible label

@@ -56,6 +56,7 @@ const repository: Repository = {
 	upstream: '',
 	upstreamGone: false,
 	version: '',
+	website: '',
 }
 const workspace: Workspace = {
 	directory: '/Users/example/Code',

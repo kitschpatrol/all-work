@@ -46,10 +46,19 @@ describe('menu requests arriving over IPC', () => {
 		}
 	})
 
-	it('accepts a repository menu request with both availability flags', () => {
-		expect(isRepositoryMenuRequest({ hasGithubRemote: true, hasReadme: false })).toBe(true)
-		for (const request of [true, undefined, [], { hasGithubRemote: true }, { hasReadme: 1 }]) {
-			expect(isRepositoryMenuRequest(request)).toBe(false)
+	it('accepts a repository menu request with all availability flags', () => {
+		const request = { hasGithubRemote: true, hasReadme: false, hasWebsite: true }
+		expect(isRepositoryMenuRequest(request)).toBe(true)
+		for (const invalid of [
+			true,
+			undefined,
+			[],
+			{ hasGithubRemote: true },
+			{ hasReadme: 1 },
+			{ ...request, hasWebsite: undefined },
+			{ ...request, hasWebsite: 'true' },
+		]) {
+			expect(isRepositoryMenuRequest(invalid)).toBe(false)
 		}
 	})
 
@@ -63,6 +72,7 @@ describe('menu requests arriving over IPC', () => {
 			'terminal',
 			'tower',
 			'vscode',
+			'website',
 		]) {
 			expect(isRepositoryMenuChoice(choice)).toBe(true)
 		}

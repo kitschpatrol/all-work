@@ -46,6 +46,7 @@ function fixture(): Workspace {
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 	}
 	return {
 		directory: temporaryDirectory,
@@ -263,6 +264,56 @@ describe('progressive Metascope metadata', () => {
 		await rm(readme)
 		controller.request(['fixture'], ['local'], true)
 		await vi.waitFor(() => expect(repository?.readme).toBe(''))
+	})
+
+	it('uses only the GitHub website, caches it, and clears it when removed', async () => {
+		let homepageUrl: string | undefined = 'https://website.example/'
+		vi.mocked(extractMetadata).mockImplementation(async (options) => {
+			await Promise.resolve()
+			return context(
+				options.sources?.includes('github') === true
+					? {
+							github: {
+								data: { homepageUrl, url: 'https://github.com/team/project' },
+								source: 'fixture',
+							},
+						}
+					: {
+							nodePackageJson: {
+								data: {
+									// eslint-disable-next-line ts/naming-convention -- Normalized package metadata requires the npm _id field.
+									_id: 'fixture@1.0.0',
+									homepage: 'https://manifest.example/',
+									name: 'fixture',
+									readme: '',
+									version: '1.0.0',
+								},
+								source: 'fixture',
+							},
+						},
+			)
+		})
+		const workspace = fixture()
+		const controller = begin(workspace)
+		await ready(workspace)
+		expect(workspace.repositories[0]?.website).toBe('')
+		controller.request(['fixture'], ['github'], true)
+		await vi.waitFor(() =>
+			expect(workspace.repositories[0]?.metadata?.groups.github?.status).toBe('ready'),
+		)
+		expect(workspace.repositories[0]?.website).toBe('https://website.example/')
+		expect(await cached('fields', 'website')).toContain('https://website.example/')
+
+		const reloaded = fixture()
+		const next = begin(reloaded)
+		await ready(reloaded)
+		expect(reloaded.repositories[0]?.website).toBe('https://website.example/')
+		homepageUrl = undefined
+		next.request(['fixture'], ['github'], true)
+		await vi.waitFor(() =>
+			expect(reloaded.repositories[0]?.metadata?.groups.github?.status).toBe('ready'),
+		)
+		expect(reloaded.repositories[0]?.website).toBe('')
 	})
 
 	it('loads real zero update counts only after an explicit dependency check', async () => {

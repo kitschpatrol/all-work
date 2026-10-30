@@ -165,6 +165,7 @@ async function createRepository(
 		upstream: '',
 		upstreamGone: false,
 		version: '',
+		website: '',
 	}
 	// Linked worktrees keep their effective config outside the repository directory.
 	const gitEntry = await stat(path.join(realPath, '.git'))

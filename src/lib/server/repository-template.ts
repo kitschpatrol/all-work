@@ -1,3 +1,4 @@
+import { getWebsiteUrl } from '#lib/repository-links.js'
 import { defineTemplate, helpers, templates } from 'metascope'
 import { getRemoteRepository } from './repository-remote.js'
 
@@ -21,6 +22,7 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const project = templates.project(context, templateData)
 	const frontmatter = templates.frontmatter(context, templateData)
 	const gitStats = helpers.firstOf(context.gitStats)?.data
+	const github = helpers.firstOf(context.github)?.data
 	const remote =
 		helpers.firstOf(context.gitConfig)?.data.remote?.origin?.url ??
 		(typeof templateData.originRemote === 'string' ? templateData.originRemote : undefined)
@@ -48,5 +50,6 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 		remote,
 		repoName: identity?.name,
 		repoOwner: identity?.owner,
+		website: getWebsiteUrl(github?.homepageUrl, github?.url) ?? '',
 	}
 })

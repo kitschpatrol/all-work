@@ -43,6 +43,8 @@ export type Repository = {
 	/** Whether the upstream is configured but its ref is missing locally. */
 	upstreamGone: boolean
 	version: string
+	/** Website from GitHub's About section, empty without a distinct website. */
+	website: string
 }
 
 /** Loading states for each metadata group. */

@@ -21,7 +21,16 @@
 	const activity = $derived(metadataActivity(repository))
 	// Each spinning icon is its own compositor layer, so only rows on screen spin
 	let onScreen = $state(false)
-	let menuError = $state('')
+	let actionError = $state('')
+
+	async function copyPath() {
+		actionError = ''
+		try {
+			await navigator.clipboard.writeText(repository.path)
+		} catch {
+			actionError = 'Could not copy the repository path to the clipboard.'
+		}
+	}
 
 	async function showMenu(event: MouseEvent) {
 		if (globalThis._allWork === undefined) {
@@ -29,15 +38,16 @@
 		}
 
 		event.preventDefault()
-		menuError = ''
+		actionError = ''
 		try {
 			const choice = await globalThis._allWork.showRepositoryMenu({
 				hasGithubRemote: githubUrl !== undefined,
 				hasReadme: repository.readme !== '',
+				hasWebsite: repository.website !== '',
 			})
 			switch (choice) {
 				case 'copyPath': {
-					await navigator.clipboard.writeText(repository.path)
+					await copyPath()
 					break
 				}
 
@@ -50,7 +60,8 @@
 				}
 
 				case 'github':
-				case 'vscode': {
+				case 'vscode':
+				case 'website': {
 					openRepositoryLink(repository, choice)
 					break
 				}
@@ -65,10 +76,18 @@
 				}
 			}
 		} catch (error) {
-			menuError = error instanceof Error ? error.message : String(error)
+			actionError = error instanceof Error ? error.message : String(error)
 		}
 	}
 </script>
+
+{#snippet websiteIcon()}
+	<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
+		<circle cx="8" cy="8" r="6.5" stroke="currentColor" />
+		<ellipse cx="8" cy="8" rx="2.5" ry="6.5" stroke="currentColor" />
+		<path d="M1.5 8h13M3 4.5h10M3 11.5h10" stroke="currentColor" />
+	</svg>
+{/snippet}
 
 <div
 	class="repository-heading"
@@ -79,7 +98,8 @@
 	<div class="repository-name">
 		<FolderIcon /><strong>{repository.relativePath}</strong>
 	</div>
-	{#if menuError !== ''}<span class="metadata-error" role="alert" title={menuError}>!</span>{/if}
+	{#if actionError !== ''}<span class="metadata-error" role="alert" title={actionError}>!</span
+		>{/if}
 	{#if repository.error !== undefined}<span
 			class="metadata-error"
 			aria-label="Metadata incomplete"
@@ -156,6 +176,24 @@
 					type="button"><GithubIcon /></button
 				>
 			{/if}
+			{#if repository.website !== ''}
+				<a
+					class="repository-action"
+					aria-label="Open website for {repository.name}"
+					href={repository.website}
+					rel="external noopener noreferrer"
+					target="_blank"
+					title="Open website: {repository.website}">{@render websiteIcon()}</a
+				>
+			{:else}
+				<button
+					class="repository-action"
+					aria-label="No separate website on GitHub for {repository.name}"
+					disabled
+					title="No separate website set on GitHub"
+					type="button">{@render websiteIcon()}</button
+				>
+			{/if}
 			<button
 				class="repository-action"
 				aria-label="Reveal {repository.name} in Finder"
@@ -170,6 +208,22 @@
 						stroke-linejoin="round"
 					/></svg
 				>
+			</button>
+			<button
+				class="repository-action"
+				aria-label="Copy path for {repository.name}"
+				onclick={copyPath}
+				title="Copy path to clipboard"
+				type="button"
+			>
+				<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
+					<rect height="9" rx="1" stroke="currentColor" width="8" x="5.5" y="5.5" />
+					<path
+						d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1"
+						stroke="currentColor"
+						stroke-linejoin="round"
+					/>
+				</svg>
 			</button>
 			<button
 				class="repository-action"
