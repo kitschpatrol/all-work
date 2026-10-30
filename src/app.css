@@ -1077,7 +1077,12 @@ tr.selected td {
 	border-right-color: #dce2eb;
 	border-bottom-color: #d5dce6;
 	color: #1f2c3d;
-	background: linear-gradient(#f0f3f8, #e9eef5);
+	background: linear-gradient(#f6f8fc, #f0f3f9);
+}
+
+/* Pinned columns keep a deeper tint than the columns scrolling beneath them, and run statuses still show */
+tr.selected :is(.selection-cell, .repository-cell, .last-output-cell) {
+	background: linear-gradient(#f2f5fa, #ecf0f7);
 }
 
 td.output-cell {
