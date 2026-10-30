@@ -7,9 +7,13 @@ import path from 'node:path'
  */
 export function userShellCommand(command: string, directory: string) {
 	if (process.platform === 'win32') {
+		// `/s` strips the surrounding quotes, so the command runs exactly as
+		// typed. Node's own argument quoting would otherwise escape the quotes
+		// inside it.
 		return {
-			args: ['/d', '/s', '/c', command],
+			args: ['/d', '/s', '/c', `"${command}"`],
 			file: process.env.ComSpec ?? 'cmd.exe',
+			windowsVerbatimArguments: true,
 		}
 	}
 
@@ -35,5 +39,6 @@ end 1>&3 2>&3 3>&-`
 			directory,
 		],
 		file,
+		windowsVerbatimArguments: false,
 	}
 }

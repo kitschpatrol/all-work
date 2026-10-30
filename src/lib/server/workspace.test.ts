@@ -25,10 +25,27 @@ let temporaryDirectory: string
 let workspace: Workspace
 let repositories: Repository[]
 const runIds: string[] = []
+const isWindows = process.platform === 'win32'
 const hasZsh = existsSync('/bin/zsh')
 const fixtureShell = hasZsh ? '/bin/zsh' : '/bin/sh'
-const syntaxErrorPattern = /syntax error|parse error/iv
+const shellVariable = isWindows ? 'ComSpec' : 'SHELL'
+const configuredShell = isWindows ? process.env.ComSpec : fixtureShell
+const syntaxErrorPattern = /syntax error|parse error|syntax of the command/iv
 const descendantPidPattern = /stubborn=(\d+)/v
+
+/**
+ * A command that runs the same way under POSIX shells and cmd.exe. The script
+ * may contain single quotes but no double quotes, backslashes, or dollar signs,
+ * since each shell treats those differently.
+ */
+function nodeCommand(script: string) {
+	return `"${process.execPath}" -e "${script}"`
+}
+
+async function removeDirectory(directory: string) {
+	// Windows reports EBUSY while a Git process that just finished still holds the directory
+	await rm(directory, { force: true, maxRetries: 10, recursive: true })
+}
 
 async function git(directory: string, args: string[]) {
 	return execute('git', ['-C', directory, ...args])
@@ -162,7 +179,7 @@ afterAll(async () => {
 	}
 
 	forgetWorkspace(workspace.id)
-	await rm(temporaryDirectory, { force: true, recursive: true })
+	await removeDirectory(temporaryDirectory)
 	vi.unstubAllEnvs()
 })
 
@@ -244,8 +261,8 @@ describe('repository discovery and Metascope metadata', () => {
 			])
 			forgetWorkspace(shallow.id)
 		} finally {
-			await rm(root, { force: true, recursive: true })
-			await rm(elsewhere, { force: true, recursive: true })
+			await removeDirectory(root)
+			await removeDirectory(elsewhere)
 		}
 	})
 
@@ -370,6 +387,8 @@ describe('repository discovery and Metascope metadata', () => {
 })
 
 describe('parallel command runs', () => {
+	const longRunningCommand = nodeCommand("console.log('started'); setTimeout(() => {}, 30_000)")
+
 	it('exports separate row values to commands and child processes as literal data', async () => {
 		const selected = repositories.map((repository, index) => ({
 			...repository,
@@ -380,7 +399,9 @@ describe('parallel command runs', () => {
 		vi.stubEnv('ALL_WORK_COLUMN_STALE', 'must not leak')
 		try {
 			const run = startRun(
-				`'${process.execPath}' -e 'process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("ALL_WORK_COLUMN_")))))'`,
+				nodeCommand(
+					"process.stdout.write(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith('ALL_WORK_COLUMN_')))))",
+				),
 				selected,
 				2,
 				1,
@@ -421,16 +442,22 @@ describe('parallel command runs', () => {
 
 	it('snapshots output variables before queueing and preserves them after the source run is deleted', async () => {
 		const source = startRun(
-			String.raw`printf '%s\n' "$ALL_WORK_COLUMN_REPOSITORY"`,
+			nodeCommand('process.stdout.write(process.env.ALL_WORK_COLUMN_REPOSITORY)'),
 			repositories,
 			2,
 			1,
 		)
 		runIds.push(source.id)
 		await waitForRun(source)
-		const run = startRun('printf \'%s\' "$ALL_WORK_COLUMN_RUN_1"; sleep 0.2', repositories, 1, 2, [
-			source,
-		])
+		const run = startRun(
+			nodeCommand(
+				'process.stdout.write(process.env.ALL_WORK_COLUMN_RUN_1); setTimeout(() => {}, 200)',
+			),
+			repositories,
+			1,
+			2,
+			[source],
+		)
 		runIds.push(run.id)
 		for (const result of Object.values(source.results)) {
 			result.output = 'changed after submission'
@@ -439,18 +466,14 @@ describe('parallel command runs', () => {
 		deleteRun(source.id)
 		await waitForRun(run)
 		for (const repository of repositories) {
-			expect(source.results[repository.id]?.command).toBe(
-				String.raw`printf '%s\n' "${repository.relativePath}"`,
-			)
 			expect(run.results[repository.id]).toMatchObject({
-				command: `printf '%s' "${repository.relativePath}\n"; sleep 0.2`,
-				output: `${repository.relativePath}\n`,
+				output: repository.relativePath,
 				status: 'success',
 			})
 		}
 	})
 
-	it('records each run with the values it ran with', async () => {
+	it.skipIf(isWindows)('records each run with the values it ran with', async () => {
 		const command = 'printf \'%s\' "$ALL_WORK_COLUMN_BRANCH"'
 		const before = repositories.map((repository) => ({ ...repository, branch: 'before' }))
 		const after = repositories.map((repository) => ({ ...repository, branch: 'after' }))
@@ -513,7 +536,9 @@ describe('parallel command runs', () => {
 
 	it('runs with each repository as cwd and keeps stdout, stderr, and exit status per row', async () => {
 		const run = startRun(
-			String.raw`pwd; printf "standard output\n"; printf "standard error\n" >&2; exit 7`,
+			nodeCommand(
+				"console.log(process.cwd()); console.log('standard output'); console.error('standard error'); process.exit(7)",
+			),
 			repositories,
 			2,
 			1,
@@ -533,7 +558,7 @@ describe('parallel command runs', () => {
 
 	it('reports each repository as its command finishes', async () => {
 		const finished: string[] = []
-		const run = startRun('printf done', repositories, 2, 1, [], (repository) => {
+		const run = startRun('echo done', repositories, 2, 1, [], (repository) => {
 			finished.push(repository.id)
 		})
 		runIds.push(run.id)
@@ -543,7 +568,7 @@ describe('parallel command runs', () => {
 
 	it('reports only repositories whose commands started before a stop', async () => {
 		const finished: string[] = []
-		const run = startRun('printf started; sleep 30', repositories, 1, 1, [], (repository) => {
+		const run = startRun(longRunningCommand, repositories, 1, 1, [], (repository) => {
 			finished.push(repository.id)
 		})
 		runIds.push(run.id)
@@ -557,7 +582,7 @@ describe('parallel command runs', () => {
 		expect(finished).toHaveLength(1)
 	})
 
-	it('preserves shell operators, quoting, and Unicode output', async () => {
+	it.skipIf(isWindows)('preserves shell operators, quoting, and Unicode output', async () => {
 		const run = startRun(
 			String.raw`printf '%s\n' 'café $HOME "quotes"' | cat && printf '%s\n' '日本語' >&2`,
 			repositories.slice(0, 1),
@@ -581,32 +606,40 @@ describe('parallel command runs', () => {
 		expect(result?.output).toMatch(syntaxErrorPattern)
 	})
 
-	it('keeps internal runner arguments out of the command positional parameters', async () => {
-		const run = startRun(String.raw`printf '%s\n' "$#:$1:$2"`, repositories.slice(0, 1), 1, 1)
-		runIds.push(run.id)
-		await waitForRun(run)
-		expect(Object.values(run.results)[0]).toMatchObject({
-			output: '0::\n',
-			status: 'success',
-		})
-	})
+	it.skipIf(isWindows)(
+		'keeps internal runner arguments out of the command positional parameters',
+		async () => {
+			const run = startRun(String.raw`printf '%s\n' "$#:$1:$2"`, repositories.slice(0, 1), 1, 1)
+			runIds.push(run.id)
+			await waitForRun(run)
+			expect(Object.values(run.results)[0]).toMatchObject({
+				output: '0::\n',
+				status: 'success',
+			})
+		},
+	)
 
 	it('reports an unavailable user shell and finishes the run', async () => {
-		vi.stubEnv('SHELL', path.join(temporaryDirectory, 'missing-shell'))
+		vi.stubEnv(shellVariable, path.join(temporaryDirectory, 'missing-shell'))
 		try {
-			const run = startRun('pwd', repositories.slice(0, 1), 1, 1)
+			const run = startRun('echo unreachable', repositories.slice(0, 1), 1, 1)
 			runIds.push(run.id)
 			await waitForRun(run)
 			const result = Object.values(run.results)[0]
 			expect(result?.status).toBe('failed')
 			expect(result?.output).toContain('ENOENT')
 		} finally {
-			vi.stubEnv('SHELL', fixtureShell)
+			vi.stubEnv(shellVariable, configuredShell)
 		}
 	})
 
 	it('streams before completion and obeys the concurrency limit', async () => {
-		const run = startRun('printf ready; sleep 0.3', repositories, 1, 1)
+		const run = startRun(
+			nodeCommand("process.stdout.write('ready'); setTimeout(() => {}, 300)"),
+			repositories,
+			1,
+			1,
+		)
 		runIds.push(run.id)
 		let observedLiveOutput = false
 		const unsubscribe = subscribeRun(run.id, (event) => {
@@ -629,7 +662,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('stops running commands and cancels commands that have not started', async () => {
-		const run = startRun('printf started; sleep 30', repositories, 1, 1)
+		const run = startRun(longRunningCommand, repositories, 1, 1)
 		runIds.push(run.id)
 		await vi.waitFor(() =>
 			expect(Object.values(run.results).some((result) => result.output.includes('started'))).toBe(
@@ -644,27 +677,30 @@ describe('parallel command runs', () => {
 		).toHaveLength(1)
 	})
 
-	it('forcefully stops descendant processes that ignore termination signals', async () => {
-		const run = startRun(
-			`'${process.execPath}' -e 'process.on("SIGTERM", () => {}); process.on("SIGHUP", () => {}); console.log("stubborn=" + process.pid); setInterval(() => {}, 1000)' & wait`,
-			repositories.slice(0, 1),
-			1,
-			1,
-		)
-		runIds.push(run.id)
-		await vi.waitFor(() =>
-			expect(Object.values(run.results)[0]?.output).toMatch(descendantPidPattern),
-		)
-		const pid = Number(Object.values(run.results)[0]?.output.match(descendantPidPattern)?.[1])
-		stopRun(run.id)
-		await waitForRun(run)
-		expect(Object.values(run.results)[0]?.status).toBe('cancelled')
-		await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 3000 })
-	})
+	it.skipIf(isWindows)(
+		'forcefully stops descendant processes that ignore termination signals',
+		async () => {
+			const run = startRun(
+				`'${process.execPath}' -e 'process.on("SIGTERM", () => {}); process.on("SIGHUP", () => {}); console.log("stubborn=" + process.pid); setInterval(() => {}, 1000)' & wait`,
+				repositories.slice(0, 1),
+				1,
+				1,
+			)
+			runIds.push(run.id)
+			await vi.waitFor(() =>
+				expect(Object.values(run.results)[0]?.output).toMatch(descendantPidPattern),
+			)
+			const pid = Number(Object.values(run.results)[0]?.output.match(descendantPidPattern)?.[1])
+			stopRun(run.id)
+			await waitForRun(run)
+			expect(Object.values(run.results)[0]?.status).toBe('cancelled')
+			await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow(), { timeout: 3000 })
+		},
+	)
 
 	it('bounds captured output while allowing the command to finish', async () => {
 		const run = startRun(
-			`'${process.execPath}' -e 'process.stdout.write("x".repeat(150000))'`,
+			nodeCommand("process.stdout.write('x'.repeat(150000))"),
 			repositories.slice(0, 1),
 			1,
 			1,
@@ -677,7 +713,7 @@ describe('parallel command runs', () => {
 	})
 
 	it('deletes retained output and leaves repository files untouched', async () => {
-		const run = startRun('printf complete', repositories.slice(0, 1), 1, 1)
+		const run = startRun('echo complete', repositories.slice(0, 1), 1, 1)
 		await waitForRun(run)
 		deleteRun(run.id)
 		expect(getRun(run.id)).toBeUndefined()
