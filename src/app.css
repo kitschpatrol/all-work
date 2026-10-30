@@ -1956,6 +1956,9 @@ tr.selected
 }
 
 .preferences-content {
+	--preference-label-width: 110px;
+	--preference-label-gap: 8px;
+
 	overflow: auto;
 	display: grid;
 	flex: 1;
@@ -1980,8 +1983,8 @@ tr.selected
 
 .preference-field {
 	display: grid;
-	grid-template-columns: 110px minmax(0, 1fr);
-	gap: 8px;
+	grid-template-columns: var(--preference-label-width) minmax(0, 1fr);
+	gap: var(--preference-label-gap);
 	align-items: start;
 	margin-bottom: 8px;
 }
@@ -2021,6 +2024,11 @@ tr.selected
 	font-size: 11px;
 	line-height: 1.45;
 	color: var(--text-secondary);
+}
+
+/* Help for a labeled field lines up with the field rather than its label */
+.preference-field + .preference-help {
+	margin-left: calc(var(--preference-label-width) + var(--preference-label-gap));
 }
 
 .preference-checkbox {
