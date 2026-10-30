@@ -187,6 +187,7 @@
 	const columnVariables = $derived(getColumnVariables(runs))
 	const rowFilter = createRowFilter({
 		clearedRuns: () => runHistory.cleared,
+		identity: () => preferences.identity,
 		onChange() {
 			scheduleMetadata()
 			void runHistory.release().catch(showError)

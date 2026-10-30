@@ -1,5 +1,6 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import { describe, expect, it } from 'vitest'
+import type { ProjectIdentity } from './preferences.js'
 import type { FilterGroup, FilterNode, FilterRule } from './row-filter.js'
 import type {
 	CommandRun,
@@ -16,7 +17,10 @@ import {
 	createRule,
 	getFilterColumns,
 	getFilterMetadataGroups,
+	getOperatorLabel,
+	getOperators,
 	getValueSuggestions,
+	isRuleActive,
 	parseFilter,
 	pruneFilter,
 	retargetRule,
@@ -24,6 +28,10 @@ import {
 
 const ready: MetadataState = { status: 'ready' }
 const now = new Date(2026, 9, 16, 12).getTime()
+const identity: ProjectIdentity = {
+	authorNames: ['Eric Mika', 'kitschpatrol'],
+	githubAccounts: ['KitschPatrol', 'scalarstudio'],
+}
 
 const loadedGroups: Partial<Record<MetadataGroup, MetadataState>> = {
 	git: ready,
@@ -85,7 +93,7 @@ function rule(
 }
 
 function evaluate(filter: FilterGroup, row: Repository, runs: CommandRun[] = []) {
-	const predicate = compileFilter(filter, runs, now)
+	const predicate = compileFilter(filter, runs, identity, now)
 	if (predicate === undefined) {
 		throw new Error('Expected the filter to have active rules')
 	}
@@ -107,9 +115,9 @@ function run(results: CommandRun['results']): CommandRun {
 
 describe('compiling filters', () => {
 	it('matches everything when no rule is complete', () => {
-		expect(compileFilter(all(), [], now)).toBeUndefined()
+		expect(compileFilter(all(), [], identity, now)).toBeUndefined()
 		expect(
-			compileFilter(all(rule('branch', 'contains'), any(rule('name', 'is'))), [], now),
+			compileFilter(all(rule('branch', 'contains'), any(rule('name', 'is'))), [], identity, now),
 		).toBeUndefined()
 	})
 
@@ -122,8 +130,90 @@ describe('compiling filters', () => {
 			rule('lastCommitDate', 'before', '2026-02-30'),
 			rule('lastCommitDate', 'inLast', '1.5'),
 			rule('changedFiles', 'between', '1'),
+			rule('name', 'isMe'),
 		]
-		expect(ignored.filter((entry) => compileFilter(all(entry), [], now) !== undefined)).toEqual([])
+		expect(
+			ignored.filter((entry) => compileFilter(all(entry), [], identity, now) !== undefined),
+		).toEqual([])
+	})
+
+	it('matches repository owners against your GitHub accounts without regard to case', () => {
+		const rows = [
+			repository('mine', { repoOwner: 'kitschpatrol' }),
+			repository('studio', { repoOwner: 'ScalarStudio' }),
+			repository('theirs', { repoOwner: 'someone' }),
+			repository('local'),
+		]
+		const results = (filter: FilterGroup) => rows.map((row) => evaluate(filter, row))
+		expect(results(all(rule('repoOwner', 'isMe')))).toEqual([true, true, false, false])
+		expect(results(all(rule('repoOwner', 'isNotMe')))).toEqual([false, false, true, true])
+		expect(results(all(rule('repoOwner', 'is', 'SOMEONE')))).toEqual([false, false, true, false])
+		expect(isRuleActive(rule('repoOwner', 'isMe'), [])).toBe(true)
+	})
+
+	it('matches no owner or author as you when no identity is set', () => {
+		const nobody = { authorNames: [], githubAccounts: [] }
+		const mine = repository('mine', { repoOwner: 'kitschpatrol' }, { Author: ['Eric Mika'] })
+		const owner = compileFilter(all(rule('repoOwner', 'isMe')), [], nobody, now)
+		const author = compileFilter(all(rule('metadata:Author', 'includesMe')), [], nobody, now)
+		expect(owner?.(mine)).toBe(false)
+		expect(author?.(mine)).toBe(false)
+	})
+
+	it('finds your author names in Author, Contributor, and Maintainer without regard to case', () => {
+		const rows = [
+			repository('authored', {}, { Author: ['eric mika', 'Ada Lovelace'] }),
+			repository('contributed', {}, { Contributor: ['Grace Hopper', 'KITSCHPATROL'] }),
+			repository('maintained', {}, { Maintainer: ['Eric Mika'] }),
+			repository('theirs', {}, { Author: ['someone'] }),
+			repository('anonymous'),
+		]
+		const results = (filter: FilterGroup) => rows.map((row) => evaluate(filter, row))
+		const people = ['metadata:Author', 'metadata:Contributor', 'metadata:Maintainer']
+		expect(results(any(...people.map((column) => rule(column, 'includesMe'))))).toEqual([
+			true,
+			true,
+			true,
+			false,
+			false,
+		])
+		expect(results(all(rule('metadata:Author', 'doesNotIncludeMe')))).toEqual([
+			false,
+			true,
+			true,
+			true,
+			true,
+		])
+		expect(results(all(rule('metadata:Author', 'includes', 'SOMEONE')))).toEqual([
+			false,
+			false,
+			false,
+			true,
+			false,
+		])
+	})
+
+	it('matches "is me" on people columns only when every listed name is yours', () => {
+		const rows = [
+			repository('sole', {}, { Maintainer: ['Eric Mika'] }),
+			repository('aliases', {}, { Maintainer: ['eric mika', 'Kitschpatrol'] }),
+			repository('shared', {}, { Maintainer: ['Eric Mika', 'Ada Lovelace'] }),
+			repository('theirs', {}, { Maintainer: ['Ada Lovelace'] }),
+			repository('unmaintained'),
+		]
+		expect(rows.map((row) => evaluate(all(rule('metadata:Maintainer', 'isMe')), row))).toEqual([
+			true,
+			true,
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('leaves owner and author rules undecided until local metadata loads', () => {
+		const loading = repository('loading', {}, {}, { local: { status: 'loading' } })
+		expect(evaluate(all(rule('repoOwner', 'isNotMe')), loading)).toBeUndefined()
+		expect(evaluate(all(rule('metadata:Author', 'doesNotIncludeMe')), loading)).toBeUndefined()
 	})
 
 	it('compares text without regard to case', () => {
@@ -290,7 +380,9 @@ describe('filtering run output', () => {
 	})
 
 	it('ignores rules on deleted runs', () => {
-		expect(compileFilter(all(rule('run-2', 'statusIs', 'failed')), runs, now)).toBeUndefined()
+		expect(
+			compileFilter(all(rule('run-2', 'statusIs', 'failed')), runs, identity, now),
+		).toBeUndefined()
 	})
 })
 
@@ -324,6 +416,60 @@ describe('editing rules', () => {
 		})
 		expect(createRule(column('run-1')).operator).toBe('statusIs')
 		expect(createRule(column('metadata:Fork')).operator).toBe('isYes')
+	})
+
+	it('offers identity comparisons only on owner and people columns', () => {
+		expect(column('repoOwner').kind).toBe('account')
+		expect(createRule(column('repoOwner')).operator).toBe('isMe')
+		expect(getOperators('text')).not.toContain('isMe')
+		expect(getOperatorLabel('account', 'isNotMe', false)).toBe('is not me')
+		for (const id of ['metadata:Author', 'metadata:Contributor', 'metadata:Maintainer']) {
+			expect(column(id).kind).toBe('people')
+		}
+
+		expect(createRule(column('metadata:Author')).operator).toBe('isMe')
+		expect(getOperators('people')).toContain('includesMe')
+		expect(column('metadata:Tags').kind).toBe('list')
+		expect(getOperators('list')).not.toContain('includesMe')
+		expect(getOperatorLabel('people', 'doesNotIncludeMe', false)).toBe('does not include me')
+	})
+
+	it('marks comparisons that need a value with an ellipsis until selected', () => {
+		expect(getOperatorLabel('list', 'includes', false)).toBe('includes…')
+		expect(getOperatorLabel('list', 'includes', true)).toBe('includes')
+		expect(getOperatorLabel('number', 'is', false)).toBe('is…')
+		expect(getOperatorLabel('number', 'between', false)).toBe('is between…')
+		expect(getOperatorLabel('date', 'inLast', false)).toBe('is within the last…')
+		expect(getOperatorLabel('output', 'contains', false)).toBe('output contains…')
+		expect(getOperatorLabel('output', 'statusIs', false)).toBe('status is…')
+		expect(getOperatorLabel('people', 'includesMe', false)).toBe('includes me')
+		expect(getOperatorLabel('text', 'isEmpty', false)).toBe('is empty')
+		expect(getOperatorLabel('boolean', 'isYes', false)).toBe('is Yes')
+	})
+
+	it('keeps a comparison when the new column offers it with the same kind of value', () => {
+		const contains = rule('name', 'contains', 'kit')
+		expect(retargetRule(contains, 'text', column('repoOwner'))).toEqual({
+			...contains,
+			column: 'repoOwner',
+		})
+		expect(retargetRule(rule('repoOwner', 'isMe'), 'account', column('name'))).toEqual({
+			column: 'name',
+			operator: 'contains',
+			value: '',
+		})
+		const includes = rule('metadata:Tags', 'includes', 'cli')
+		expect(retargetRule(includes, 'list', column('metadata:Author'))).toEqual({
+			...includes,
+			column: 'metadata:Author',
+		})
+		expect(
+			retargetRule(rule('metadata:Author', 'includesMe'), 'people', column('metadata:Tags')),
+		).toEqual({
+			column: 'metadata:Tags',
+			operator: 'includes',
+			value: '',
+		})
 	})
 
 	it('keeps the value when moving between columns of the same kind', () => {
@@ -437,5 +583,89 @@ describe('saved filters', () => {
 			[dirty, clean, unavailable].map((row) => evaluate(getPresetFilter(id), row))
 		expect(results('changed')).toEqual([true, false, false])
 		expect(results('clean')).toEqual([false, true, false])
+	})
+
+	it('finds repositories ahead of or behind their upstream', () => {
+		const tracked = { upstream: 'origin/main' }
+		const rows = [
+			repository('ahead', { ...tracked, ahead: 2 }),
+			repository('behind', { ...tracked, behind: 1 }),
+			repository('synced', tracked),
+			repository('untracked', { ahead: 3 }),
+			repository('gone', { ...tracked, ahead: 1, upstreamGone: true }),
+		]
+		expect(rows.map((row) => evaluate(getPresetFilter('outOfSync'), row))).toEqual([
+			true,
+			true,
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('finds clean repositories with commits to push and nothing to pull', () => {
+		const tracked = { upstream: 'origin/main' }
+		const rows = [
+			repository('ready', { ...tracked, ahead: 2 }),
+			repository('diverged', { ...tracked, ahead: 2, behind: 1 }),
+			repository('dirty', { ...tracked, ahead: 2, changedFiles: 1 }),
+			repository('synced', tracked),
+			repository('untracked', { ahead: 2 }),
+		]
+		expect(rows.map((row) => evaluate(getPresetFilter('readyToPush'), row))).toEqual([
+			true,
+			false,
+			false,
+			false,
+			false,
+		])
+	})
+
+	it('finds repositories with a GitHub remote', () => {
+		const rows = [
+			repository('ssh', { remote: 'git@github.com:kitschpatrol/all-work.git' }),
+			repository('https', { remote: 'https://GitHub.com/kitschpatrol/all-work' }),
+			repository('elsewhere', { remote: 'https://gitlab.com/someone/project.git' }),
+			repository('local'),
+		]
+		expect(rows.map((row) => evaluate(getPresetFilter('github'), row))).toEqual([
+			true,
+			true,
+			false,
+			false,
+		])
+	})
+
+	it('finds repositories you authored or own', () => {
+		const rows = [
+			repository('authored', { repoOwner: 'someone' }, { Author: ['Ada Lovelace', 'Eric Mika'] }),
+			repository('owned', { repoOwner: 'kitschpatrol' }, { Author: ['Ada Lovelace'] }),
+			repository('theirs', { repoOwner: 'someone' }, { Author: ['Ada Lovelace'] }),
+			repository('local'),
+		]
+		expect(rows.map((row) => evaluate(getPresetFilter('mine'), row))).toEqual([
+			true,
+			true,
+			false,
+			false,
+		])
+	})
+
+	it('finds clean repositories with commits to pull and nothing to push', () => {
+		const tracked = { upstream: 'origin/main' }
+		const rows = [
+			repository('ready', { ...tracked, behind: 2 }),
+			repository('diverged', { ...tracked, ahead: 1, behind: 2 }),
+			repository('dirty', { ...tracked, behind: 2, changedFiles: 1 }),
+			repository('synced', tracked),
+			repository('untracked', { behind: 2 }),
+		]
+		expect(rows.map((row) => evaluate(getPresetFilter('readyToPull'), row))).toEqual([
+			true,
+			false,
+			false,
+			false,
+			false,
+		])
 	})
 })

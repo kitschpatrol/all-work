@@ -43,6 +43,7 @@ function setup(
 	const rows = [repository('dirty', 2), repository('clean', 0)]
 	const state = createRowFilter({
 		clearedRuns: () => clearedRuns,
+		identity: () => ({ authorNames: [], githubAccounts: [] }),
 		onChange,
 		onPresetsChange,
 		presets: () => savedPresets,
@@ -178,6 +179,18 @@ describe('row filter state', () => {
 		expect(onChange).not.toHaveBeenCalled()
 	})
 
+	it('matches "is me" rules against the identity it is given', () => {
+		const state = createRowFilter({
+			clearedRuns: () => [],
+			identity: () => ({ authorNames: [], githubAccounts: ['kitschpatrol'] }),
+			onChange: vi.fn<() => void>(),
+			runs: () => [],
+		})
+		state.set({ match: 'all', rules: [{ column: 'repoOwner', operator: 'isMe', value: '' }] })
+		const rows = [{ ...repository('mine', 0), repoOwner: 'kitschpatrol' }, repository('local', 0)]
+		expect(rows.filter((row) => state.matches(row)).map((row) => row.id)).toEqual(['mine'])
+	})
+
 	it('applies presets without expanding and clears one when chosen again in the menu', () => {
 		const { rows, state } = setup()
 		state.togglePreset('changed')
@@ -277,8 +290,8 @@ describe('row filter state', () => {
 			match: 'all',
 			rules: [{ column: 'changedFiles', operator: 'atLeast', value: '5' }],
 		})
-		await expect(state.savePreset('with changes')).rejects.toThrow('Built-in presets')
-		await expect(state.savePreset('Mine', 'changed')).rejects.toThrow('Built-in presets')
+		await expect(state.savePreset('dirty')).rejects.toThrow('Built-in presets')
+		await expect(state.savePreset('Main branch', 'changed')).rejects.toThrow('Built-in presets')
 		await state.deletePreset()
 		expect(savedPresets).toHaveLength(0)
 		expect(state.selectedPreset).toBeUndefined()
@@ -341,12 +354,12 @@ describe('row filter state', () => {
 		)
 		expect(state.selectedPreset).toBeUndefined()
 		expect(onChange).not.toHaveBeenCalled()
-		await state.savePreset('Mine')
+		await state.savePreset('Main branch')
 		state.restore(
 			{ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'dev' }] },
 			savedPresets[0]?.id,
 		)
-		expect(state.selectedPreset?.label).toBe('Mine')
+		expect(state.selectedPreset?.label).toBe('Main branch')
 		expect(state.modified).toBe(true)
 	})
 

@@ -88,7 +88,9 @@
 		value={rule.operator}
 	>
 		{#each getOperators(kind) as operator (operator)}
-			<option value={operator}>{getOperatorLabel(kind, operator)}</option>
+			<option value={operator}
+				>{getOperatorLabel(kind, operator, operator === rule.operator)}</option
+			>
 		{/each}
 	</select>
 	{#if shape === 'text'}<FilterValueInput

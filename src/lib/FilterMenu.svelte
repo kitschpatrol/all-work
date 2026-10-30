@@ -181,7 +181,8 @@
 	<option value="all">None</option>
 	{#if selection === 'custom'}<option value="custom">Custom filter</option>{/if}
 	<optgroup label="Presets">
-		{#each builtinPresets as preset (preset.id)}<option value={preset.id}>{preset.label}</option
+		{#each builtinPresets as preset (preset.id)}<option title={preset.description} value={preset.id}
+				>{preset.label}</option
 			>{/each}
 	</optgroup>
 	{#if userPresets.length > 0}<optgroup label="User">
@@ -201,6 +202,7 @@
 			aria-label="Filter preset"
 			disabled={busy}
 			onchange={async (event) => choose(event.currentTarget)}
+			title={selected?.description}
 			value={selection}
 		>
 			{@render presetOptions()}
@@ -265,6 +267,7 @@
 								aria-label="Filter preset"
 								disabled={busy}
 								onchange={async (event) => choose(event.currentTarget)}
+								title={selected?.description}
 								value={selection}
 							>
 								{@render presetOptions()}

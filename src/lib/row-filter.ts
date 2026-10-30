@@ -1,4 +1,5 @@
 import type { ColumnKind } from './metadata-columns.js'
+import type { ProjectIdentity } from './preferences.js'
 import type { CommandRun, MetadataGroup, MetadataValue, Repository } from './workspace.js'
 import { repositoryColumns } from './column-variables.js'
 import { asRecord } from './record.js'
@@ -6,8 +7,12 @@ import { asRecord } from './record.js'
 /** How a group combines its rules: every rule, at least one, or none of them. */
 export type FilterMatch = 'all' | 'any' | 'none'
 
-/** Run output columns add command status to the repository column kinds. */
-export type FilterKind = 'output' | ColumnKind
+/**
+ * Run output columns add command status, account columns add your GitHub
+ * accounts, and people columns add your author names to the repository column
+ * kinds.
+ */
+export type FilterKind = 'account' | 'output' | 'people' | ColumnKind
 
 /** Calendar units for "within the last" date rules. */
 export type DateUnit = 'days' | 'months' | 'weeks' | 'years'
@@ -30,15 +35,19 @@ const operandShapes = {
 	contains: 'text',
 	doesNotContain: 'text',
 	doesNotInclude: 'text',
+	doesNotIncludeMe: 'none',
 	endsWith: 'text',
 	greaterThan: 'number',
 	includes: 'text',
+	includesMe: 'none',
 	inLast: 'duration',
 	is: 'text',
 	isEmpty: 'none',
+	isMe: 'none',
 	isNo: 'none',
 	isNot: 'text',
 	isNotEmpty: 'none',
+	isNotMe: 'none',
 	isYes: 'none',
 	lessThan: 'number',
 	matches: 'text',
@@ -90,8 +99,30 @@ export type FilterPredicate = (repository: Repository) => boolean | undefined
 
 type Test<T> = (value: T) => boolean
 
+type CompileContext = {
+	/** Lowercased GitHub accounts that `isMe` rules compare against. */
+	accounts: ReadonlySet<string>
+	/** Lowercased author names that `includesMe` rules compare against. */
+	authorNames: ReadonlySet<string>
+	now: number
+	runs: readonly CommandRun[]
+}
+
 // Menu order for each kind; the first operator starts new rules
 const operatorsByKind = {
+	account: [
+		'isMe',
+		'isNotMe',
+		'contains',
+		'doesNotContain',
+		'is',
+		'isNot',
+		'startsWith',
+		'endsWith',
+		'matches',
+		'isEmpty',
+		'isNotEmpty',
+	],
 	boolean: ['isYes', 'isNo', 'isEmpty', 'isNotEmpty'],
 	date: ['inLast', 'notInLast', 'before', 'after', 'isEmpty', 'isNotEmpty'],
 	list: ['includes', 'doesNotInclude', 'isEmpty', 'isNotEmpty'],
@@ -112,6 +143,15 @@ const operatorsByKind = {
 		'contains',
 		'doesNotContain',
 		'matches',
+		'isEmpty',
+		'isNotEmpty',
+	],
+	people: [
+		'isMe',
+		'includesMe',
+		'doesNotIncludeMe',
+		'includes',
+		'doesNotInclude',
 		'isEmpty',
 		'isNotEmpty',
 	],
@@ -137,15 +177,19 @@ const operatorLabels: Record<FilterOperator, string> = {
 	contains: 'contains',
 	doesNotContain: 'does not contain',
 	doesNotInclude: 'does not include',
+	doesNotIncludeMe: 'does not include me',
 	endsWith: 'ends with',
 	greaterThan: 'is greater than',
 	includes: 'includes',
+	includesMe: 'includes me',
 	inLast: 'is within the last',
 	is: 'is',
 	isEmpty: 'is empty',
+	isMe: 'is me',
 	isNo: 'is No',
 	isNot: 'is not',
 	isNotEmpty: 'is not empty',
+	isNotMe: 'is not me',
 	isYes: 'is Yes',
 	lessThan: 'is less than',
 	matches: 'matches pattern',
@@ -186,6 +230,13 @@ const numberTests: Partial<Record<FilterOperator, (value: number, operand: numbe
 const matchModes = new Set<string>(['all', 'any', 'none'])
 const dayPattern = /^(\d{4})-(\d{2})-(\d{2})$/v
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
+// Columns naming GitHub accounts or people, which rules can compare with your own
+const identityColumns = new Map<string, FilterKind>([
+	['metadata:Author', 'people'],
+	['metadata:Contributor', 'people'],
+	['metadata:Maintainer', 'people'],
+	['repoOwner', 'account'],
+])
 // Saved settings are hand-editable, so bound recursion through nested groups
 const maxDepth = 32
 
@@ -226,10 +277,19 @@ export function getOperators(kind: FilterKind): readonly FilterOperator[] {
 	return operatorsByKind[kind]
 }
 
-/** Describe an operator in the wording its column kind uses. */
-export function getOperatorLabel(kind: FilterKind, operator: FilterOperator): string {
+/**
+ * Describe an operator in the wording its column kind uses. In the menu, an
+ * operator that needs a value ends with an ellipsis until it is selected and
+ * its value field appears.
+ */
+export function getOperatorLabel(
+	kind: FilterKind,
+	operator: FilterOperator,
+	selected: boolean,
+): string {
 	const label = operatorLabels[operator]
-	return kind === 'output' && outputOperators.has(operator) ? `output ${label}` : label
+	const worded = kind === 'output' && outputOperators.has(operator) ? `output ${label}` : label
+	return selected || getOperandShape(kind, operator) === 'none' ? worded : `${worded}…`
 }
 
 /** The operand an operator needs for a column kind. */
@@ -237,6 +297,10 @@ export function getOperandShape(kind: FilterKind, operator: FilterOperator): Ope
 	return kind === 'number' && (operator === 'is' || operator === 'isNot')
 		? 'number'
 		: operandShapes[operator]
+}
+
+function getColumnKind(column: { id: string; kind: ColumnKind }): FilterKind {
+	return identityColumns.get(column.id) ?? column.kind
 }
 
 /** Start a rule on a column with its first operator and no value. */
@@ -250,11 +314,14 @@ export function createRule(column: FilterColumn): FilterRule {
 }
 
 /**
- * Point a rule at another column, keeping its operator and value only when they
- * still apply to the new column's kind.
+ * Point a rule at another column, keeping its operator and value only when the
+ * new column's kind offers that operator with the same kind of value.
  */
 export function retargetRule(rule: FilterRule, from: FilterKind, to: FilterColumn): FilterRule {
-	return from === to.kind ? { ...rule, column: to.id } : createRule(to)
+	return getOperators(to.kind).includes(rule.operator) &&
+		getOperandShape(from, rule.operator) === getOperandShape(to.kind, rule.operator)
+		? { ...rule, column: to.id }
+		: createRule(to)
 }
 
 /** Change a rule's operator, clearing a value whose format no longer fits. */
@@ -293,7 +360,12 @@ export function getFilterColumns(
 	// A run being cleared can briefly be in both lists, and is listed once, as a column
 	const columnIds = new Set(runs.map((run) => run.id))
 	return [
-		...repositoryColumns.map(({ category, header, id, kind }) => ({ category, header, id, kind })),
+		...repositoryColumns.map((column) => ({
+			category: column.category,
+			header: column.header,
+			id: column.id,
+			kind: getColumnKind(column),
+		})),
 		...runs.map(runColumn('Runs')),
 		...clearedRuns.filter((run) => !columnIds.has(run.id)).map(runColumn('Cleared runs')),
 	]
@@ -491,6 +563,33 @@ function compileList(rule: FilterRule): Test<string[]> | undefined {
 	return emptiness(rule.operator, (items: string[]) => items.length === 0)
 }
 
+function compileAccount(rule: FilterRule, accounts: ReadonlySet<string>): Test<string> | undefined {
+	if (rule.operator === 'isMe' || rule.operator === 'isNotMe') {
+		const expected = rule.operator === 'isMe'
+		return (account) => accounts.has(account.toLowerCase()) === expected
+	}
+
+	return compileText(rule.operator, rule.value)
+}
+
+function compilePeople(rule: FilterRule, names: ReadonlySet<string>): Test<string[]> | undefined {
+	// Only you, under any of your names
+	if (rule.operator === 'isMe') {
+		return (items) => items.length > 0 && items.every((item) => names.has(item.toLowerCase()))
+	}
+
+	if (rule.operator === 'includesMe' || rule.operator === 'doesNotIncludeMe') {
+		const expected = rule.operator === 'includesMe'
+		return (items) => items.some((item) => names.has(item.toLowerCase())) === expected
+	}
+
+	return compileList(rule)
+}
+
+function lowercaseSet(names: readonly string[]): ReadonlySet<string> {
+	return new Set(names.map((name) => name.toLowerCase()))
+}
+
 function compileBoolean(rule: FilterRule): Test<boolean | undefined> | undefined {
 	if (rule.operator === 'isYes' || rule.operator === 'isNo') {
 		const expected = rule.operator === 'isYes'
@@ -544,24 +643,26 @@ function compileOutput(rule: FilterRule, run: CommandRun): FilterPredicate | und
 					: test(run.results[repository.id]?.output ?? '')
 }
 
-function compileRule(
-	rule: FilterRule,
-	runs: readonly CommandRun[],
-	now: number,
-): FilterPredicate | undefined {
-	const run = runs.find((item) => item.id === rule.column)
-	const kind = run === undefined ? columnsById.get(rule.column)?.kind : 'output'
+function compileRule(rule: FilterRule, context: CompileContext): FilterPredicate | undefined {
+	const run = context.runs.find((item) => item.id === rule.column)
+	const column = columnsById.get(rule.column)
+	const kind =
+		run === undefined ? (column === undefined ? undefined : getColumnKind(column)) : 'output'
 	if (kind === undefined || !getOperators(kind).includes(rule.operator)) {
 		return undefined
 	}
 
 	switch (kind) {
+		case 'account': {
+			return settled(rule.column, asText, compileAccount(rule, context.accounts))
+		}
+
 		case 'boolean': {
 			return settled(rule.column, asBoolean, compileBoolean(rule))
 		}
 
 		case 'date': {
-			return settled(rule.column, asDate, compileDate(rule, now))
+			return settled(rule.column, asDate, compileDate(rule, context.now))
 		}
 
 		case 'list': {
@@ -576,20 +677,20 @@ function compileRule(
 			return run === undefined ? undefined : compileOutput(rule, run)
 		}
 
+		case 'people': {
+			return settled(rule.column, asItems, compilePeople(rule, context.authorNames))
+		}
+
 		case 'text': {
 			return settled(rule.column, asText, compileText(rule.operator, rule.value))
 		}
 	}
 }
 
-function compileGroup(
-	group: FilterGroup,
-	runs: readonly CommandRun[],
-	now: number,
-): FilterPredicate | undefined {
+function compileGroup(group: FilterGroup, context: CompileContext): FilterPredicate | undefined {
 	const predicates = group.rules.flatMap(
 		(node) =>
-			(isFilterGroup(node) ? compileGroup(node, runs, now) : compileRule(node, runs, now)) ?? [],
+			(isFilterGroup(node) ? compileGroup(node, context) : compileRule(node, context)) ?? [],
 	)
 	if (predicates.length === 0) {
 		return undefined
@@ -642,19 +743,34 @@ function compileGroup(
  *
  * @param filter The root group.
  * @param runs Command runs whose output columns rules may reference.
+ * @param identity Your GitHub accounts, which "is me" rules match, and author
+ *   names, which "includes me" rules match.
  * @param now Reference time for relative date rules.
  */
 export function compileFilter(
 	filter: FilterGroup,
 	runs: readonly CommandRun[],
+	identity: ProjectIdentity,
 	now = Date.now(),
 ): FilterPredicate | undefined {
-	return compileGroup(filter, runs, now)
+	return compileGroup(filter, {
+		accounts: lowercaseSet(identity.githubAccounts),
+		authorNames: lowercaseSet(identity.authorNames),
+		now,
+		runs,
+	})
 }
 
 /** Report whether a rule currently takes part in filtering. */
 export function isRuleActive(rule: FilterRule, runs: readonly CommandRun[]): boolean {
-	return compileRule(rule, runs, Date.now()) !== undefined
+	// Activity depends on the rule alone, not on whose names it would match
+	const context = {
+		accounts: new Set<string>(),
+		authorNames: new Set<string>(),
+		now: Date.now(),
+		runs,
+	}
+	return compileRule(rule, context) !== undefined
 }
 
 function activeRules(group: FilterGroup, runs: readonly CommandRun[]): FilterRule[] {

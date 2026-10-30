@@ -1,4 +1,5 @@
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
+import type { ProjectIdentity } from './preferences.js'
 import type { FilterGroup } from './row-filter.js'
 import type { CommandRun, Repository } from './workspace.js'
 import { getPresetFilter, resolveFilterPresets } from './filter-presets.js'
@@ -18,6 +19,8 @@ import {
 type RowFilterOptions = {
 	/** Runs whose columns were cleared but whose output rules still filter by. */
 	clearedRuns: () => CommandRun[]
+	/** Your accounts and names, which "is me" and "includes me" rules match. */
+	identity: () => ProjectIdentity
 	/** Called after the rules change so newly shown rows can load metadata. */
 	onChange: () => void
 	onPresetsChange?: (presets: FilterPreset[]) => Promise<void>
@@ -29,7 +32,7 @@ type RowFilterOptions = {
  * Own the filter rules and whether the Filter popover is showing, and derive
  * everything the table, toolbar, and menu need from them.
  *
- * @param options Sources for the rows and runs that rules evaluate against.
+ * @param options Sources for the runs and identity that rules evaluate against.
  *
  * @returns Reactive filter state and the actions that change it.
  */
@@ -42,7 +45,7 @@ export function createRowFilter(options: RowFilterOptions) {
 	const ruleColumns = $derived(getRuleColumns(filter))
 	const savedPresets = $derived(options.presets?.() ?? [])
 	const presets = $derived(resolveFilterPresets(savedPresets))
-	const predicate = $derived(compileFilter(filter, ruleRuns))
+	const predicate = $derived(compileFilter(filter, ruleRuns, options.identity()))
 	// Blank or invalid rules take no part in filtering
 	const activeRules = $derived(countActiveRules(filter, ruleRuns))
 	// Only an explicit choice selects a preset. A saved preset stays selected while

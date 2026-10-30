@@ -9,19 +9,36 @@ import {
 } from './filter-presets.js'
 
 describe('saved filter presets', () => {
-	it('keeps built-in presets while applying saved overrides and custom presets', () => {
+	it('sorts built-in and saved presets while applying saved overrides', () => {
 		const saved: FilterPreset[] = [
 			{
 				filter: { match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] },
 				id: 'changed',
-				label: 'With Changes',
+				label: 'Dirty',
 			},
 			{ filter: getPresetFilter('clean'), id: 'custom:fixture', label: 'My filter' },
 		]
 		const resolved = resolveFilterPresets(saved)
-		expect(resolved.map((preset) => preset.id)).toEqual(['changed', 'clean', 'custom:fixture'])
+		expect(resolved.map((preset) => preset.id)).toEqual([
+			'clean',
+			'changed',
+			'outOfSync',
+			'failingCi',
+			'github',
+			'mine',
+			'custom:fixture',
+			'needsAttention',
+			'noRemote',
+			'openPrs',
+			'publishedPackages',
+			'readyToPull',
+			'readyToPush',
+			'recentlyActive',
+		])
 		expect(getPresetFilter('changed', resolved)).toEqual(saved[0]?.filter)
-		expect(getPresetFilter('changed')).toEqual(filterPresets[0]?.filter)
+		expect(getPresetFilter('changed')).toEqual(
+			filterPresets.find((preset) => preset.id === 'changed')?.filter,
+		)
 	})
 
 	it('copies filters so edits cannot change a saved preset', () => {

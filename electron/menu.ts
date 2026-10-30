@@ -194,6 +194,7 @@ function buildTemplate(
 						item(preset.label, 'view.filterPreset', {
 							checked: state.filterPreset === preset.id,
 							payload: preset.id,
+							toolTip: filterPresets.find((entry) => entry.id === preset.id)?.description,
 							type: 'checkbox',
 						}),
 					),

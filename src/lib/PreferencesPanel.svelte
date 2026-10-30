@@ -160,7 +160,7 @@
 			</div>
 			<p class="preference-help">
 				One name or account per line. Used by Metascope to identify your authored and maintained
-				projects.
+				projects, and by the filter’s “is me” and “includes me” rules.
 			</p>
 		</fieldset>
 		<fieldset disabled={busy}>
