@@ -16,7 +16,22 @@
 
 ## Overview
 
-All Work is a local desktop and browser workspace for running one shell command across many Git repositories. A fixed toolbar keeps the workspace field on the left and the command field on the right. The table fills the remaining window and scrolls through every matching repository without pagination.
+All Work is a desktop application to simplify managing and maintaining large quantities of local Git repositories through an information-dense graphical interface.
+
+It has two core competencies:
+
+1. Aggregation and display of vast amounts of Git project metadata in a filterable, and flexible data table, exposing up to <!-- column-count --> columns of metadata about your local repositories.
+2. Quick execution of any command in parallel across all your projects — or on easily-selected subsets matching specific criteria.
+
+I developed All Work to help manage my 200+ local repositories, and am sharing it here in case anyone else might find it useful.
+
+Please note that the project is still of beta quality. I'm only maintaining a macOS release for now.
+
+_If you're just interested in access to the project metadata extraction and normalization tooling that powers the All Work data table, that's available in CLI and library form in [Metascope](https://github.com/kitschpatrol/metascope)._
+
+It aggregates a massive amount comprehensive in a flexible and easily-filtered
+
+running one shell command across many Git repositories. A fixed toolbar keeps the workspace field on the left and the command field on the right. The table fills the remaining window and scrolls through every matching repository without pagination.
 
 - Discovers Git repositories and worktrees, including projects without `package.json`. Choose recursive discovery or scan only one level down.
 - Uses [Metascope](https://github.com/kitschpatrol/metascope) for local project metadata, current branch, working tree status, and cached remote comparisons.
