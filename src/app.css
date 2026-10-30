@@ -189,8 +189,8 @@ h1 {
 .app-identity::after {
 	content: '';
 	position: absolute;
-	top: -7px;
-	bottom: -7px;
+	top: -6px;
+	bottom: -6px;
 	border-left: 1px solid #bcbcbc;
 	box-shadow: 1px 0 #ffffffb3;
 }
@@ -983,6 +983,7 @@ input[type='search']::-webkit-search-cancel-button {
 	box-shadow: inset 0 1px 2px #0e3a8066;
 }
 
+/* Space below the last row reads as a floor behind the table, darker than the toolbars */
 .table-scroll {
 	overflow: auto;
 	display: flex;
@@ -990,7 +991,7 @@ input[type='search']::-webkit-search-cancel-button {
 	flex-flow: column nowrap;
 	min-height: 0;
 	border-block: 1px solid #b5b5b5;
-	background: #fff;
+	background: #dcdcdc;
 }
 
 table {
@@ -999,8 +1000,13 @@ table {
 	border-collapse: separate;
 }
 
+/* The rows, or the header alone, cast a soft shadow onto the floor below */
 .table-scroll > table {
 	flex-shrink: 0;
+	background: #fff;
+	box-shadow:
+		0 1px 2px #0000001f,
+		0 10px 28px #00000029;
 }
 
 .column-measurement {
@@ -1115,12 +1121,13 @@ th.last-output-cell {
 .table-scroll th.table-filler {
 	pointer-events: auto;
 	z-index: 2;
-	background: linear-gradient(#f8f8f8, #ebebeb);
+	background: none;
 }
 
+/* Filler cells are transparent, so the row paints the space beyond the last column and a dragged column's slot alike */
 .table-scroll td.table-filler {
-	border-bottom-color: #e6e8eb;
-	background: #f4f5f7;
+	border-bottom: 0;
+	background: none;
 }
 
 /* Shift-clicking checkboxes extends the row selection, never a text selection */
@@ -1207,6 +1214,32 @@ th.column-dragged + th:not(.last-output-cell) {
 /* Hover states and tooltips would flicker beneath the pointer while a column moves */
 .column-dragging {
 	user-select: none;
+}
+
+/*
+ * Each row paints the space beyond its last cell. The same paint shows through
+ * the slot a dragged column leaves behind, during the drag and while it settles
+ * after the drop.
+ */
+tbody tr {
+	background: linear-gradient(to top, #e6e8eb 1px, #f4f5f7 1px);
+}
+
+/* The header row sticks along with its cells, so its painted slot stays under them while scrolled */
+thead tr {
+	position: sticky;
+	z-index: 3;
+	top: 0;
+}
+
+/* A real border, so the line snaps to device pixels exactly like the cells' borders beside it */
+thead tr::after {
+	content: '';
+	position: absolute;
+	z-index: -1;
+	inset: 0;
+	border-bottom: 1px solid #b9b9b9;
+	background: linear-gradient(#f8f8f8, #ebebeb);
 }
 
 .column-dragging table {
@@ -2089,21 +2122,32 @@ tr.selected
 	}
 }
 
-/* Too narrow for both sections in one row: the command section stacks under the workspace section */
+/* Too narrow for both sections in one row: each becomes a toolbar row of its own, command under workspace */
 @media (width <= 1100px) {
 	.app-shell {
-		--toolbar-height: 66px;
+		--toolbar-height: 74px;
 	}
 
 	.app-toolbar {
 		grid-template-columns: minmax(0, 1fr);
-		gap: 6px;
+		gap: 0;
+		padding: 0;
+		background: none;
+		box-shadow: none;
+	}
+
+	.workspace-tools,
+	.command-form {
+		padding: 6px 8px;
+		background: linear-gradient(#f5f5f5, #dfdfdf);
+		box-shadow: inset 0 1px #fff;
+	}
+
+	.workspace-tools {
+		border-bottom: 1px solid #a6a6a6;
 	}
 
 	.workspace-tools::after {
-		inset: auto 0 -4px;
-		border-top: 1px solid #bcbcbc;
-		border-left: 0;
-		box-shadow: 0 1px #ffffffb3;
+		display: none;
 	}
 }
