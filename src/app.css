@@ -5,6 +5,7 @@
 	--text: #1f2124;
 	--text-secondary: #4d535c;
 	--text-tertiary: #6b727d;
+	--text-placeholder: #a3a8b0;
 	--accent: #2468dc;
 	--focus-ring: #3b84f080;
 	--selected-face: linear-gradient(#5196f4, #2468dc);
@@ -1713,6 +1714,11 @@ th[aria-sort='descending'] {
 	text-align: center;
 	background: #ffeccc;
 	box-shadow: inset 0 0 0 1px #f3cf94;
+}
+
+/* Empty and loading placeholders recede behind real values, even in selected rows */
+.cell-placeholder {
+	color: var(--text-placeholder);
 }
 
 .not-targeted {

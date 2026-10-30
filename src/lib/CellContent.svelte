@@ -5,6 +5,7 @@
 	import {
 		formatColumnCellValue,
 		getColumnDisplay,
+		getColumnValue,
 		getMetadataPlaceholder,
 	} from './column-variables.js'
 	import { parseExternalUrl } from './external-links.js'
@@ -37,6 +38,8 @@
 	const result = $derived(run?.results[repository.id])
 	const display = $derived(getColumnDisplay(columnId))
 	const value = $derived(formatColumnCellValue(repository, columnId, runs))
+	const raw = $derived(getColumnValue(repository, columnId, runs))
+	const missing = $derived(raw === undefined || raw === '')
 	const url = $derived(parseExternalUrl(value))
 
 	async function openLink(event: MouseEvent) {
@@ -57,33 +60,35 @@
 	}
 </script>
 
+{#snippet placeholder(text: string)}<span class="cell-placeholder">{text}</span>{/snippet}
+
 {#if columnId === 'relativePath'}<RepositoryCell {onOpen} {onRefresh} {repository} {shortcuts} />
 {:else if columnId === 'name'}<span class="project-name">{repository.name}</span>
 {:else if columnId === 'branch'}<span class="branch"
-		>⑂ {repository.branch === ''
-			? getMetadataPlaceholder(repository, 'branch')
-			: repository.branch}</span
+		>⑂ {#if repository.branch === ''}{@render placeholder(
+				getMetadataPlaceholder(repository, 'branch'),
+			)}{:else}{repository.branch}{/if}</span
 	>
 {:else if columnId === 'changedFiles'}<span
 		class="status-badge"
 		class:dirty={repository.changedFiles > 0}
 		><span class="status-dot"></span><span class="status-label"
-			>{repository.gitStatusAvailable
-				? repository.changedFiles > 0
+			>{#if repository.gitStatusAvailable}{repository.changedFiles > 0
 					? `${repository.changedFiles} Changed`
-					: 'Clean'
-				: getMetadataPlaceholder(repository, 'changedFiles')}</span
+					: 'Clean'}{:else}{@render placeholder(
+					getMetadataPlaceholder(repository, 'changedFiles'),
+				)}{/if}</span
 		></span
 	>
 {:else if columnId === 'sync'}<span class="sync-value"
-		>{repository.ahead > 0 || repository.behind > 0
-			? `↑${repository.ahead} ↓${repository.behind}`
-			: '—'}</span
+		>{#if repository.ahead > 0 || repository.behind > 0}↑{repository.ahead} ↓{repository.behind}{:else}{@render placeholder(
+				'—',
+			)}{/if}</span
 	>
 {:else if columnId === 'lastCommitDate'}<span class="date-value"
-		>{repository.lastCommitDate === '' && repository.metadata?.groups.git?.status !== 'ready'
-			? getMetadataPlaceholder(repository, 'lastCommitDate')
-			: formatDate(repository.lastCommitDate)}</span
+		>{#if repository.lastCommitDate === '' && repository.metadata?.groups.git?.status !== 'ready'}{@render placeholder(
+				getMetadataPlaceholder(repository, 'lastCommitDate'),
+			)}{:else}{formatDate(repository.lastCommitDate)}{/if}</span
 	>
 {:else if run !== undefined}{#if result !== undefined}<OutputPreview
 			label="View output for {repository.name}"
@@ -101,4 +106,6 @@
 		rel="external noopener noreferrer"
 		target="_blank">{value}</a
 	>
-{:else}<span class="cell-text" class:monospace={display !== 'text'}>{value}</span>{/if}
+{:else}<span class="cell-text" class:monospace={display !== 'text'}
+		>{#if missing}{@render placeholder(value)}{:else}{value}{/if}</span
+	>{/if}
