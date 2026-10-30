@@ -10,7 +10,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		error(400, 'Enter a directory path.')
 	}
 
-	const recursive = body.recursive ?? true
+	const recursive = body.recursive ?? false
 	if (typeof recursive !== 'boolean') {
 		error(400, 'Recursive must be a checkbox value.')
 	}

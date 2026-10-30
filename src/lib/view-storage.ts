@@ -94,7 +94,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		filterPreset: isFilterPresetId(record.filterPreset) ? record.filterPreset : undefined,
 		nextRunNumber: integer(record.nextRunNumber, 1, 1),
 		outputLines: integer(record.outputLines, 3, 1),
-		recursive: record.recursive !== false,
+		recursive: record.recursive === true,
 		resizedColumns: strings(record.resizedColumns),
 		rowSelection: booleanRecord(record.rowSelection),
 		runIds: strings(record.runIds).slice(-1000),

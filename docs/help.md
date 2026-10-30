@@ -38,7 +38,7 @@ The macOS desktop app includes native menus, a folder picker, and separate outpu
 
 A workspace is a folder to search for Git repositories. It can contain many repositories, or be a repository itself. `~` and `~/…` are accepted in the path field.
 
-With **Recursive** enabled, All Work searches nested folders, including nested repositories. With it disabled, it checks only the chosen folder and its immediate children. Repositories with a `.git` directory and worktrees with a `.git` file are recognized; bare repositories are not discovered by this check.
+**Recursive** is off by default. With it enabled, All Work searches nested folders, including nested repositories. With it disabled, it checks only the chosen folder and its immediate children. Repositories with a `.git` directory and worktrees with a `.git` file are recognized; bare repositories are not discovered by this check.
 
 Common dependency, build, and cache folders are skipped, including `node_modules`, `vendor`, `build`, `dist`, `coverage`, `.git`, `.cache`, and Python virtual environments. These directory-name exclusions are separate from each repository's ignore rules.
 
@@ -106,7 +106,7 @@ Hiding an output column through **Columns** keeps its run. The × in its header 
 
 ### Repository shortcuts
 
-Repository shortcut buttons start hidden. Choose which to show under **Preferences → Repo shortcut buttons**, or use **View → Show Repo Shortcut Buttons** to toggle all of them together. The desktop Repository context menu offers the actions even when the buttons are hidden:
+The GitHub, Finder, terminal, and refresh shortcut buttons show by default. Choose which to show under **Preferences → Repo shortcut buttons**, or use **View → Show Repo Shortcut Buttons** to toggle all of them together. The desktop Repository context menu offers the actions even when the buttons are hidden:
 
 - Open a readme in the preferred app.
 - Open in Tower or VS Code.
@@ -487,7 +487,7 @@ Current defaults contain the developer's author aliases and GitHub accounts. Rep
 
 ### Repo shortcut buttons
 
-Each checkbox controls one button in every Repository cell. All nine start disabled. Enabling a checkbox adds its button; readme, GitHub, and website actions appear disabled when their target is unavailable. The desktop context menu remains available independently of the buttons.
+Each checkbox controls one button in every Repository cell. Open in GitHub, Reveal in Finder, Open in Terminal, and Refresh Metadata start enabled; the other five start disabled. Enabling a checkbox adds its button; readme, GitHub, and website actions appear disabled when their target is unavailable. The desktop context menu remains available independently of the buttons.
 
 | Preference       | Button behavior and requirements                                                                                                                                        |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -519,7 +519,7 @@ Application lists load when Preferences opens. Reopen Preferences after installi
 | ------------------------------------ | ------------------------------------------ |
 | Author names                         | Developer author aliases.                  |
 | GitHub accounts                      | Developer account names.                   |
-| Repo shortcut buttons                | All disabled.                              |
+| Repo shortcut buttons                | GitHub, Finder, Terminal, and Refresh.     |
 | Readmes → Open with                  | System default.                            |
 | Terminal → Open with                 | System default.                            |
 | Restore the last workspace on launch | Enabled.                                   |
@@ -610,7 +610,7 @@ Use the actual run number in your table, and wait for the source run if you need
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | No repositories found                              | Confirm the path contains `.git` roots or worktrees. Enable Recursive for deeper folders. Excluded dependency/build folders and symlinked collection folders are not traversed.                                            |
 | No matching repositories, or Run in 0              | Clear the search, choose Filter → None, and disable Selected only. Then select rows. Hidden selections are not action targets.                                                                                             |
-| Missing shortcut buttons                           | Enable individual buttons in Preferences, or use View → Show Repo Shortcut Buttons. They start hidden.                                                                                                                     |
+| Missing shortcut buttons                           | Enable individual buttons in Preferences, or use View → Show Repo Shortcut Buttons.                                                                                                                                        |
 | GitHub metadata missing                            | Verify `gh auth status`, repository access, and field permissions. Reload after authentication changes; an environment token takes precedence over CLI credentials. GitHub-specific metadata may not apply to other hosts. |
 | Metadata shows … or an old value                   | Wait for the queue, hover for status and timestamps, or force Refresh Metadata for Selected. Cached data can remain visible during a refresh.                                                                              |
 | Dependency fields show Not scanned                 | Select repositories and run Check Dependencies for Selected in the desktop app. Showing the columns or referencing variables does not perform the check.                                                                   |

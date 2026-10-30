@@ -29,6 +29,12 @@ describe('shared JSON view persistence', () => {
 		expect(parseSavedView(undefined, '/projects').columnPreset).toBe('defaults')
 	})
 
+	it('discovers repositories non-recursively unless the saved view enables it', () => {
+		expect(parseSavedView(undefined, '/projects').recursive).toBe(false)
+		expect(parseSavedView({ recursive: 'true' }, '/projects').recursive).toBe(false)
+		expect(parseSavedView({ recursive: true }, '/projects').recursive).toBe(true)
+	})
+
 	it('loads identity and view data from the server without accessing browser storage', async () => {
 		const preferences = {
 			...defaultPreferences(),

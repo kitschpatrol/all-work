@@ -204,7 +204,7 @@ async function linksToRepository(link: string): Promise<boolean> {
  */
 export async function scanWorkspace(
 	input: string,
-	recursive = true,
+	recursive = false,
 	identity?: ProjectIdentity,
 ): Promise<Workspace> {
 	const expanded =

@@ -26,7 +26,7 @@ export const initialMenuState: MenuState = {
 	loading: false,
 	selectedCount: 0,
 	selectedOnly: false,
-	showRepositoryShortcuts: false,
+	showRepositoryShortcuts: true,
 	visibleCount: 0,
 }
 

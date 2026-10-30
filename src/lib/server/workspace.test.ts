@@ -148,7 +148,7 @@ beforeAll(async () => {
 	await git(first, ['config', 'branch.worktree-test.remote', 'origin'])
 	await git(first, ['config', 'branch.worktree-test.merge', 'refs/heads/deleted'])
 	await symlink(first, path.join(temporaryDirectory, 'symlinked-repository'))
-	workspace = await scanWorkspace(temporaryDirectory)
+	workspace = await scanWorkspace(temporaryDirectory, true)
 	await vi.waitFor(
 		() => {
 			if (
@@ -229,7 +229,7 @@ describe('repository discovery and Metascope metadata', () => {
 			await symlink(path.join(elsewhere, 'missing'), path.join(root, 'broken'))
 
 			const realTarget = await realpath(target)
-			const scanned = await scanWorkspace(root)
+			const scanned = await scanWorkspace(root, true)
 			expect(scanned.warnings).toEqual([])
 			expect(
 				scanned.repositories.map(({ name, path: directory, relativePath }) => ({
@@ -349,7 +349,7 @@ describe('repository discovery and Metascope metadata', () => {
 		expect(byPath('project with spaces')).toMatchObject({ upstream: '', upstreamGone: false })
 	})
 	it('keeps repository identifiers stable when metadata is refreshed', async () => {
-		const refreshed = await scanWorkspace(temporaryDirectory)
+		const refreshed = await scanWorkspace(temporaryDirectory, true)
 		expect(refreshed.id).not.toBe(workspace.id)
 		expect(refreshed.repositories.map((repository) => repository.id)).toEqual(
 			workspace.repositories.map((repository) => repository.id),
@@ -359,7 +359,7 @@ describe('repository discovery and Metascope metadata', () => {
 	})
 
 	it('scans again with cached names and branches already applied', async () => {
-		const refreshed = await scanWorkspace(temporaryDirectory)
+		const refreshed = await scanWorkspace(temporaryDirectory, true)
 		try {
 			expect(
 				refreshed.repositories.find(

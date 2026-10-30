@@ -29,19 +29,29 @@ describe('saved project identity', () => {
 		})
 	})
 
-	it('hides repository shortcuts unless individually enabled and ignores invalid values', () => {
-		expect(defaultPreferences().repositoryShortcuts).toEqual(createRepositoryShortcuts())
-		expect(parsePreferences({}).repositoryShortcuts).toEqual(createRepositoryShortcuts())
+	it('shows refresh, terminal, Finder, and GitHub shortcuts unless saved otherwise', () => {
+		const defaults = {
+			...createRepositoryShortcuts(),
+			finder: true,
+			github: true,
+			refresh: true,
+			terminal: true,
+		}
+		expect(defaultPreferences().repositoryShortcuts).toEqual(defaults)
+		expect(parsePreferences({}).repositoryShortcuts).toEqual(defaults)
 		expect(parsePreferences({ repositoryShortcuts: 'broken' }).repositoryShortcuts).toEqual(
-			createRepositoryShortcuts(),
+			defaults,
 		)
 		const preferences = parsePreferences({
-			repositoryShortcuts: { copyPath: true, readme: false, terminal: 'true', unknown: true },
+			repositoryShortcuts: {
+				copyPath: true,
+				finder: false,
+				readme: 'true',
+				terminal: 'false',
+				unknown: true,
+			},
 		})
-		expect(preferences.repositoryShortcuts).toEqual({
-			...createRepositoryShortcuts(),
-			copyPath: true,
-		})
+		expect(preferences.repositoryShortcuts).toEqual({ ...defaults, copyPath: true, finder: false })
 	})
 
 	it('keeps a saved readme app only when it is a bundle identifier', () => {

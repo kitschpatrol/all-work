@@ -84,7 +84,7 @@
 
 	const { data }: PageProps = $props()
 	let directory = $state('')
-	let recursive = $state(true)
+	let recursive = $state(false)
 	let workspace: undefined | Workspace = $state()
 	let loading = $state(false)
 	let starting = $state(false)
@@ -441,7 +441,7 @@
 		savedView = undefined
 		pendingScroll = undefined
 		directory = workspace?.directory ?? data.defaultDirectory
-		recursive = true
+		recursive = false
 		autoClear = false
 		columnOrder = []
 		command = ''
