@@ -1768,13 +1768,16 @@ tr.selected
 	padding: 32px 12px;
 	color: var(--text-tertiary);
 	text-align: center;
+	text-shadow:
+		0 1px 0 #ffffffb3,
+		0 -1px 0 #0000000a;
 }
 
 .empty-state h3 {
 	margin: 0 0 4px;
 	font-size: 13px;
 	font-weight: 600;
-	color: #3a3e44;
+	color: #62676e;
 }
 
 .empty-state p {
