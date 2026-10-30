@@ -1,8 +1,10 @@
 # All Work
 
-<!-- badges -->
+<!-- badges({ githubRelease: true }) -->
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
+[![CI](https://github.com/kitschpatrol/all-work/actions/workflows/ci.yml/badge.svg)](https://github.com/kitschpatrol/all-work/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/kitschpatrol/all-work?label=Release)](https://github.com/kitschpatrol/all-work/releases/latest)
 
 <!-- /badges -->
 

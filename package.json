@@ -4,7 +4,15 @@
 	"private": true,
 	"description": "A parallel command line for all your Git repositories.",
 	"keywords": [
-		"github"
+		"automation",
+		"dashboard",
+		"git",
+		"github",
+		"metadata",
+		"repository",
+		"software-analytics",
+		"task-runner",
+		"homebrew-formula"
 	],
 	"homepage": "https://github.com/kitschpatrol/all-work",
 	"bugs": "https://github.com/kitschpatrol/all-work/issues",
@@ -71,7 +79,6 @@
 	},
 	"packageManager": "pnpm@12.16.1",
 	"engines": {
-		"node": "^24.16.0 || >=26.3.0",
-		"pnpm": ">=10.0.0"
+		"node": "^24.16.0 || >=26.3.0"
 	}
 }
