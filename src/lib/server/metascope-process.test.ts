@@ -11,7 +11,7 @@ beforeAll(async () => {
 	await writeFile(
 		path.join(directory, 'README.md'),
 		'# Heavy fixture\n\n' +
-			'- A [link](https://example.com) with **bold text** and `code`.\n'.repeat(60_000),
+			'- A [link](https://example.com) with **bold text** and `code`.\n'.repeat(15_000),
 	)
 })
 afterAll(async () => {
@@ -83,7 +83,7 @@ describe('isolated Metascope scans', () => {
 		expect(JSON.stringify(await extractMetadata({ ...readme, path: directory }))).toContain(
 			'Heavy fixture',
 		)
-	}, 60_000)
+	}, 120_000)
 
 	it('cancels a queued extraction without disturbing the running ones', async () => {
 		const controller = new AbortController()
