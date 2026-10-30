@@ -12,6 +12,7 @@ export default cspellConfig({
 		'mitchellh',
 		'NSURL',
 		'pycache',
+		'slopforest',
 		'togglefullscreen',
 		'wezterm',
 		'ZDOTDIR',

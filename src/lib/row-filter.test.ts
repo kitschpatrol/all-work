@@ -30,7 +30,7 @@ const ready: MetadataState = { status: 'ready' }
 const now = new Date(2026, 9, 16, 12).getTime()
 const identity: ProjectIdentity = {
 	authorNames: ['Eric Mika', 'kitschpatrol'],
-	githubAccounts: ['KitschPatrol', 'scalarstudio'],
+	githubAccounts: ['KitschPatrol', 'slopforest'],
 }
 
 const loadedGroups: Partial<Record<MetadataGroup, MetadataState>> = {
@@ -141,7 +141,7 @@ describe('compiling filters', () => {
 	it('matches repository owners against your GitHub accounts without regard to case', () => {
 		const rows = [
 			repository('mine', { repoOwner: 'kitschpatrol' }),
-			repository('studio', { repoOwner: 'ScalarStudio' }),
+			repository('studio', { repoOwner: 'SlopForest' }),
 			repository('theirs', { repoOwner: 'someone' }),
 			repository('local'),
 		]

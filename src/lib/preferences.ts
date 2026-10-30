@@ -76,8 +76,8 @@ export function defaultPreferences(): Preferences {
 		columnPresets: [],
 		filterPresets: [],
 		identity: {
-			authorNames: ['Eric Mika', 'kitschpatrol', 'scalarstudio'],
-			githubAccounts: ['kitschpatrol', 'scalarstudio'],
+			authorNames: [],
+			githubAccounts: [],
 		},
 		readmeApp: '',
 		repositoryShortcuts: createRepositoryShortcuts(),
