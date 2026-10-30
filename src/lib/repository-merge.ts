@@ -1,4 +1,10 @@
-import type { MetadataGroups, MetadataState, MetadataValue, Repository } from './workspace.js'
+import type {
+	MetadataEvent,
+	MetadataGroups,
+	MetadataState,
+	MetadataValue,
+	Repository,
+} from './workspace.js'
 
 function sameValue(a: MetadataValue, b: MetadataValue) {
 	return Array.isArray(a) && Array.isArray(b)
@@ -71,4 +77,40 @@ export function mergeRepository(target: Repository, update: Repository): void {
 	if (target.metadata !== undefined && target.metadata !== metadata) {
 		mergeRecord<MetadataValue>(target.metadata.values, metadata.values, sameValue)
 	}
+}
+
+/**
+ * Apply a streamed metadata event to the rows the page shows. A snapshot
+ * replaces them. Otherwise repositories deleted from disk are dropped, and
+ * changed rows and loading states merge in place.
+ *
+ * @returns The rows to show: the same array unless the event added or removed
+ *   any.
+ */
+export function applyMetadataEvent(repositories: Repository[], event: MetadataEvent): Repository[] {
+	if (event.snapshot) {
+		return event.repositories
+	}
+
+	const removed = new Set(event.removed)
+	const remaining =
+		removed.size === 0
+			? repositories
+			: repositories.filter((repository) => !removed.has(repository.id))
+	const rows = new Map(remaining.map((repository) => [repository.id, repository]))
+	for (const update of event.repositories) {
+		const row = rows.get(update.id)
+		if (row !== undefined) {
+			mergeRepository(row, update)
+		}
+	}
+
+	for (const { groups, id } of event.statuses) {
+		const row = rows.get(id)
+		if (row !== undefined) {
+			mergeGroups(row, groups)
+		}
+	}
+
+	return remaining
 }

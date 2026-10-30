@@ -353,6 +353,23 @@ async function detectReadme(repository: Repository) {
 	}
 }
 
+/**
+ * Whether a repository's folder, or its `.git` entry, is gone from disk. Other
+ * errors are left for the scan to report.
+ */
+async function isDeleted(repository: Repository) {
+	try {
+		await access(path.join(repository.path, '.git'))
+		return false
+	} catch (error) {
+		return (
+			error instanceof Error &&
+			'code' in error &&
+			(error.code === 'ENOENT' || error.code === 'ENOTDIR')
+		)
+	}
+}
+
 async function applyGitSupplement(
 	repository: Repository,
 	available: boolean,
@@ -425,6 +442,19 @@ export function startWorkspaceMetadata(
 	const controller = new AbortController()
 	// Looked up once, when the first network source needs it
 	let githubToken: Promise<string | undefined> | undefined
+
+	// A repository deleted from disk leaves the workspace, as it would on a rescan
+	function remove(repository: Repository) {
+		if (disposed) {
+			return
+		}
+
+		workspace.repositories = workspace.repositories.filter((entry) => entry !== repository)
+		const remaining = queue.filter((job) => job.repository !== repository)
+		queue.splice(0, queue.length, ...remaining)
+		contexts.delete(repository.id)
+		notify(repository, 'removed')
+	}
 
 	async function extract({ group, repository }: Job) {
 		const { metadata } = repository
@@ -536,7 +566,11 @@ export function startWorkspaceMetadata(
 
 	async function runJob(job: Job) {
 		try {
-			await extract(job)
+			if (await isDeleted(job.repository)) {
+				remove(job.repository)
+			} else {
+				await extract(job)
+			}
 		} finally {
 			active--
 			busy.delete(job.repository.id)

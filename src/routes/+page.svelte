@@ -65,7 +65,7 @@
 	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
 	import { createRepositoryShortcuts, defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
-	import { mergeGroups, mergeRepository } from '#lib/repository-merge.js'
+	import { applyMetadataEvent } from '#lib/repository-merge.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
 	import { emptyFilter } from '#lib/row-filter.js'
 	import { createRowSelection } from '#lib/row-selection.js'
@@ -548,6 +548,12 @@
 		eventStream = undefined
 	}
 
+	// Deselect rows that are no longer listed
+	function pruneSelection(repositories: Repository[]) {
+		const ids = new Set(repositories.map((repository) => repository.id))
+		rowSelection = Object.fromEntries(Object.entries(rowSelection).filter(([id]) => ids.has(id)))
+	}
+
 	async function loadDirectory(restored?: SavedView) {
 		if (loading || activeRuns.length > 0) {
 			return
@@ -575,17 +581,11 @@
 				runs = runHistory.restore(restoredRuns, restored.clearedRunIds, restored.nextRunNumber)
 				applySavedView(restored)
 				rowFilter.prune()
-				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
-				rowSelection = Object.fromEntries(
-					Object.entries(rowSelection).filter(([id]) => repositoryIds.has(id)),
-				)
+				pruneSelection(next.repositories)
 				clearPreviousOutputs()
 				watchRuns()
 			} else if (next.directory === workspace?.directory) {
-				const repositoryIds = new Set(next.repositories.map((repository) => repository.id))
-				rowSelection = Object.fromEntries(
-					Object.entries(rowSelection).filter(([id]) => repositoryIds.has(id)),
-				)
+				pruneSelection(next.repositories)
 			} else {
 				await Promise.all(runs.map(async (run) => request(`/api/runs/${run.id}`, {}, 'DELETE')))
 				closeStreams()
@@ -636,30 +636,15 @@
 					return
 				}
 
-				if (event.snapshot) {
-					workspace.repositories = event.repositories
-				} else {
-					const rows = new Map(
-						workspace.repositories.map((repository) => [repository.id, repository]),
-					)
-					for (const update of event.repositories) {
-						const row = rows.get(update.id)
-						if (row !== undefined) {
-							mergeRepository(row, update)
-						}
-					}
+				const repositories = applyMetadataEvent(workspace.repositories, event)
+				if (repositories !== workspace.repositories) {
+					workspace.repositories = repositories
+					pruneSelection(repositories)
+				}
 
-					for (const { groups, id } of event.statuses) {
-						const row = rows.get(id)
-						if (row !== undefined) {
-							mergeGroups(row, groups)
-						}
-					}
-
-					// Loading states alone change no values the filter or sort read
-					if (event.repositories.length > 0) {
-						tableRows.changed()
-					}
+				// Loading states alone change no values the filter or sort read
+				if (!event.snapshot && event.repositories.length > 0) {
+					tableRows.changed()
 				}
 
 				scheduleMetadata()

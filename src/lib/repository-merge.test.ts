@@ -1,7 +1,7 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import { describe, expect, it } from 'vitest'
 import type { Repository } from './workspace.js'
-import { mergeGroups, mergeRepository } from './repository-merge.js'
+import { applyMetadataEvent, mergeGroups, mergeRepository } from './repository-merge.js'
 
 function repository(overrides: Partial<Repository> = {}): Repository {
 	return {
@@ -99,5 +99,44 @@ describe('repository merge', () => {
 		const next = repository({ metadata: undefined })
 		mergeRepository(next, repository())
 		expect(next.metadata?.values.Version).toBe('1.0.0')
+	})
+})
+
+describe('metadata events', () => {
+	const event = { removed: [], repositories: [], snapshot: false, statuses: [] }
+
+	it('replaces every row with a snapshot', () => {
+		const rows = [repository()]
+		const snapshot = [repository({ id: 'b' })]
+		expect(applyMetadataEvent(rows, { ...event, repositories: snapshot, snapshot: true })).toBe(
+			snapshot,
+		)
+	})
+
+	it('merges changes into the same rows when none were removed', () => {
+		const rows = [repository(), repository({ id: 'b' })]
+		const [first, second] = rows
+		const result = applyMetadataEvent(rows, {
+			...event,
+			repositories: [repository({ branch: 'next' })],
+			statuses: [{ groups: { local: { status: 'loading' } }, id: 'b' }],
+		})
+		expect(result).toBe(rows)
+		expect(first?.branch).toBe('next')
+		expect(second?.metadata?.groups).toEqual({ local: { status: 'loading' } })
+	})
+
+	it('drops removed rows and ignores changes to them', () => {
+		const rows = [repository(), repository({ id: 'b' })]
+		const [first, second] = rows
+		const result = applyMetadataEvent(rows, {
+			...event,
+			removed: ['a'],
+			repositories: [repository({ branch: 'next' }), repository({ branch: 'next', id: 'b' })],
+		})
+		expect(result).toEqual([second])
+		expect(rows).toHaveLength(2)
+		expect(first?.branch).toBe('main')
+		expect(second?.branch).toBe('next')
 	})
 })

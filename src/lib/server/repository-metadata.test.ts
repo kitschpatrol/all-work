@@ -1,6 +1,6 @@
 import type { MetadataContext } from 'metascope'
 import { sourceNames } from 'metascope'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +23,12 @@ function context(data: Partial<MetadataContext> = {}): MetadataContext {
 	) as MetadataContext
 }
 
-function fixture(): Workspace {
+// Repositories deleted from disk leave the workspace, so each fixture has a folder
+async function createFolder(repository: Repository) {
+	await mkdir(path.join(repository.path, '.git'), { recursive: true })
+}
+
+async function fixture(): Promise<Workspace> {
 	const repository: Repository = {
 		ahead: 0,
 		behind: 0,
@@ -48,6 +53,7 @@ function fixture(): Workspace {
 		version: '',
 		website: '',
 	}
+	await createFolder(repository)
 	return {
 		directory: temporaryDirectory,
 		id: 'workspace',
@@ -127,7 +133,7 @@ describe('progressive Metascope metadata', () => {
 		const deferred = Promise.withResolvers<MetadataContext>()
 		vi.mocked(extractMetadata).mockReturnValueOnce(deferred.promise)
 
-		const workspace = fixture()
+		const workspace = await fixture()
 		begin(workspace)
 		expect(workspace.repositories[0]?.name).toBe('fixture')
 		expect(workspace.repositories[0]?.metadata?.groups.git).toBeUndefined()
@@ -146,7 +152,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('leaves skipped flags and update counts unknown, and retains narrow Git fallbacks', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		begin(workspace)
 		await ready(workspace)
 		const values = workspace.repositories[0]?.metadata?.values
@@ -171,7 +177,7 @@ describe('progressive Metascope metadata', () => {
 					})
 				: context()
 		})
-		const workspace = fixture()
+		const workspace = await fixture()
 		begin(workspace)
 		await ready(workspace)
 		expect(workspace.repositories[0]?.metadata?.values['Total Files']).toBe(42)
@@ -181,7 +187,7 @@ describe('progressive Metascope metadata', () => {
 		})
 		totalFiles = 84
 		const restored: number[] = []
-		const reloaded = fixture()
+		const reloaded = await fixture()
 		const next = begin(
 			reloaded,
 			vi.fn((repository: Repository) => {
@@ -204,7 +210,7 @@ describe('progressive Metascope metadata', () => {
 
 	it('reports loading states apart from changed rows', async () => {
 		const notify = vi.fn<(repository: Repository, change: MetadataChange) => void>()
-		const workspace = fixture()
+		const workspace = await fixture()
 		begin(workspace, notify)
 		await ready(workspace)
 		const changes = notify.mock.calls.map(([, change]) => change)
@@ -215,9 +221,8 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('shows cached local and Git fields while they refresh', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const repository = workspace.repositories[0]
-		await mkdir(repository?.path ?? '')
 		await writeFile(path.join(repository?.path ?? '', 'README.md'), '# Fixture\n')
 		begin(workspace)
 		await ready(workspace)
@@ -230,7 +235,7 @@ describe('progressive Metascope metadata', () => {
 		await rm(path.join(repository?.path ?? '', 'README.md'))
 		const scan = Promise.withResolvers<MetadataContext>()
 		vi.mocked(extractMetadata).mockReturnValueOnce(scan.promise)
-		const reloaded = fixture()
+		const reloaded = await fixture()
 		const restored = reloaded.repositories[0]
 		const notify = vi.fn<(repository: Repository) => void>()
 		const controller = startWorkspaceMetadata(reloaded, notify, async (target) => {
@@ -253,10 +258,9 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('rechecks the readme whenever local metadata refreshes', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const repository = workspace.repositories[0]
 		const readme = path.join(repository?.path ?? '', 'README.md')
-		await mkdir(repository?.path ?? '')
 		await writeFile(readme, '# Fixture\n')
 		const controller = begin(workspace)
 		await ready(workspace)
@@ -293,7 +297,7 @@ describe('progressive Metascope metadata', () => {
 						},
 			)
 		})
-		const workspace = fixture()
+		const workspace = await fixture()
 		const controller = begin(workspace)
 		await ready(workspace)
 		expect(workspace.repositories[0]?.website).toBe('')
@@ -304,7 +308,7 @@ describe('progressive Metascope metadata', () => {
 		expect(workspace.repositories[0]?.website).toBe('https://website.example/')
 		expect(await cached('fields', 'website')).toContain('https://website.example/')
 
-		const reloaded = fixture()
+		const reloaded = await fixture()
 		const next = begin(reloaded)
 		await ready(reloaded)
 		expect(reloaded.repositories[0]?.website).toBe('https://website.example/')
@@ -317,7 +321,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('loads real zero update counts only after an explicit dependency check', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const controller = begin(workspace)
 		await ready(workspace)
 		expect(workspace.repositories[0]?.metadata?.values['Total Updates']).toBeUndefined()
@@ -345,7 +349,7 @@ describe('progressive Metascope metadata', () => {
 	it('looks up the GitHub token once, for network sources only', async () => {
 		vi.mocked(resolveGithubToken).mockClear()
 		vi.mocked(resolveGithubToken).mockResolvedValue('resolved-token')
-		const workspace = fixture()
+		const workspace = await fixture()
 		const controller = begin(workspace)
 		await ready(workspace)
 		expect(resolveGithubToken).not.toHaveBeenCalled()
@@ -369,7 +373,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('keeps known false flags and zero counts when a later remote response has no source data', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const controller = begin(workspace)
 		await ready(workspace)
 		vi.mocked(extractMetadata).mockResolvedValueOnce(
@@ -414,7 +418,7 @@ describe('progressive Metascope metadata', () => {
 					},
 				}),
 			)
-		const reloaded = fixture()
+		const reloaded = await fixture()
 		begin(reloaded)
 		await ready(reloaded)
 		expect(reloaded.repositories[0]?.metadata?.values['Latest Release Version']).toBe('2.0.0')
@@ -437,7 +441,7 @@ describe('progressive Metascope metadata', () => {
 				},
 			}),
 		)
-		const workspace = fixture()
+		const workspace = await fixture()
 		workspace.identity = { authorNames: ['Someone Else'], githubAccounts: ['other'] }
 		const controller = begin(workspace)
 		await ready(workspace)
@@ -450,7 +454,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('keeps cached classifications and remote metadata separate for different identities', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		workspace.identity = { authorNames: ['First'], githubAccounts: ['first'] }
 		const controller = begin(workspace)
 		await ready(workspace)
@@ -462,7 +466,7 @@ describe('progressive Metascope metadata', () => {
 		controller.request(['fixture'], ['github'], true)
 		await vi.waitFor(() => expect(workspace.repositories[0]?.metadata?.values.Stars).toBe(7))
 		await vi.waitFor(async () => expect(await cached('values', 'Stars')).toContain(7))
-		const reloaded = fixture()
+		const reloaded = await fixture()
 		reloaded.identity = { authorNames: ['Second'], githubAccounts: ['second'] }
 		begin(reloaded)
 		await ready(reloaded)
@@ -470,7 +474,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('limits work to four repositories and coalesces duplicate source requests', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const original = workspace.repositories[0]
 		if (original === undefined) {
 			throw new Error('Missing fixture')
@@ -482,6 +486,7 @@ describe('progressive Metascope metadata', () => {
 			metadata: { groups: {}, values: {} },
 			path: `${original.path}-${index}`,
 		}))
+		await Promise.all(workspace.repositories.map(async (repository) => createFolder(repository)))
 		const controller = begin(workspace)
 		await ready(workspace)
 		const baseline = vi.mocked(extractMetadata).mock.calls.length
@@ -513,7 +518,7 @@ describe('progressive Metascope metadata', () => {
 	})
 
 	it('runs background requests after prioritized ones and promotes rows that come into view', async () => {
-		const workspace = fixture()
+		const workspace = await fixture()
 		const original = workspace.repositories[0]
 		if (original === undefined) {
 			throw new Error('Missing fixture')
@@ -525,6 +530,7 @@ describe('progressive Metascope metadata', () => {
 			metadata: { groups: {}, values: {} },
 			path: `${original.path}-${index}`,
 		}))
+		await Promise.all(workspace.repositories.map(async (repository) => createFolder(repository)))
 		const controller = begin(workspace)
 		await ready(workspace)
 		const baseline = vi.mocked(extractMetadata).mock.calls.length
@@ -554,9 +560,74 @@ describe('progressive Metascope metadata', () => {
 			.mocked(extractMetadata)
 			.mock.calls.slice(baseline)
 			.map(([options]) => options.path?.slice(original.path.length + 1))
-		expect(order).toEqual(['0', '1', '2', '3', '8', '9', '10', '11', '7', '4', '5', '6'])
+		// The first four start together, so their scans may begin in any order
+		expect(new Set(order.slice(0, 4))).toEqual(new Set(['0', '1', '2', '3']))
+		expect(order.slice(4)).toEqual(['8', '9', '10', '11', '7', '4', '5', '6'])
 		for (const resolve of pending.splice(0)) {
 			resolve()
 		}
+	})
+
+	it('removes a repository deleted from disk before scanning it, along with its queued work', async () => {
+		const notify = vi.fn<(repository: Repository, change: MetadataChange) => void>()
+		const workspace = await fixture()
+		const original = workspace.repositories[0]
+		if (original === undefined) {
+			throw new Error('Missing fixture')
+		}
+
+		workspace.repositories = ['kept', 'deleted'].map((id) => ({
+			...original,
+			id,
+			metadata: { groups: {}, values: {} },
+			path: path.join(temporaryDirectory, id),
+		}))
+		await Promise.all(workspace.repositories.map(async (repository) => createFolder(repository)))
+		const [kept, deleted] = workspace.repositories
+		const controller = begin(workspace, notify)
+		await ready(workspace)
+		const baseline = vi.mocked(extractMetadata).mock.calls.length
+
+		await rm(path.join(temporaryDirectory, 'deleted'), { force: true, recursive: true })
+		controller.request(['deleted'], ['github', 'ci'], true)
+		await vi.waitFor(() => expect(notify).toHaveBeenCalledWith(deleted, 'removed'))
+		expect(workspace.repositories).toEqual([kept])
+		expect(extractMetadata).toHaveBeenCalledTimes(baseline)
+
+		controller.request(['deleted', 'kept'], ['github'], true)
+		await vi.waitFor(() => expect(kept?.metadata?.groups.github?.status).toBe('unavailable'))
+		expect(extractMetadata).toHaveBeenCalledTimes(baseline + 1)
+		expect(notify.mock.calls.filter(([, change]) => change === 'removed')).toHaveLength(1)
+	})
+
+	it('removes a repository whose Git folder was deleted', async () => {
+		const notify = vi.fn<(repository: Repository, change: MetadataChange) => void>()
+		const workspace = await fixture()
+		const controller = begin(workspace, notify)
+		await ready(workspace)
+		const repository = workspace.repositories[0]
+		await rm(path.join(repository?.path ?? '', '.git'), { force: true, recursive: true })
+		controller.request(['fixture'], ['local'], true)
+		await vi.waitFor(() => expect(notify).toHaveBeenCalledWith(repository, 'removed'))
+		expect(workspace.repositories).toEqual([])
+	})
+
+	it('keeps a repository it cannot read, and reports the scan error', async () => {
+		const notify = vi.fn<(repository: Repository, change: MetadataChange) => void>()
+		const workspace = await fixture()
+		const controller = begin(workspace, notify)
+		await ready(workspace)
+		const repository = workspace.repositories[0]
+		vi.mocked(extractMetadata).mockRejectedValueOnce(new Error('Permission denied'))
+		await chmod(repository?.path ?? '', 0o000)
+		try {
+			controller.request(['fixture'], ['local'], true)
+			await vi.waitFor(() => expect(repository?.metadata?.groups.local?.status).toBe('error'))
+		} finally {
+			await chmod(repository?.path ?? '', 0o700)
+		}
+
+		expect(workspace.repositories).toEqual([repository])
+		expect(notify).not.toHaveBeenCalledWith(repository, 'removed')
 	})
 })

@@ -16,6 +16,7 @@ export const GET: RequestHandler = ({ request, url }) => {
 	const encoder = new TextEncoder()
 	const rows = new Map<string, Repository>()
 	const statuses = new Map<string, Repository>()
+	const removed = new Set<string>()
 	let batchTimer: ReturnType<typeof setTimeout> | undefined
 	function cleanup() {
 		closed = true
@@ -24,6 +25,7 @@ export const GET: RequestHandler = ({ request, url }) => {
 		clearTimeout(batchTimer)
 		rows.clear()
 		statuses.clear()
+		removed.clear()
 		request.signal.removeEventListener('abort', cleanup)
 	}
 
@@ -40,7 +42,11 @@ export const GET: RequestHandler = ({ request, url }) => {
 					return
 				}
 
-				if (change === 'row') {
+				if (change === 'removed') {
+					rows.delete(repository.id)
+					statuses.delete(repository.id)
+					removed.add(repository.id)
+				} else if (change === 'row') {
 					rows.set(repository.id, repository)
 				} else {
 					statuses.set(repository.id, repository)
@@ -49,6 +55,7 @@ export const GET: RequestHandler = ({ request, url }) => {
 				batchTimer ??= setTimeout(() => {
 					batchTimer = undefined
 					send(controller, {
+						removed: removed.values().toArray(),
 						repositories: rows.values().toArray(),
 						snapshot: false,
 						statuses: statuses
@@ -59,9 +66,15 @@ export const GET: RequestHandler = ({ request, url }) => {
 					})
 					rows.clear()
 					statuses.clear()
+					removed.clear()
 				}, 120)
 			})
-			send(controller, { repositories: workspace.repositories, snapshot: true, statuses: [] })
+			send(controller, {
+				removed: [],
+				repositories: workspace.repositories,
+				snapshot: true,
+				statuses: [],
+			})
 			heartbeat = setInterval(() => {
 				controller.enqueue(encoder.encode(': heartbeat\n\n'))
 			}, 15_000)

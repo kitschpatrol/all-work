@@ -50,14 +50,19 @@ export type Repository = {
 /** Loading states for each metadata group. */
 export type MetadataGroups = Partial<Record<MetadataGroup, MetadataState>>
 
-/** Whether a repository's row data changed, or only its metadata loading states. */
-export type MetadataChange = 'row' | 'status'
+/**
+ * Whether a repository's row data changed, only its metadata loading states, or
+ * the repository was deleted from disk.
+ */
+export type MetadataChange = 'removed' | 'row' | 'status'
 
 /**
- * Repository changes streamed to the page: whole rows that changed, and the
- * loading states of rows whose data did not.
+ * Repository changes streamed to the page: whole rows that changed, the loading
+ * states of rows whose data did not, and IDs of repositories deleted from
+ * disk.
  */
 export type MetadataEvent = {
+	removed: string[]
 	repositories: Repository[]
 	snapshot: boolean
 	statuses: Array<{ groups: MetadataGroups; id: string }>
