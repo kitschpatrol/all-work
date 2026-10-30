@@ -63,7 +63,7 @@
 	import MetadataProgress from '#lib/MetadataProgress.svelte'
 	import NumberField from '#lib/NumberField.svelte'
 	import { savePreferenceChanges, updatePreferences } from '#lib/preference-actions.js'
-	import { defaultPreferences } from '#lib/preferences.js'
+	import { createRepositoryShortcuts, defaultPreferences } from '#lib/preferences.js'
 	import { openRepositories } from '#lib/repository-links.js'
 	import { mergeGroups, mergeRepository } from '#lib/repository-merge.js'
 	import { createRowFilter } from '#lib/row-filter-state.svelte.js'
@@ -709,7 +709,7 @@
 		const orderedIds = [...new Set([...visibleRepositories.map((row) => row.id), ...allIds])]
 		const groups = new Set([
 			...filterGroups,
-			...(preferences.showRepositoryShortcuts ? (['github'] as const) : []),
+			...(preferences.repositoryShortcuts.website ? (['github'] as const) : []),
 			...table
 				.getVisibleLeafColumns()
 				.map((column) => repositoryColumns.find((entry) => entry.id === column.id)?.group)
@@ -1088,7 +1088,12 @@
 		},
 		'view.toggleRepositoryShortcuts'() {
 			void applyPreferences(
-				{ ...preferences, showRepositoryShortcuts: !preferences.showRepositoryShortcuts },
+				{
+					...preferences,
+					repositoryShortcuts: createRepositoryShortcuts(
+						!Object.values(preferences.repositoryShortcuts).some(Boolean),
+					),
+				},
 				true,
 			)
 		},
@@ -1136,7 +1141,7 @@
 		loading,
 		selectedCount: targets.length,
 		selectedOnly,
-		showRepositoryShortcuts: preferences.showRepositoryShortcuts,
+		showRepositoryShortcuts: Object.values(preferences.repositoryShortcuts).some(Boolean),
 		visibleCount: visibleRepositories.length,
 	}}
 />
@@ -1453,7 +1458,7 @@
 												{outputLines}
 												{repository}
 												{runs}
-												showShortcuts={preferences.showRepositoryShortcuts}
+												shortcuts={preferences.repositoryShortcuts}
 											/>{/if}
 									</td>{#if cell.column.id === fillerAfterColumnId}<td
 											class="table-filler"

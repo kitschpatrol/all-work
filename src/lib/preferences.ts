@@ -11,6 +11,21 @@ export type ProjectIdentity = {
 	githubAccounts: string[]
 }
 
+/** Shortcut choices in the order they appear in a repository cell. */
+export const repositoryShortcutOptions = [
+	{ id: 'readme', label: 'Open Readme' },
+	{ id: 'tower', label: 'Open in Tower' },
+	{ id: 'vscode', label: 'Open in VS Code' },
+	{ id: 'github', label: 'Open in GitHub' },
+	{ id: 'website', label: 'Open Website' },
+	{ id: 'finder', label: 'Reveal in Finder' },
+	{ id: 'copyPath', label: 'Copy Path' },
+	{ id: 'terminal', label: 'Open in Terminal' },
+	{ id: 'refresh', label: 'Refresh Metadata' },
+] as const
+
+export type RepositoryShortcuts = Record<(typeof repositoryShortcutOptions)[number]['id'], boolean>
+
 export type Preferences = {
 	columnPresets: ColumnPreset[]
 	filterPresets: FilterPreset[]
@@ -20,14 +35,21 @@ export type Preferences = {
 	 * default.
 	 */
 	readmeApp: string
+	repositoryShortcuts: RepositoryShortcuts
 	restoreWorkspace: boolean
-	showRepositoryShortcuts: boolean
 	/**
 	 * Bundle identifier of the app that opens repositories in a terminal, or
 	 * empty for the system default.
 	 */
 	terminalApp: string
 	version: 1
+}
+
+/** Create a fresh set of shortcut choices with every button on or off. */
+export function createRepositoryShortcuts(enabled = false): RepositoryShortcuts {
+	return Object.fromEntries(
+		repositoryShortcutOptions.map(({ id }) => [id, enabled]),
+	) as RepositoryShortcuts
 }
 
 /** An installed application, by bundle identifier and the name Finder shows. */
@@ -58,8 +80,8 @@ export function defaultPreferences(): Preferences {
 			githubAccounts: ['kitschpatrol', 'scalarstudio'],
 		},
 		readmeApp: '',
+		repositoryShortcuts: createRepositoryShortcuts(),
 		restoreWorkspace: true,
-		showRepositoryShortcuts: false,
 		terminalApp: '',
 		version: 1,
 	}
@@ -106,13 +128,22 @@ export function parseIdentityNames(value: string) {
 export function parsePreferences(value: unknown): Preferences {
 	const record = asRecord(value)
 	const defaults = defaultPreferences()
+	const repositoryShortcuts = { ...defaults.repositoryShortcuts }
+	const savedShortcuts = asRecord(record?.repositoryShortcuts)
+	for (const { id } of repositoryShortcutOptions) {
+		const enabled = savedShortcuts?.[id]
+		if (typeof enabled === 'boolean') {
+			repositoryShortcuts[id] = enabled
+		}
+	}
+
 	return {
 		columnPresets: parseColumnPresets(record?.columnPresets),
 		filterPresets: parseFilterPresets(record?.filterPresets),
 		identity: parseIdentity(record?.identity) ?? defaults.identity,
 		readmeApp: isBundleId(record?.readmeApp) ? record.readmeApp : defaults.readmeApp,
+		repositoryShortcuts,
 		restoreWorkspace: record?.restoreWorkspace !== false,
-		showRepositoryShortcuts: record?.showRepositoryShortcuts === true,
 		terminalApp: isBundleId(record?.terminalApp) ? record.terminalApp : defaults.terminalApp,
 		version: 1,
 	}

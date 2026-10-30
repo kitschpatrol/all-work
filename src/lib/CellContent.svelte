@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { RepositoryShortcuts } from './preferences.js'
 	import type { NativeOpenTarget } from './repository-links.js'
 	import type { CommandRun, Repository } from './workspace.js'
 	import {
@@ -18,7 +19,7 @@
 		outputLines,
 		repository,
 		runs,
-		showShortcuts,
+		shortcuts,
 	}: {
 		columnId: string
 		onInspect: (run: CommandRun, repository: Repository) => void
@@ -27,19 +28,14 @@
 		outputLines: number
 		repository: Repository
 		runs: CommandRun[]
-		showShortcuts: boolean
+		shortcuts: RepositoryShortcuts
 	} = $props()
 	const run = $derived(runs.find((item) => item.id === columnId))
 	const result = $derived(run?.results[repository.id])
 	const display = $derived(getColumnDisplay(columnId))
 </script>
 
-{#if columnId === 'relativePath'}<RepositoryCell
-		{onOpen}
-		{onRefresh}
-		{repository}
-		{showShortcuts}
-	/>
+{#if columnId === 'relativePath'}<RepositoryCell {onOpen} {onRefresh} {repository} {shortcuts} />
 {:else if columnId === 'name'}<span class="project-name">{repository.name}</span>
 {:else if columnId === 'branch'}<span class="branch"
 		>⑂ {repository.branch === ''

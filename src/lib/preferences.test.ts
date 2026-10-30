@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getPresetFilter } from './filter-presets.js'
 import {
+	createRepositoryShortcuts,
 	defaultPreferences,
 	parseIdentity,
 	parseIdentityNames,
@@ -16,21 +17,31 @@ describe('saved project identity', () => {
 		expect(defaultPreferences().filterPresets).toEqual([])
 		expect(defaultPreferences().columnPresets).toEqual([])
 		expect(
-			parsePreferences({ columnPresets, filterPresets, showRepositoryShortcuts: true }),
+			parsePreferences({
+				columnPresets,
+				filterPresets,
+				repositoryShortcuts: createRepositoryShortcuts(true),
+			}),
 		).toMatchObject({
 			columnPresets,
 			filterPresets,
-			showRepositoryShortcuts: true,
+			repositoryShortcuts: createRepositoryShortcuts(true),
 		})
 	})
 
-	it('hides repository shortcuts unless they were explicitly enabled', () => {
-		expect(defaultPreferences().showRepositoryShortcuts).toBe(false)
-		expect(parsePreferences({}).showRepositoryShortcuts).toBe(false)
-		expect(parsePreferences({ showRepositoryShortcuts: 'true' }).showRepositoryShortcuts).toBe(
-			false,
+	it('hides repository shortcuts unless individually enabled and ignores invalid values', () => {
+		expect(defaultPreferences().repositoryShortcuts).toEqual(createRepositoryShortcuts())
+		expect(parsePreferences({}).repositoryShortcuts).toEqual(createRepositoryShortcuts())
+		expect(parsePreferences({ repositoryShortcuts: 'broken' }).repositoryShortcuts).toEqual(
+			createRepositoryShortcuts(),
 		)
-		expect(parsePreferences({ showRepositoryShortcuts: true }).showRepositoryShortcuts).toBe(true)
+		const preferences = parsePreferences({
+			repositoryShortcuts: { copyPath: true, readme: false, terminal: 'true', unknown: true },
+		})
+		expect(preferences.repositoryShortcuts).toEqual({
+			...createRepositoryShortcuts(),
+			copyPath: true,
+		})
 	})
 
 	it('keeps a saved readme app only when it is a bundle identifier', () => {

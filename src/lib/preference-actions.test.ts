@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getPresetFilter } from './filter-presets.js'
 import { savePreferenceChanges, updatePreferences } from './preference-actions.js'
-import { defaultPreferences } from './preferences.js'
+import { createRepositoryShortcuts, defaultPreferences } from './preferences.js'
 import { savePreferences } from './view-storage.js'
 import { postWindowMessage } from './window-messages.js'
 
@@ -14,7 +14,10 @@ vi.mock('./window-messages.js', () => ({
 
 describe('preference actions', () => {
 	it('persists preset edits while retaining other settings and broadcasting plain data', async () => {
-		const previous = { ...defaultPreferences(), showRepositoryShortcuts: true }
+		const previous = {
+			...defaultPreferences(),
+			repositoryShortcuts: { ...createRepositoryShortcuts(), copyPath: true, website: true },
+		}
 		const next = await savePreferenceChanges(previous, {
 			columnPresets: [{ columns: new Proxy(['name'], {}), id: 'custom:fixture', label: 'Fixture' }],
 			filterPresets: [
@@ -25,7 +28,7 @@ describe('preference actions', () => {
 			{ columns: ['name'], id: 'custom:fixture', label: 'Fixture' },
 		])
 		expect(next.filterPresets).toHaveLength(1)
-		expect(next.showRepositoryShortcuts).toBe(true)
+		expect(next.repositoryShortcuts).toEqual(previous.repositoryShortcuts)
 		expect(next.identity).toEqual(previous.identity)
 		expect(savePreferences).toHaveBeenCalledWith(next)
 		expect(postWindowMessage).toHaveBeenCalledWith({
@@ -40,13 +43,13 @@ describe('preference actions', () => {
 		const next = {
 			...previous,
 			identity: new Proxy(previous.identity, {}),
-			showRepositoryShortcuts: true,
+			repositoryShortcuts: createRepositoryShortcuts(true),
 		}
 		expect(() => structuredClone(next)).toThrow()
 		await updatePreferences(previous, next, undefined, true)
 		expect(savePreferences).toHaveBeenCalledWith(next)
 		expect(postWindowMessage).toHaveBeenCalledWith({
-			preferences: { ...previous, showRepositoryShortcuts: true },
+			preferences: { ...previous, repositoryShortcuts: createRepositoryShortcuts(true) },
 			type: 'preferences-changed',
 		})
 	})

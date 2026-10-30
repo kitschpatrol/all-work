@@ -2,7 +2,13 @@
 	import { onMount } from 'svelte'
 	import type { AppChoices, Preferences } from './preferences.js'
 	import { request } from './client-request.js'
-	import { defaultPreferences, parseIdentity, parseIdentityNames } from './preferences.js'
+	import {
+		createRepositoryShortcuts,
+		defaultPreferences,
+		parseIdentity,
+		parseIdentityNames,
+		repositoryShortcutOptions,
+	} from './preferences.js'
 	import { loadSettings, savePreferences } from './view-storage.js'
 	import { listenForWindowMessages } from './window-messages.js'
 
@@ -26,7 +32,7 @@
 	let readmeApp = $state('')
 	let readmeApps: AppChoices = $state({ apps: [], defaultName: '' })
 	let restoreWorkspace = $state(true)
-	let showRepositoryShortcuts = $state(false)
+	let repositoryShortcuts = $state(createRepositoryShortcuts())
 	let terminalApp = $state('')
 	let terminalApps: AppChoices = $state({ apps: [], defaultName: '' })
 	let busy = $state(true)
@@ -48,7 +54,7 @@
 		githubAccounts = preferences.identity.githubAccounts.join('\n')
 		readmeApp = preferences.readmeApp
 		restoreWorkspace = preferences.restoreWorkspace
-		showRepositoryShortcuts = preferences.showRepositoryShortcuts
+		repositoryShortcuts = { ...preferences.repositoryShortcuts }
 		terminalApp = preferences.terminalApp
 	}
 
@@ -59,7 +65,7 @@
 			}
 
 			preferences = update.preferences
-			showRepositoryShortcuts = update.preferences.showRepositoryShortcuts
+			repositoryShortcuts = { ...update.preferences.repositoryShortcuts }
 		})
 		void (async () => {
 			try {
@@ -120,8 +126,8 @@
 			...preferences,
 			identity,
 			readmeApp,
+			repositoryShortcuts,
 			restoreWorkspace,
-			showRepositoryShortcuts,
 			terminalApp,
 			version: 1,
 		})
@@ -164,10 +170,13 @@
 			</p>
 		</fieldset>
 		<fieldset disabled={busy}>
-			<legend>Appearance</legend>
-			<label class="preference-checkbox"
-				><input type="checkbox" bind:checked={showRepositoryShortcuts} /> Show repo shortcut buttons</label
-			>
+			<legend>Repo shortcut buttons</legend>
+			{#each repositoryShortcutOptions as shortcut (shortcut.id)}
+				<label class="preference-checkbox">
+					<input type="checkbox" bind:checked={repositoryShortcuts[shortcut.id]} />
+					{shortcut.label}
+				</label>
+			{/each}
 		</fieldset>
 		<fieldset disabled={busy}>
 			<legend>Readmes</legend>
