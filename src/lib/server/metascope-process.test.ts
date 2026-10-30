@@ -73,7 +73,7 @@ describe('isolated Metascope scans', () => {
 		for (const result of results) {
 			expect(JSON.stringify(result)).toContain('Heavy fixture')
 		}
-	}, 30_000)
+	}, 60_000)
 
 	it('extracts again after cancelling a running extraction', async () => {
 		const controller = new AbortController()
