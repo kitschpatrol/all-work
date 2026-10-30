@@ -92,7 +92,13 @@ function createWindow(appUrl: URL): void {
 
 	mainWindow.on('closed', () => {
 		mainWindow = undefined
-		syncMenu(initialMenuState, () => mainWindow)
+		syncMenu(
+			initialMenuState,
+			() => mainWindow,
+			() => {
+				showAbout(appUrl)
+			},
+		)
 	})
 }
 
@@ -122,8 +128,7 @@ function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
 		fullscreenable: request.resizable,
 		height: request.height,
 		maximizable: request.resizable,
-		minHeight: 240,
-		minWidth: 360,
+		...(request.resizable && { minWidth: 360, minHeight: 240 }),
 		resizable: request.resizable,
 		title: 'All Work',
 		webPreferences,
@@ -136,6 +141,16 @@ function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
 		secondaryWindows.delete(window)
 	})
 	void window.loadURL(new URL(request.url, appUrl).href)
+}
+
+/** Open the About window, or bring it forward if it is already open. */
+function showAbout(appUrl: URL): void {
+	openSecondaryWindow(appUrl, {
+		height: 318,
+		resizable: false,
+		url: `/about?${new URLSearchParams({ version: app.getVersion() }).toString()}`,
+		width: 300,
+	})
 }
 
 /** Only the app's own page may invoke privileged IPC handlers. */
@@ -380,11 +395,23 @@ async function main(): Promise<void> {
 
 		ipcMain.on('all-work:menu-state', (event, state: unknown) => {
 			if (isTrustedSender(event, appUrl) && isMenuState(state)) {
-				syncMenu(state, () => mainWindow)
+				syncMenu(
+					state,
+					() => mainWindow,
+					() => {
+						showAbout(appUrl)
+					},
+				)
 			}
 		})
 
-		syncMenu(initialMenuState, () => mainWindow)
+		syncMenu(
+			initialMenuState,
+			() => mainWindow,
+			() => {
+				showAbout(appUrl)
+			},
+		)
 
 		if (app.isPackaged) {
 			log.info(`Logging to ${getJsonFileTransportDestinations().join(', ')}`)

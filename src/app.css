@@ -1908,6 +1908,49 @@ tr.selected
 	background: none;
 }
 
+.about-window {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	height: 100dvh;
+	padding: 8px 24px 32px;
+	color: var(--text);
+	text-align: center;
+	background: #ececec;
+}
+
+.about-window h1 {
+	margin: 10px 0 2px;
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.about-detail {
+	margin: 0;
+	font-size: 11px;
+	color: var(--text-secondary);
+}
+
+.about-links {
+	margin: 14px 0;
+	line-height: 1.7;
+}
+
+.about-window a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+.about-window a:focus-visible {
+	text-decoration: underline;
+}
+
+@media (hover: hover) {
+	.about-window a:hover {
+		text-decoration: underline;
+	}
+}
+
 .output-window,
 .preferences-window {
 	display: flex;

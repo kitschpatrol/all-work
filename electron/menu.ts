@@ -1,6 +1,7 @@
 import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
+import { homepageUrl } from '../src/lib/app-links.js'
 import {
 	defaultColumnPreset,
 	isBasicColumnPreset,
@@ -9,7 +10,6 @@ import {
 import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
-const HOMEPAGE = 'https://github.com/kitschpatrol/all-work'
 const builtinColumnPresets = resolveColumnPresets([], [])
 
 export const initialMenuState: MenuState = {
@@ -38,6 +38,7 @@ function buildTemplate(
 	state: MenuState,
 	send: Send,
 	selectAll: () => void,
+	showAbout: () => void,
 ): MenuItemConstructorOptions[] {
 	const isMac = process.platform === 'darwin'
 
@@ -72,7 +73,7 @@ function buildTemplate(
 	const appMenu: MenuItemConstructorOptions = {
 		label: app.name,
 		submenu: [
-			{ role: 'about' },
+			{ click: showAbout, label: `About ${app.name}` },
 			separator,
 			preferences,
 			separator,
@@ -246,13 +247,13 @@ function buildTemplate(
 		submenu: [
 			{
 				click() {
-					void shell.openExternal(`${HOMEPAGE}#readme`)
+					void shell.openExternal(`${homepageUrl}#readme`)
 				},
 				label: 'All Work Help',
 			},
 			{
 				click() {
-					void shell.openExternal(`${HOMEPAGE}/issues`)
+					void shell.openExternal(`${homepageUrl}/issues`)
 				},
 				label: 'Report an Issue…',
 			},
@@ -274,8 +275,16 @@ function buildTemplate(
 /**
  * Install the application menu, enabling and checking items to match the
  * renderer's current state. Call again whenever the state changes.
+ *
+ * @param state The renderer's current menu state.
+ * @param getWindow The main window, which receives menu commands.
+ * @param showAbout Opens the About window.
  */
-export function syncMenu(state: MenuState, getWindow: () => BrowserWindow | undefined): void {
+export function syncMenu(
+	state: MenuState,
+	getWindow: () => BrowserWindow | undefined,
+	showAbout: () => void,
+): void {
 	const send: Send = (command, payload) => {
 		getWindow()?.webContents.send('all-work:menu-command', command, payload)
 	}
@@ -290,5 +299,5 @@ export function syncMenu(state: MenuState, getWindow: () => BrowserWindow | unde
 		}
 	}
 
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildTemplate(state, send, selectAll)))
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildTemplate(state, send, selectAll, showAbout)))
 }
