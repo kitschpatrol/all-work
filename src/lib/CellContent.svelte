@@ -7,12 +7,14 @@
 		getColumnDisplay,
 		getMetadataPlaceholder,
 	} from './column-variables.js'
+	import { parseExternalUrl } from './external-links.js'
 	import OutputPreview from './OutputPreview.svelte'
 	import RepositoryCell from './RepositoryCell.svelte'
 	import { formatDate } from './table-formatting.js'
 
 	const {
 		columnId,
+		onError,
 		onInspect,
 		onOpen,
 		onRefresh,
@@ -22,6 +24,7 @@
 		shortcuts,
 	}: {
 		columnId: string
+		onError: (error: unknown) => void
 		onInspect: (run: CommandRun, repository: Repository) => void
 		onOpen: (repository: Repository, app: NativeOpenTarget) => Promise<void>
 		onRefresh: (repository: Repository) => Promise<void>
@@ -33,6 +36,25 @@
 	const run = $derived(runs.find((item) => item.id === columnId))
 	const result = $derived(run?.results[repository.id])
 	const display = $derived(getColumnDisplay(columnId))
+	const value = $derived(formatColumnCellValue(repository, columnId, runs))
+	const url = $derived(parseExternalUrl(value))
+
+	async function openLink(event: MouseEvent) {
+		if (
+			url === undefined ||
+			globalThis._allWork === undefined ||
+			(event.button !== 0 && event.button !== 1)
+		) {
+			return
+		}
+
+		event.preventDefault()
+		try {
+			await globalThis._allWork.openExternalUrl(url.href)
+		} catch (error) {
+			onError(error)
+		}
+	}
 </script>
 
 {#if columnId === 'relativePath'}<RepositoryCell {onOpen} {onRefresh} {repository} {shortcuts} />
@@ -71,6 +93,12 @@
 			}}
 			{result}
 		/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
-{:else}<span class="cell-text" class:monospace={display !== 'text'}
-		>{formatColumnCellValue(repository, columnId, runs)}</span
-	>{/if}
+{:else if url !== undefined}<a
+		class="cell-text cell-link"
+		href={url.href}
+		onauxclick={openLink}
+		onclick={openLink}
+		rel="external noopener noreferrer"
+		target="_blank">{value}</a
+	>
+{:else}<span class="cell-text" class:monospace={display !== 'text'}>{value}</span>{/if}

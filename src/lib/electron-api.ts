@@ -118,6 +118,7 @@ export type HiddenColumnsMenuRequest = {
 export type AllWorkApi = {
 	chooseDirectory: () => Promise<string | undefined>
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
+	openExternalUrl: (url: string) => Promise<void>
 	openWindow: (request: AppWindowRequest) => Promise<void>
 	showColumnMenu: (request: ColumnMenuRequest) => Promise<void>
 	showHiddenColumnsMenu: (request: HiddenColumnsMenuRequest) => Promise<void>

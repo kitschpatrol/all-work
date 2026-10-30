@@ -32,6 +32,9 @@ const api: AllWorkApi = {
 			ipcRenderer.removeListener('all-work:menu-command', listener)
 		}
 	},
+	async openExternalUrl(url: string): Promise<void> {
+		await ipcRenderer.invoke('all-work:open-external-url', url)
+	},
 	async openWindow(request: AppWindowRequest): Promise<void> {
 		await ipcRenderer.invoke('all-work:open-window', request)
 	},

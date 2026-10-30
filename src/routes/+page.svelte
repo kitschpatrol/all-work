@@ -1451,6 +1451,7 @@
 											>
 										{:else}<CellContent
 												columnId={cell.column.id}
+												onError={showError}
 												onInspect={inspect}
 												onOpen={openInApp}
 												onRefresh={async (target: Repository) =>

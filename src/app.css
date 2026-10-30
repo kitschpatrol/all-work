@@ -1533,6 +1533,16 @@ th[aria-sort='descending'] {
 	top: 1px;
 }
 
+.cell-link {
+	text-decoration: underline;
+	text-decoration-color: #c3c8cf;
+	text-underline-offset: 2px;
+}
+
+.cell-link:focus-visible {
+	text-decoration-color: var(--text-secondary);
+}
+
 .metadata-error {
 	flex-shrink: 0;
 	font-size: 12px;
@@ -2172,6 +2182,10 @@ tr.selected
 }
 
 @media (hover: hover) {
+	.cell-link:hover {
+		text-decoration-color: var(--text-secondary);
+	}
+
 	tr:not(.selected):hover td:not(.table-filler, [data-run-status]) {
 		background: #f5f7fa;
 	}

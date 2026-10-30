@@ -16,6 +16,7 @@ import {
 	isRepositoryMenuRequest,
 } from '../src/lib/electron-api.js'
 import { initialMenuState, syncMenu } from './menu.js'
+import { openExternalUrl } from './open-url.js'
 
 // The packaged app serves the adapter-node build from a fixed loopback origin.
 // In development, electron-vite starts the SvelteKit dev server and reports
@@ -223,6 +224,14 @@ async function main(): Promise<void> {
 
 			const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
 			return result.canceled ? undefined : result.filePaths[0]
+		})
+
+		ipcMain.handle('all-work:open-external-url', async (event, url: unknown) => {
+			if (!isTrustedSender(event, appUrl)) {
+				throw new Error('Links can only be opened from inside All Work.')
+			}
+
+			await openExternalUrl(url)
 		})
 
 		ipcMain.handle('all-work:open-window', (event, request: unknown) => {
