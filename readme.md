@@ -1,10 +1,11 @@
 # All Work
 
-<!-- badges({ githubRelease: true }) -->
+<!-- badges({ githubRelease: true, custom: { Homebrew: { image: "https://img.shields.io/badge/Homebrew-kitschpatrol%2Ftap%2Fall--work-FBB040?logo=homebrew&logoColor=white", link: "https://github.com/kitschpatrol/homebrew-tap/blob/main/Casks/all-work.rb" } } }) -->
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 [![CI](https://github.com/kitschpatrol/all-work/actions/workflows/ci.yml/badge.svg)](https://github.com/kitschpatrol/all-work/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/kitschpatrol/all-work?label=Release)](https://github.com/kitschpatrol/all-work/releases/latest)
+[![Homebrew](https://img.shields.io/badge/Homebrew-kitschpatrol%2Ftap%2Fall--work-FBB040?logo=homebrew&logoColor=white)](https://github.com/kitschpatrol/homebrew-tap/blob/main/Casks/all-work.rb)
 
 <!-- /badges -->
 
