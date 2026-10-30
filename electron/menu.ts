@@ -1,21 +1,19 @@
 import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
-import { defaultColumnPreset } from '../src/lib/column-presets.js'
+import { defaultColumnPreset, resolveColumnPresets } from '../src/lib/column-presets.js'
 import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
 const HOMEPAGE = 'https://github.com/kitschpatrol/all-work'
+const builtinColumnPresets = resolveColumnPresets([], [])
 
 export const initialMenuState: MenuState = {
 	autoClear: false,
 	canReload: false,
 	canRun: false,
 	columnPreset: defaultColumnPreset.id,
-	columnPresets: [
-		{ id: defaultColumnPreset.id, label: defaultColumnPreset.label },
-		{ id: 'all', label: 'All' },
-	],
+	columnPresets: builtinColumnPresets.map(({ id, label }) => ({ id, label })),
 	filterActive: false,
 	filterPreset: undefined,
 	filterPresets: filterPresets.map(({ id, label }) => ({ id, label })),
@@ -213,6 +211,7 @@ function buildTemplate(
 						item(preset.label, 'view.columnPreset', {
 							checked: state.columnPreset === preset.id,
 							payload: preset.id,
+							toolTip: builtinColumnPresets.find((entry) => entry.id === preset.id)?.description,
 							type: 'checkbox',
 						}),
 					),

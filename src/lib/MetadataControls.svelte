@@ -68,6 +68,7 @@
 				// A command does not become the selection
 				event.currentTarget.value = columnPresets.selected?.id ?? 'custom'
 			}}
+			title={columnPresets.selected?.description}
 			value={columnPresets.selected?.id ?? 'custom'}
 		>
 			<ColumnPresetOptions {columnPresets} />

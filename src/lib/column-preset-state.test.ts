@@ -82,13 +82,13 @@ describe('column preset state', () => {
 	})
 
 	it('applies a preset and restores its columns by applying it again', async () => {
-		const { apply, state, toggle, visible } = setup()
+		const { apply, savedPresets, state, toggle, visible } = setup()
 		toggle('remote')
 		await state.savePreset('Remotes')
 		const saved = visible()
 		state.applyPreset('defaults')
 		expect(visible()).toEqual(defaultColumnPreset.columns.toSorted())
-		const id = state.presets[2]?.id
+		const id = savedPresets[0]?.id
 		expect(id).toBeDefined()
 		state.applyPreset(id!)
 		toggle('version')
@@ -183,14 +183,19 @@ describe('column preset state', () => {
 		expect(state.selected).toBeUndefined()
 		state.applyPreset('all')
 		await state.deletePreset()
-		expect(state.presets.map((preset) => preset.id)).toEqual(['defaults', 'all'])
+		expect(state.presets).toHaveLength(15)
+		expect(state.presets.every((preset) => !preset.id.startsWith('custom:'))).toBe(true)
 	})
 
-	it('shows every optional column with All', () => {
-		const { state, visible } = setup()
+	it('shows every optional column with All and hides them with None, keeping command output', () => {
+		const { state, visibility, visible } = setup()
 		state.applyPreset('all')
 		expect(visible()).toEqual(available.toSorted())
 		expect(state.selected?.id).toBe('all')
+		state.applyPreset('none')
+		expect(visible()).toEqual([])
+		expect(state.selected?.id).toBe('none')
+		expect(visibility()['run-1']).toBe(true)
 	})
 
 	it('keeps the columns when saving fails', async () => {

@@ -1,12 +1,44 @@
 import { describe, expect, it } from 'vitest'
+import type { MenuState } from './electron-api.js'
+import { resolveColumnPresets } from './column-presets.js'
 import {
 	isColumnMenuRequest,
 	isHiddenColumnsMenuRequest,
+	isMenuState,
 	isRepositoryMenuChoice,
 	isRepositoryMenuRequest,
 } from './electron-api.js'
+import { filterPresets } from './filter-presets.js'
 
 describe('menu requests arriving over IPC', () => {
+	it('accepts built-in menus alongside 100 saved presets and rejects oversized lists', () => {
+		const saved = Array.from({ length: 100 }, (_, index) => ({
+			id: `custom:${index}` as const,
+			label: `Preset ${index}`,
+		}))
+		const state: MenuState = {
+			autoClear: false,
+			canReload: false,
+			canRun: false,
+			columnPreset: 'none',
+			columnPresets: [...resolveColumnPresets([], []), ...saved],
+			filterActive: false,
+			filterPreset: undefined,
+			filterPresets: [...filterPresets, ...saved],
+			hasActiveRuns: false,
+			hasFinishedRuns: false,
+			loading: false,
+			selectedCount: 0,
+			selectedOnly: false,
+			showRepositoryShortcuts: false,
+			visibleCount: 0,
+		}
+		expect(isMenuState(state)).toBe(true)
+		const extra = { id: 'custom:overflow', label: 'Overflow' }
+		expect(isMenuState({ ...state, columnPresets: [...state.columnPresets, extra] })).toBe(false)
+		expect(isMenuState({ ...state, filterPresets: [...state.filterPresets, extra] })).toBe(false)
+	})
+
 	it('accepts a column menu request only when it says whether the column has a variable', () => {
 		const request = {
 			canFilter: true,

@@ -1,7 +1,7 @@
 import type { ColumnPreset, ColumnPresetId } from './column-presets.js'
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
-import { isColumnPresetId } from './column-presets.js'
-import { isFilterPresetId } from './filter-presets.js'
+import { columnPresets, isColumnPresetId } from './column-presets.js'
+import { filterPresets, isFilterPresetId } from './filter-presets.js'
 import { asRecord } from './record.js'
 
 /**
@@ -219,10 +219,14 @@ export function isRepositoryMenuRequest(value: unknown): value is RepositoryMenu
 }
 
 // Built-in presets plus up to 100 saved ones, each with a short visible label
-function isPresetList(value: unknown, isId: (id: unknown) => boolean): boolean {
+function isPresetList(
+	value: unknown,
+	isId: (id: unknown) => boolean,
+	builtinCount: number,
+): boolean {
 	return (
 		Array.isArray(value) &&
-		value.length <= 102 &&
+		value.length <= builtinCount + 100 &&
 		value.every((entry: unknown) => {
 			const preset = asRecord(entry)
 			return (
@@ -248,10 +252,10 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.canReload === 'boolean' &&
 		typeof state.canRun === 'boolean' &&
 		(state.columnPreset === undefined || isColumnPresetId(state.columnPreset)) &&
-		isPresetList(state.columnPresets, isColumnPresetId) &&
+		isPresetList(state.columnPresets, isColumnPresetId, columnPresets.length + 1) &&
 		typeof state.filterActive === 'boolean' &&
 		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
-		isPresetList(state.filterPresets, isFilterPresetId) &&
+		isPresetList(state.filterPresets, isFilterPresetId, filterPresets.length) &&
 		typeof state.hasActiveRuns === 'boolean' &&
 		typeof state.hasFinishedRuns === 'boolean' &&
 		typeof state.loading === 'boolean' &&

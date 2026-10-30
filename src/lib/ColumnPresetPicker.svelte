@@ -155,6 +155,7 @@
 			onchange={(event) => {
 				choose(event.currentTarget)
 			}}
+			title={selected?.description}
 			value={selection}
 		>
 			<ColumnPresetOptions {columnPresets} />

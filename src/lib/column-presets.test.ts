@@ -13,12 +13,32 @@ const available = ['name', 'description', 'branch', 'version']
 const review: ColumnPreset = { columns: ['name', 'version'], id: 'custom:review', label: 'Review' }
 
 describe('column presets', () => {
-	it('lists the built-ins first and ignores a saved entry that tries to replace one', () => {
+	it('keeps Default and All first, sorts the rest, and ignores saved replacements of built-ins', () => {
 		const resolved = resolveColumnPresets(
 			[{ columns: [], id: 'defaults', label: 'Defaults' }, review],
 			['name', 'version'],
 		)
-		expect(resolved).toEqual([defaultColumnPreset, allColumnPreset(['name', 'version']), review])
+		expect(resolved.map((preset) => preset.label)).toEqual([
+			'Default',
+			'All',
+			'Adoption',
+			'CI Triage',
+			'Codebase Size',
+			'Dependencies',
+			'Fork Sync',
+			'Git Work',
+			'GitHub',
+			'Maintenance',
+			'None',
+			'Ownership',
+			'Platform',
+			'Project Catalog',
+			'Publishing',
+			'Review',
+		])
+		expect(resolved).toContainEqual(defaultColumnPreset)
+		expect(resolved).toContainEqual(allColumnPreset(['name', 'version']))
+		expect(resolved).toContainEqual(review)
 		expect(allColumnPreset(['name', 'version']).columns).toEqual(['name', 'version'])
 	})
 
