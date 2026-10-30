@@ -1,7 +1,11 @@
 import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 import { app, Menu, shell, webContents } from 'electron'
 import type { MenuCommand, MenuState } from '../src/lib/electron-api.js'
-import { defaultColumnPreset, resolveColumnPresets } from '../src/lib/column-presets.js'
+import {
+	defaultColumnPreset,
+	isBasicColumnPreset,
+	resolveColumnPresets,
+} from '../src/lib/column-presets.js'
 import { commandPresets } from '../src/lib/command-presets.js'
 import { filterPresets } from '../src/lib/filter-presets.js'
 
@@ -49,6 +53,15 @@ function buildTemplate(
 			label,
 			...options,
 		}
+	}
+
+	function columnPresetItem(preset: MenuState['columnPresets'][number]) {
+		return item(preset.label, 'view.columnPreset', {
+			checked: state.columnPreset === preset.id,
+			payload: preset.id,
+			toolTip: builtinColumnPresets.find((entry) => entry.id === preset.id)?.description,
+			type: 'checkbox',
+		})
 	}
 
 	const preferences = item('Preferences…', 'preferences.open', { accelerator: 'CmdOrCtrl+,' })
@@ -207,14 +220,13 @@ function buildTemplate(
 					item('Show All', 'view.columns', { payload: 'all' }),
 					item('Hide All Optional', 'view.columns', { payload: 'none' }),
 					separator,
-					...state.columnPresets.map((preset) =>
-						item(preset.label, 'view.columnPreset', {
-							checked: state.columnPreset === preset.id,
-							payload: preset.id,
-							toolTip: builtinColumnPresets.find((entry) => entry.id === preset.id)?.description,
-							type: 'checkbox',
-						}),
-					),
+					...state.columnPresets
+						.filter((preset) => isBasicColumnPreset(preset.id))
+						.map((preset) => columnPresetItem(preset)),
+					separator,
+					...state.columnPresets
+						.filter((preset) => !isBasicColumnPreset(preset.id))
+						.map((preset) => columnPresetItem(preset)),
 				],
 			},
 			item('Fit Columns to Contents', 'view.fitColumns'),

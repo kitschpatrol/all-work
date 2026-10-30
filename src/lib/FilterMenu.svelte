@@ -179,7 +179,9 @@
 
 {#snippet presetOptions()}
 	<option value="all">None</option>
-	{#if selection === 'custom'}<option value="custom">Custom filter</option>{/if}
+	<hr />
+	{#if selection === 'custom'}<option value="custom">Custom filter</option>
+		<hr />{/if}
 	<optgroup label="Presets">
 		{#each builtinPresets as preset (preset.id)}<option title={preset.description} value={preset.id}
 				>{preset.label}</option

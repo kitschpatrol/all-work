@@ -1,8 +1,10 @@
 import type { ColumnPreset, ColumnPresetId } from './column-presets.js'
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
-import { columnPresets, isColumnPresetId } from './column-presets.js'
+import { isColumnPresetId, resolveColumnPresets } from './column-presets.js'
 import { filterPresets, isFilterPresetId } from './filter-presets.js'
 import { asRecord } from './record.js'
+
+const builtinColumnPresetCount = resolveColumnPresets([], []).length
 
 /**
  * Application menu commands sent from the Electron main process to the
@@ -252,7 +254,7 @@ export function isMenuState(value: unknown): value is MenuState {
 		typeof state.canReload === 'boolean' &&
 		typeof state.canRun === 'boolean' &&
 		(state.columnPreset === undefined || isColumnPresetId(state.columnPreset)) &&
-		isPresetList(state.columnPresets, isColumnPresetId, columnPresets.length + 1) &&
+		isPresetList(state.columnPresets, isColumnPresetId, builtinColumnPresetCount) &&
 		typeof state.filterActive === 'boolean' &&
 		(state.filterPreset === undefined || isFilterPresetId(state.filterPreset)) &&
 		isPresetList(state.filterPresets, isFilterPresetId, filterPresets.length) &&

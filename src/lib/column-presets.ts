@@ -18,6 +18,8 @@ const presetIds = [
 	'publishing',
 ] as const
 const builtinPresetIds: ReadonlySet<string> = new Set(presetIds)
+// General selections listed ahead of the topical presets
+const basicPresetIds: ReadonlySet<string> = new Set(['all', 'defaults', 'none'])
 
 /**
  * Identifies a column preset in the Columns popover, View menu, and saved
@@ -57,8 +59,15 @@ export const defaultColumnPreset: ColumnPreset = {
 	label: 'Default',
 }
 
-/** Built-in selections of optional repository columns. */
-export const columnPresets: readonly ColumnPreset[] = [
+const noneColumnPreset: ColumnPreset = {
+	columns: [],
+	description: 'Only Repository and existing command output columns.',
+	id: 'none',
+	label: 'None',
+}
+
+/** Built-in topical selections of optional repository columns. */
+const columnPresets: readonly ColumnPreset[] = [
 	{
 		columns: [
 			'metadata:Stars',
@@ -90,7 +99,6 @@ export const columnPresets: readonly ColumnPreset[] = [
 		id: 'codebaseSize',
 		label: 'Codebase Size',
 	},
-	defaultColumnPreset,
 	{
 		columns: [
 			'packageManager',
@@ -148,12 +156,6 @@ export const columnPresets: readonly ColumnPreset[] = [
 		description: 'Builds, open work, security alerts, and dependency updates.',
 		id: 'maintenance',
 		label: 'Maintenance',
-	},
-	{
-		columns: [],
-		description: 'Only Repository and existing command output columns.',
-		id: 'none',
-		label: 'None',
 	},
 	{
 		columns: [
@@ -265,16 +267,24 @@ export function parseColumnPresets(value: unknown): ColumnPreset[] {
 	return presets.values().toArray()
 }
 
-/** Keep Default and All first, then sort other column selections alphabetically. */
+/** Whether a preset is Default, All, or None, which lead every preset list. */
+export function isBasicColumnPreset(id: ColumnPresetId): boolean {
+	return basicPresetIds.has(id)
+}
+
+/**
+ * Keep Default, All, and None first, then sort other column selections
+ * alphabetically.
+ */
 export function resolveColumnPresets(
 	saved: readonly ColumnPreset[],
 	available: readonly string[],
 ): ColumnPreset[] {
 	const remaining = [
-		...columnPresets.filter((preset) => preset.id !== 'defaults'),
+		...columnPresets,
 		...saved.filter((preset) => preset.id.startsWith('custom:')),
 	].toSorted((a, b) => a.label.localeCompare(b.label))
-	return [defaultColumnPreset, allColumnPreset(available), ...remaining]
+	return [defaultColumnPreset, allColumnPreset(available), noneColumnPreset, ...remaining]
 }
 
 /**

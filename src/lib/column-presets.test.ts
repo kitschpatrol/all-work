@@ -3,6 +3,7 @@ import type { ColumnPreset } from './column-presets.js'
 import {
 	allColumnPreset,
 	defaultColumnPreset,
+	isBasicColumnPreset,
 	isColumnPresetId,
 	matchesColumns,
 	parseColumnPresets,
@@ -13,7 +14,7 @@ const available = ['name', 'description', 'branch', 'version']
 const review: ColumnPreset = { columns: ['name', 'version'], id: 'custom:review', label: 'Review' }
 
 describe('column presets', () => {
-	it('keeps Default and All first, sorts the rest, and ignores saved replacements of built-ins', () => {
+	it('keeps Default, All, and None first, sorts the rest, and ignores saved replacements of built-ins', () => {
 		const resolved = resolveColumnPresets(
 			[{ columns: [], id: 'defaults', label: 'Defaults' }, review],
 			['name', 'version'],
@@ -21,6 +22,7 @@ describe('column presets', () => {
 		expect(resolved.map((preset) => preset.label)).toEqual([
 			'Default',
 			'All',
+			'None',
 			'Adoption',
 			'CI Triage',
 			'Codebase Size',
@@ -29,7 +31,6 @@ describe('column presets', () => {
 			'Git Work',
 			'GitHub',
 			'Maintenance',
-			'None',
 			'Ownership',
 			'Platform',
 			'Project Catalog',
@@ -39,6 +40,9 @@ describe('column presets', () => {
 		expect(resolved).toContainEqual(defaultColumnPreset)
 		expect(resolved).toContainEqual(allColumnPreset(['name', 'version']))
 		expect(resolved).toContainEqual(review)
+		expect(
+			resolved.filter((preset) => isBasicColumnPreset(preset.id)).map((preset) => preset.label),
+		).toEqual(['Default', 'All', 'None'])
 		expect(allColumnPreset(['name', 'version']).columns).toEqual(['name', 'version'])
 	})
 
