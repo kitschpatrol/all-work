@@ -72,8 +72,9 @@ A deeper dive into additional functionality is available in a [help document](./
 - Checks for dependency updates on demand with **Repositories → Check Dependencies for Selected**.
 - Create and save custom filters to control which repos are visible. Graphically build complex filter predicates based on any column value. (Or pick from helpful presets.)
 - Curate and save sets of specific metadata columns to show in the table. (Or pick from presets.)
-- Drag and drop table columns to reorder.
-- Click the table headings to sort by specific column values.
+- Drag and drop table columns to reorder. Dock metadata or output columns at either table edge from their header menus to keep them visible while scrolling.
+- Click the table headings to sort by specific column values. Run columns can sort by output text or exit code.
+- Remembers column visibility, order, widths, docking, and sorting between launches. Scroll position is not saved.
 - Shortcut buttons for each repo quickly open a repo in the finder, open its page in GitHub, open it in the terminal or editor of your choice, and more. (Choose which buttons to show in Preferences.)
 - Additional commands and shortcuts abound in context menus.
 - No pagination, everything is shown all the time in one scrollable table (unless filters are applied).
@@ -83,7 +84,7 @@ A deeper dive into additional functionality is available in a [help document](./
 - Commands execute in each repository's folder through your login shell, loading its aliases, functions, and PATH settings. Pipes and shell operators work; interactive input isn't supported.
 - Output streams into a new column, combining stdout and stderr, with up to 128,000 characters retained per repository per run.
 - Use environment variables containing each row's column values to pass repository-specific arguments, including values from hidden columns. Insert them from the **Variables** drop-down or autocompletion triggered by `$`. For example, `printf '%s\n' "$ALL_WORK_COLUMN_NAME"` prints each project's name.
-- Choose how many rows of command output are displayed in the table.
+- Choose how many lines of command output are displayed in the table.
 - Click command output cells to open a larger view of a specific run.
 - Control the number of parallel jobs to optimize for different tasks.
 - Get quick access to common commands in the presets drop-down.
@@ -95,7 +96,7 @@ A deeper dive into additional functionality is available in a [help document](./
 
 ## Privacy
 
-Repository scans and command execution run on your machine. All Work has no built-in analytics or telemetry..
+Repository scans and command execution run on your machine. All Work has no built-in analytics or telemetry.
 
 Some metadata requires network requests. As applicable, All Work uses Metascope to query GitHub, npm, PyPI, PyPI Stats, and Obsidian's community plugin registry for repository details, CI status, package information, and download counts. Dependency checks also query upstream services for available versions. These lookups can disclose repository and package identifiers to the services involved, and authenticated GitHub requests use your GitHub token. Commands you run can also access the network.
 
@@ -127,6 +128,10 @@ These files can contain private repository details and anything printed by your 
 Earlier unreleased versions of All Work were written by hand in 2024 and focused only on the data table. Parallel command execution and the first public release came in 2026.
 
 Technically, All Work can run in a browser, but it's distributed only in application form since it's nice to have native menus and multiple windows.
+
+Only macOS is officially support, but tests are passing on Linux runners. Many tests pass on Windows as well, and some path-related accommodations have already been made, but a bit more work would be needed for a functional build.
+
+See [Development and packaging](./docs/help.md#development-and-packaging) for commands and release instructions.
 
 ## Contributing
 

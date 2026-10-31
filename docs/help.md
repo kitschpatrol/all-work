@@ -48,9 +48,13 @@ Unreadable folders appear in a warning above the table. Other readable repositor
 
 **Reload** discovers repositories again and refreshes local metadata. Reloading the same workspace preserves output columns and selections for repositories still present. Loading a different workspace clears the displayed runs, selection, search, and filter rules. Stop active command runs before reloading or switching workspaces; these controls are disabled while commands are active.
 
+Refreshing metadata also removes a repository's row and selection if its folder or `.git` entry has been deleted from disk. Newly added repositories still require **Reload** to be discovered.
+
 ## Selecting and searching repositories
 
 All matching repositories share one scrollable table; there is no pagination. Click anywhere in a row's checkbox cell to toggle it. Shift-click extends the last plain click's checked or unchecked state across a range; further Shift-clicks resize the range. Drag down the checkbox column to apply the same state to a range, with scrolling at the edges.
+
+Rows and scrolling columns render as they approach the viewport to keep large tables responsive. Sorting, filtering, selection, copying, and command targets still include matching repositories outside the viewport.
 
 The header checkbox selects or deselects every matching repository, including rows outside the viewport. Sorting and filtering preserve stored selections, but hidden selections are excluded from the current action targets. The footer's selected count also counts only matching selections.
 
@@ -92,15 +96,21 @@ Every preset keeps the mandatory Repository column. The table lists the optional
 
 **Save…** stores the current repository-column visibility as a named preset. Editing a saved preset adds an asterisk: **Save** keeps the edits and **Revert** restores the saved selection. **Rename…** changes its name. **Delete** removes the preset while leaving the current columns visible. Editing a built-in preset starts a custom selection instead; built-in presets cannot be overwritten. Saving under an existing user preset's name offers to replace it. You can save up to 100 column presets, with names up to 80 characters.
 
-Column presets affect repository-column visibility, leaving output-column visibility alone. They do not store a separate sort order, column order, or set of widths; those belong to the current saved view. The column list's **Select all** and **Deselect all** buttons also affect output columns.
+Column presets affect repository-column visibility, leaving output-column visibility alone. They do not store a separate sort order, column order, docking layout, or set of widths; those belong to the current saved view. The column list's **Select all** and **Deselect all** buttons also affect output columns.
 
-### Sorting, sizing, and copying
+### Sorting, docking, sizing, and copying
 
 Click a column heading to change its sort order. Shift-click a heading to add it to the current sort. Run columns sort by their output text, including while output streams. To group successes and failures instead, right-click a run header and choose **Sort Exit Code Ascending** or **Sort Exit Code Descending**; repositories without an exit code yet, or omitted from the run, stay last. Clicking the heading returns to sorting by output.
 
-Drag headers to reorder movable columns. The selection and Repository columns stay at the left, and the newest run column stays at the right when visible. Drag a column edge to resize it; double-click the edge to fit that column to its contents. **View → Fit Columns to Contents** recalculates the visible widths. Manual widths are otherwise preserved as metadata arrives.
+Drag headers to reorder columns within the scrolling area or within the same dock. The selection checkbox column always stays at the far left. Repository starts docked at the left, but can return to the scrolling area or move to the right; it cannot be hidden.
 
-In the desktop app, right-click a header for sorting (run headers offer **Sort Output** and **Sort Exit Code**, each ascending or descending), **Hide Column** where allowed, **Filter By…**, **Copy**, **Copy Selected**, and **Copy Variable**. Copy actions use matching rows in table order; **Copy Selected** restricts them to selected matches. Run headers also offer **Clear Finished to Left** and **Clear Finished to Right**. Right-click unused header space to show a hidden column at the end of the movable columns.
+In the desktop app, right-click a metadata or run header and choose **Dock Left** or **Dock Right** to keep that column visible while scrolling horizontally. Choose the checked docking item again to return it to the scrolling area beside that dock, or choose the other side to move it directly there. Multiple columns can share a dock. Dragging reorders columns within their current area; use the menu to change which area they belong to.
+
+Each new run docks at the far right. The immediately preceding run leaves the right dock if it was there; other docked columns keep their positions. A run can also return to the scrolling area or move to the left. Hiding a column preserves its docking choice for when it is shown again. **Reset View** restores Repository to the left dock and the newest displayed run to the right.
+
+Drag a column edge to resize it; columns docked on the right resize from their left edge. Double-click the resize edge to fit that column to its contents. **View → Fit Columns to Contents** recalculates widths for all shown columns, including those outside the viewport. Fitting uses all matching repositories. Manual widths are otherwise preserved as metadata arrives.
+
+The desktop header menu also offers sorting (run headers offer **Sort Output** and **Sort Exit Code**, each ascending or descending), **Hide Column** where allowed, **Filter By…**, **Copy**, **Copy Selected**, and **Copy Variable**. Copy actions use matching rows in table order; **Copy Selected** restricts them to selected matches. Run headers additionally offer **Copy Command**, **Clear Finished to Left**, and **Clear Finished to Right**. **Copy Command** copies the original submitted command, including unexpanded variable references. Right-click unused header space to show a hidden column at the end of the scrolling columns, or in its saved dock if it has one.
 
 Hiding an output column through **Columns** keeps its run. The × in its header clears the run's displayed output instead; see [clearing and retaining output](#clearing-and-retaining-output).
 
@@ -195,6 +205,8 @@ Showing dependency-update columns alone does not perform a check. Choose the **D
 
 Successful metadata is cached on disk. A failed refresh can retain the previous values; hover a cell to inspect its source, last update, cache status, and error. To discover newly added repositories, reload the workspace; refreshing metadata does not repeat discovery.
 
+The footer's **Loading N repositories…** status counts repositories with queued or loading metadata across the workspace, including those outside the viewport or hidden by filters.
+
 ### GitHub authentication
 
 All Work resolves a token in this order:
@@ -260,13 +272,13 @@ The Windows runner uses `ComSpec` or `cmd.exe` with `/d /s /c`, rather than UNIX
 
 ### Inspecting output
 
-Every run adds an output column with its run number, command, progress, and success/failure counts. Each repository's result shows its status, exit code when available, duration, and captured text. **Output lines** changes only the table preview height.
+Every run adds an output column with its run number, command, progress, and success/failure counts. Each repository's result shows its status, exit code when available, duration, and captured text. **Output lines** controls how many lines appear in the table preview. When command output makes a row taller, ordinary metadata text wraps at whitespace to use the available height; links remain on one line. Text beyond the available space is still truncated. This does not change the captured output.
 
 Output combines stdout and stderr and strips terminal control sequences. All Work retains up to 128,000 characters per repository per run. Reaching the capture limit does not stop the command. A preview shortened by **Output lines** can still have more captured text; the capture-limit message identifies actual truncation.
 
 Click a result to open a separate output window in the desktop app, or a dialog in browser mode. **Copy output** copies its captured text. **Previous result** and **Next result** follow the current filtered table order and skip repositories omitted from the run.
 
-The displayed command substitutes simple column-variable references with their captured values. It leaves other shell variables and more complex shell expansions as typed; this display is not a complete shell execution trace.
+The displayed command substitutes simple column-variable references with their captured values. It leaves other shell variables and more complex shell expansions as typed; this display is not a complete shell execution trace. To copy the original command before substitution, use **Copy Command** in the run header's desktop context menu.
 
 ### Stopping commands
 
@@ -527,7 +539,7 @@ Application lists load when Preferences opens. Reopen Preferences after installi
 
 ### Saved view and workspace restoration
 
-Named filter and column presets, identity, shortcut choices, preferred apps, and the workspace-restoration setting are saved in preferences. The current view separately remembers the workspace path, recursive setting, command draft and history, Jobs, Output lines, Auto clear, search and filter rules, selections, column visibility/order/widths, sorting, scroll position, and run references.
+Named filter and column presets, identity, shortcut choices, preferred apps, and the workspace-restoration setting are saved in preferences. The current view separately remembers the workspace path, recursive setting, command draft and history, Jobs, Output lines, Auto clear, search and filter rules, selections, column visibility/order/widths, docking, sorting (including which runs sort by exit code), and run references. Table scroll position is not saved or restored.
 
 **Storage → Restore the last workspace on launch** is enabled by default. On startup, it loads the last workspace, restores its current view and available run output, and starts normal metadata refreshes. It never reruns saved commands; interrupted runs restore as cancelled snapshots after a server restart.
 
@@ -577,6 +589,8 @@ These shortcuts refer to the macOS desktop app:
 | Option-click **+** in filter rules | Add a nested rule group                                               |
 
 Browser mode provides Preferences through the gear button or its shortcut (⌘, on macOS or Ctrl+, elsewhere), and repository selection through ⌘A/Ctrl+A and ⌥⌘A/Alt+Ctrl+A outside text fields. Other application menu shortcuts are not installed there and may retain their browser meanings. Preferences and output use dialogs, **Browse…** is absent, and native repository/header context menus are absent. Enter workspace paths manually. Dependency checking is currently exposed through the desktop Repositories menu.
+
+Focus rings appear when navigating with the keyboard or using field-focus shortcuts such as ⌘L and ⌘F. Clicking a control, or typing in a field focused by a click, does not add a focus ring. The **Jobs** and **Output lines** stepper arrows leave keyboard focus where it was.
 
 ## Example workflows
 
@@ -628,7 +642,7 @@ Use the actual run number in your table, and wait for the source run if you need
 
 ## Development and packaging
 
-A source checkout requires Git, Node.js satisfying the `engines` field in [package.json](../package.json), and the pnpm version declared there. Start with `pnpm install`.
+A source checkout requires Git, Node.js satisfying the `engines` field in [package.json](../package.json), and the pnpm version declared there. The package's `os` field declares macOS (`darwin`) support only; other platforms are not supported by the normal install configuration. Start with `pnpm install` on macOS.
 
 | Command                  | Purpose                                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
@@ -662,6 +676,8 @@ The action API accepts loopback hostnames and same-origin application requests. 
 
 The interface uses SvelteKit 3, Svelte 5, and TanStack Table's Svelte adapter. Electron provides the application menu, folder picker, native context menus, and secondary windows. Execa manages command processes, streaming, and cancellation; Metascope extracts project metadata.
 
+The table renders rows and scrolling metadata columns near the viewport, with spacers preserving the rest of the table's dimensions. Docked columns and command-output columns remain rendered for each rendered row; output determines row height. Column fitting measures values from the full matching row set, including cells outside the viewport. Table features and column definitions live in [table-columns.ts](../src/lib/table-columns.ts), with fitting in [table-sizing.ts](../src/lib/table-sizing.ts).
+
 Metadata extraction uses up to four isolated scanner processes. They are reused between repositories, exit after 30 idle seconds, and have a two-minute extraction timeout. Local scans take priority over background network requests, and one repository's source groups run sequentially. These limits are independent of command **Jobs**.
 
 Reloading or replacing a workspace cancels its outstanding metadata work. Linked worktrees and repositories without commits receive supplemental Git status queries when Metascope has no Git statistics. No separate package rows are created from monorepo workspace manifests.
@@ -670,7 +686,7 @@ For implementation details, see the [metadata loader](../src/lib/server/reposito
 
 ### Maintainer release scripts
 
-`pnpm release1` uses Bumpp to bump the version and create a release commit, then builds. `pnpm release2` packages and publishes artifacts to GitHub; it uses the maintainer's 1Password CLI token lookup and sets `APPLE_KEYCHAIN_PROFILE=notarytool`. These scripts require the corresponding maintainer credentials and macOS signing setup and are not needed for ordinary development.
+`pnpm release` uses Bumpp to bump the version and create a `Release: <version>` commit, builds the app, then packages and publishes artifacts to GitHub. It uses the maintainer's 1Password CLI token lookup and sets `APPLE_KEYCHAIN_PROFILE=notarytool`. This script requires the corresponding maintainer credentials and macOS signing setup and is not needed for ordinary development.
 
 To save notarization credentials in that Keychain profile:
 
