@@ -190,6 +190,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		}
 
 		markSlotEdge(slotEdge)
+		markDockEdge(layout())
 	})
 
 	// Writes only cells that differ, so a column already in place restyles nothing
@@ -214,6 +215,45 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		if (columnId !== undefined) {
 			for (const element of columnElements(scroller, columnId)) {
 				element.dataset.slotEdge = ''
+			}
+		}
+	}
+
+	/*
+	 * Inside a dock, the column showing innermost casts the dock's shadow. The
+	 * column innermost in the DOM carries the dock's class until the drop, so
+	 * while the two differ, marks override it: "true" on the one showing there,
+	 * "false" on the one with the class.
+	 */
+	function markDockEdge(current: Layout) {
+		if (current.region === 'center') {
+			return
+		}
+
+		const others = current.columns.filter((column) => column.id !== id)
+		const innermost = current.region === 'start' ? others.length : 0
+		const showing =
+			slot === innermost ? id : current.region === 'start' ? others.at(-1)?.id : others[0]?.id
+		const classed = current.region === 'start' ? current.columns.at(-1)?.id : current.columns[0]?.id
+		for (const column of current.columns) {
+			const mark =
+				showing === classed
+					? undefined
+					: column.id === showing
+						? 'true'
+						: column.id === classed
+							? 'false'
+							: undefined
+			for (const element of columnElements(scroller, column.id)) {
+				if (element.dataset.dockEdge === mark) {
+					continue
+				}
+
+				if (mark === undefined) {
+					delete element.dataset.dockEdge
+				} else {
+					element.dataset.dockEdge = mark
+				}
 			}
 		}
 	}
@@ -265,6 +305,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		}
 
 		markSlotEdge(others[next]?.id)
+		markDockEdge(current)
 	}
 
 	function update() {
@@ -361,6 +402,11 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		await tick()
 		markSlotEdge(undefined)
+		// The committed order moved the dock's class to the column showing innermost
+		for (const element of scroller.querySelectorAll<HTMLElement>('[data-dock-edge]')) {
+			delete element.dataset.dockEdge
+		}
+
 		for (const columnId of ids) {
 			cancelSlide(columnId)
 			setTransform(columnId, 0)

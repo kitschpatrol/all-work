@@ -1128,18 +1128,23 @@ td.output-cell[data-run-status='running'] {
 	}
 }
 
-/* Docked columns stick to the scroller's edges, where each dock's innermost column casts a shadow onto the scrolling columns */
+/*
+ * Docked columns stick to the scroller's edges, where each dock's innermost
+ * column casts a shadow onto the scrolling columns. While a dock's columns are
+ * dragged into a new order, the drag marks the column showing innermost, since
+ * the order only changes once it drops.
+ */
 .docked-start,
 .docked-end {
 	position: sticky;
 	z-index: 2;
 }
 
-.docked-start.dock-edge {
+.docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
 	box-shadow: 1px 0 #00000026;
 }
 
-.docked-end.dock-edge {
+.docked-end:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
 	box-shadow: -1px 0 #00000026;
 }
 
@@ -1177,8 +1182,8 @@ th.docked-end {
 }
 
 /* Column shadows join across rows, with the docked columns casting the widest shadows */
-.docked-start.dock-edge::after,
-.docked-end.dock-edge::after,
+.docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::after,
+.docked-end:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::before,
 :where(:not(.docked-start) + .table-filler)::before,
 .column-dragged::before,
 .column-dragged::after {
@@ -1190,13 +1195,13 @@ th.docked-end {
 	width: var(--docked-column-shadow-width);
 }
 
-.docked-start.dock-edge::after,
+.docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::after,
 .column-dragged::after {
 	left: calc(100% + 1px);
 	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
-.docked-end.dock-edge::after,
+.docked-end:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::before,
 .column-dragged::before {
 	right: calc(100% + 1px);
 	background: linear-gradient(to left, var(--column-shadow-stops));
@@ -1260,6 +1265,25 @@ th.column-dragged:is(.docked-start, .docked-end) {
 	opacity: var(--column-drag-shadow-opacity);
 }
 
+/* A dragged column showing innermost in its dock casts the dock's shadow on that side, which stays put as it settles */
+.docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::after,
+.docked-end:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true'])::before {
+	width: var(--docked-column-shadow-width);
+	opacity: 1;
+}
+
+.column-dragged.docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
+	box-shadow:
+		-1px 0 #0000001f,
+		1px 0 #00000026;
+}
+
+.column-dragged.docked-end:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
+	box-shadow:
+		-1px 0 #00000026,
+		1px 0 #0000001f;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	th {
 		transition:
@@ -1274,14 +1298,28 @@ th.column-dragged:is(.docked-start, .docked-end) {
 }
 
 /* Cells draw only their right border, so the dragged column carries away the left edge of the column right of its slot */
-td[data-slot-edge]:not(.dock-edge) {
+td[data-slot-edge] {
 	box-shadow: inset 1px 0 #eceef1;
 }
 
-th[data-slot-edge]:not(.dock-edge) {
+th[data-slot-edge] {
 	box-shadow:
 		inset 1px 0 #d3d3d3,
 		inset 2px 0 #fff;
+}
+
+/* Only the left dock's innermost column can sit right of the slot, keeping its own edge too */
+td[data-slot-edge].docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
+	box-shadow:
+		inset 1px 0 #eceef1,
+		1px 0 #00000026;
+}
+
+th[data-slot-edge].docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-edge='true']) {
+	box-shadow:
+		inset 1px 0 #d3d3d3,
+		inset 2px 0 #fff,
+		1px 0 #00000026;
 }
 
 /*
