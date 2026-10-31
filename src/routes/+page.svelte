@@ -1063,7 +1063,7 @@
 			></td>{/if}</tr
 	>{/snippet}
 
-$1{data.isElectron ? undefined : selection.shortcut} />
+<svelte:window onkeydown={data.isElectron ? undefined : selection.shortcut} />
 
 <svelte:head>
 	<title>All Work</title>
