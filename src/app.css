@@ -1214,6 +1214,11 @@ th.docked-end {
 	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
+/* While a dragged column's slot sits against the blank space, no column casts this edge shadow until one lands there */
+.table-filler[data-slot-beside]::before {
+	opacity: 0;
+}
+
 /* Clicking anywhere in a selection cell toggles its checkbox */
 .selection-hit-area {
 	position: absolute;

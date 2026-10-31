@@ -29,6 +29,9 @@ type ColumnDragOptions = {
 	scroller: HTMLElement
 }
 
+/** What borders one side of a dragged column's slot. */
+export type SlotSide = 'blank' | 'column' | 'edge'
+
 type Layout = {
 	/** The region's movable visible columns in order. */
 	columns: Array<{ id: string; width: number }>
@@ -98,17 +101,23 @@ function slide(scroller: HTMLElement, id: string, from: number) {
  *   there is none.
  * @param table.width The table's width.
  *
- * @returns Whether a column borders the slot on its left and on its right.
+ * @returns What borders the slot on its left and on its right: another column,
+ *   the blank space, or the table's edge.
  */
 export function slotBorders(
 	left: number,
 	right: number,
 	table: { blankEnd: number; blankStart: number; width: number },
-): { left: boolean; right: boolean } {
+): { left: SlotSide; right: SlotSide } {
 	const blank = table.blankEnd - table.blankStart >= 1
 	return {
-		left: left >= 1 && (!blank || Math.abs(left - table.blankEnd) >= 1),
-		right: right <= table.width - 1 && (!blank || Math.abs(right - table.blankStart) >= 1),
+		left: left < 1 ? 'edge' : blank && Math.abs(left - table.blankEnd) < 1 ? 'blank' : 'column',
+		right:
+			right > table.width - 1
+				? 'edge'
+				: blank && Math.abs(right - table.blankStart) < 1
+					? 'blank'
+					: 'column',
 	}
 }
 
@@ -209,6 +218,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	// Whether a column borders the slot on each side, as last set on the scroller
 	const slotSides = new Map<string, boolean>()
 	let tableWidth = 0
+	let blankBeside = false
 	let drag: number | undefined
 	let frame: number | undefined
 	// Measured once as the drag begins, so each frame avoids a forced layout
@@ -224,6 +234,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		markSlotEdge(slotEdge)
 		markDockEdge(layout())
+		if (blankBeside) {
+			markBlankBeside(true)
+		}
 	})
 
 	// Writes only cells that differ, so a column already in place restyles nothing
@@ -307,9 +320,13 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			width: tableWidth,
 		})
 		const sides = {
-			'--column-drag-slot-left-edge': borders.left,
-			'--column-drag-slot-right-edge': borders.right,
+			'--column-drag-slot-left-edge': borders.left === 'column',
+			'--column-drag-slot-right-edge': borders.right === 'column',
 		}
+		if ((borders.right === 'blank') !== blankBeside) {
+			markBlankBeside(borders.right === 'blank')
+		}
+
 		for (const [property, bordered] of Object.entries(sides)) {
 			if (slotSides.get(property) === bordered) {
 				continue
@@ -317,6 +334,22 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 			slotSides.set(property, bordered)
 			scroller.style.setProperty(property, bordered ? '1' : '0')
+		}
+	}
+
+	// The blank space's edge shadow falls from the column before it, so it waits while the slot sits there empty
+	function markBlankBeside(beside: boolean) {
+		blankBeside = beside
+		for (const element of scroller.querySelectorAll<HTMLElement>('.table-filler')) {
+			if (beside === (element.dataset.slotBeside !== undefined)) {
+				continue
+			}
+
+			if (beside) {
+				element.dataset.slotBeside = ''
+			} else {
+				delete element.dataset.slotBeside
+			}
 		}
 	}
 
@@ -471,6 +504,11 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		// The committed order moved the dock's class to the column showing innermost
 		for (const element of scroller.querySelectorAll<HTMLElement>('[data-dock-edge]')) {
 			delete element.dataset.dockEdge
+		}
+
+		// The dragged column lands in the slot beside the blank space and casts its edge shadow again
+		if (blankBeside) {
+			markBlankBeside(false)
 		}
 
 		for (const columnId of ids) {
