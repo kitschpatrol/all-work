@@ -92,15 +92,15 @@ export function createVirtualRows(options: VirtualRowsOptions) {
 	let viewportHeight = $state(0)
 	let observer: ResizeObserver | undefined
 
-	const offsets = $derived.by(() => {
+	const estimate = $derived.by(() => {
 		let total = 0
 		for (const height of heights.values()) {
 			total += height
 		}
 
-		const estimate = heights.size === 0 ? fallbackHeight : total / heights.size
-		return rowOffsets(options.ids(), heights, estimate)
+		return heights.size === 0 ? fallbackHeight : total / heights.size
 	})
+	const offsets = $derived(rowOffsets(options.ids(), heights, estimate))
 	const range = $derived(
 		visibleRange(offsets, scrollTop - overscan, scrollTop + viewportHeight + overscan),
 	)
@@ -174,6 +174,10 @@ export function createVirtualRows(options: VirtualRowsOptions) {
 			return end
 		},
 		row: row satisfies Attachment<HTMLElement>,
+		// The height assumed for each row a spacer stands in for: the average measured row
+		get rowHeight() {
+			return estimate
+		},
 		scroller: scroller satisfies Attachment<HTMLElement>,
 		// The index of the first rendered row
 		get start() {

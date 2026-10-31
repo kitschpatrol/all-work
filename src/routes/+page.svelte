@@ -264,8 +264,8 @@
 		docked: () => dockedColumns,
 		keep: (id) => id === draggingColumnId || runs.some((run) => run.id === id),
 	})
-	const tableColumnCount = $derived(
-		table.getVisibleLeafColumns().length + (fillerAfterColumnId === undefined ? 0 : 1),
+	const endColumnCount = $derived(
+		table.getVisibleLeafColumns().filter((column) => dockedColumns.end.includes(column.id)).length,
 	)
 	const selection = createRowSelection({
 		ids: () => visibleRepositories.map((row) => row.id),
@@ -1045,7 +1045,25 @@
 	}
 </script>
 
-<svelte:window onkeydown={data.isElectron ? undefined : selection.shortcut} />
+<!--
+	Stands in for unrendered rows, striped like them. The top spacer's stripes
+	meet the first rendered row at its bottom edge and the bottom spacer's the
+	last at its top edge, each shifted a row so the row beside it alternates.
+-->
+{#snippet rowSpacer(height: number, edge: 'bottom' | 'top', beside: number)}<tr
+		style:height="{height}px"
+		style:--row-height="{virtualRows.rowHeight}px"
+		style:--row-stripes-y={edge === 'bottom' ? '100%' : '0%'}
+		style:--row-stripes-shift="{beside % 2 === 1 ? virtualRows.rowHeight : 0}px"
+		class="row-spacer"
+		aria-hidden="true"
+		>{#if fillerAfterColumnId !== undefined}<td
+				colspan={table.getVisibleLeafColumns().length - endColumnCount}
+			></td><td class="table-filler"></td>{/if}{#if endColumnCount > 0}<td colspan={endColumnCount}
+			></td>{/if}</tr
+	>{/snippet}
+
+$1{data.isElectron ? undefined : selection.shortcut} />
 
 <svelte:head>
 	<title>All Work</title>
@@ -1374,9 +1392,11 @@
 							>{/each}</thead
 					>
 					<tbody
-						>{#if virtualRows.before > 0}<tr class="row-spacer" aria-hidden="true"
-								><td style:height="{virtualRows.before}px" colspan={tableColumnCount}></td></tr
-							>{/if}{#each renderedRows as row, index (row.id)}{@const cells =
+						>{#if virtualRows.before > 0}{@render rowSpacer(
+								virtualRows.before,
+								'bottom',
+								virtualRows.start,
+							)}{/if}{#each renderedRows as row, index (row.id)}{@const cells =
 								row.getAllCellsByColumnId()}<tr
 								class:even={(virtualRows.start + index) % 2 === 1}
 								class:selected={row.getIsSelected()}
@@ -1433,9 +1453,11 @@
 														shortcuts={preferences.repositoryShortcuts}
 													/>{/if}
 											</td>{/if}{/if}{/each}</tr
-							>{/each}{#if virtualRows.after > 0}<tr class="row-spacer" aria-hidden="true"
-								><td style:height="{virtualRows.after}px" colspan={tableColumnCount}></td></tr
-							>{/if}</tbody
+							>{/each}{#if virtualRows.after > 0}{@render rowSpacer(
+								virtualRows.after,
+								'top',
+								virtualRows.end,
+							)}{/if}</tbody
 					>
 				</table>
 				{#if table.getRowModel().rows.length === 0}<div class="empty-state">

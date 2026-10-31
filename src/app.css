@@ -1071,15 +1071,28 @@ tr.selected td {
 	background: linear-gradient(#f6f8fc, #f0f3f9);
 }
 
-/* Spacers hold the place of rows rendered only near the viewport, showing the table's white until those rows render */
+/*
+ * Spacers hold the place of rows rendered only near the viewport, striped like
+ * those rows until they render: the columns alternate white and off-white with
+ * a line below each row, and the blank space shows its floor.
+ */
 tbody tr.row-spacer {
-	background: none;
+	background: linear-gradient(to bottom, #f4f5f7 calc(var(--row-height) - 1px), #e6e8eb 0) 0
+		calc(var(--row-stripes-y) + var(--row-stripes-shift)) / 100% var(--row-height) repeat-y;
 }
 
 tbody tr.row-spacer td {
 	padding: 0;
 	border: 0;
-	background: none;
+	background: linear-gradient(
+			to bottom,
+			#fff calc(var(--row-height) - 1px),
+			#eceef1 0 var(--row-height),
+			#fbfcfd 0 calc(var(--row-height) * 2 - 1px),
+			#eceef1 0
+		)
+		0 calc(var(--row-stripes-y) + var(--row-stripes-shift)) / 100% calc(var(--row-height) * 2)
+		repeat-y;
 }
 
 /* Docked columns keep a deeper tint than the columns scrolling beneath them, and run statuses still show */
