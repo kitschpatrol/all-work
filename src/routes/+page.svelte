@@ -70,6 +70,7 @@
 	import { measureColumns } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
+	import { createVirtualRows } from '#lib/virtual-rows.svelte.js'
 	import { listenForWindowMessages, postWindowMessage } from '#lib/window-messages.js'
 	import { onMount, tick } from 'svelte'
 	import { on } from 'svelte/events'
@@ -242,11 +243,16 @@
 		sortByExitCode: runSorting.set,
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
+	const virtualRows = createVirtualRows({ ids: () => visibleRepositories.map((row) => row.id) })
+	const renderedRows = $derived(visibleRepositories.slice(virtualRows.start, virtualRows.end))
 	// Spare width opens up before the end dock, which keeps it at the table's right edge
 	const fillerAfterColumnId = $derived(
 		table.getVisibleLeafColumns().findLast((column) => !dockedColumns.end.includes(column.id))?.id,
 	)
 	const dockPositions = $derived(getDockPositions(table.getVisibleLeafColumns(), dockedColumns))
+	const tableColumnCount = $derived(
+		table.getVisibleLeafColumns().length + (fillerAfterColumnId === undefined ? 0 : 1),
+	)
 	const selection = createRowSelection({
 		ids: () => visibleRepositories.map((row) => row.id),
 		onChange(next) {
@@ -1297,6 +1303,7 @@
 				bind:this={tableScroll}
 				class="table-scroll"
 				{@attach titleOnHover(describeCell)}
+				{@attach virtualRows.scroller}
 				aria-label="Repository table"
 				onpointerdown={() => {
 					pendingScroll = undefined
@@ -1313,7 +1320,10 @@
 				}}
 				role="region"
 			>
-				<table style:width="max(100%, {table.getTotalSize()}px)">
+				<table
+					style:width="max(100%, {table.getTotalSize()}px)"
+					aria-rowcount={visibleRepositories.length + 1}
+				>
 					<colgroup>
 						{#each table.getVisibleLeafColumns() as column (column.id)}
 							<col style:width="{column.getSize()}px" />
@@ -1321,7 +1331,7 @@
 						{/each}
 					</colgroup>
 					<thead
-						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
+						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr aria-rowindex={1}
 								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
 										(item) => item.id === header.column.id,
 									)}{@const dock = dockPositions[header.column.id]}<th
@@ -1406,8 +1416,13 @@
 							>{/each}</thead
 					>
 					<tbody
-						>{#each table.getRowModel().rows as row (row.id)}<tr
+						>{#if virtualRows.before > 0}<tr class="row-spacer" aria-hidden="true"
+								><td style:height="{virtualRows.before}px" colspan={tableColumnCount}></td></tr
+							>{/if}{#each renderedRows as row, index (row.id)}<tr
+								class:even={(virtualRows.start + index) % 2 === 1}
 								class:selected={row.getIsSelected()}
+								{@attach virtualRows.row}
+								aria-rowindex={virtualRows.start + index + 2}
 								data-repository-id={row.id}
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
@@ -1454,7 +1469,9 @@
 											class="table-filler"
 											aria-hidden="true"
 										></td>{/if}{/each}</tr
-							>{/each}</tbody
+							>{/each}{#if virtualRows.after > 0}<tr class="row-spacer" aria-hidden="true"
+								><td style:height="{virtualRows.after}px" colspan={tableColumnCount}></td></tr
+							>{/if}</tbody
 					>
 				</table>
 				{#if table.getRowModel().rows.length === 0}<div class="empty-state">

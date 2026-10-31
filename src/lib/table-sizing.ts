@@ -29,7 +29,9 @@ export function measureColumns(
 
 	const headers = [...table.querySelectorAll<HTMLElement>(':scope > thead > tr > th')]
 	const cells = [
-		...(table.querySelector(':scope > tbody > tr')?.querySelectorAll<HTMLElement>('td') ?? []),
+		...(table
+			.querySelector(':scope > tbody > tr[data-repository-id]')
+			?.querySelectorAll<HTMLElement>('td') ?? []),
 	]
 	const sizes: Record<string, number> = {}
 	for (const column of columns) {

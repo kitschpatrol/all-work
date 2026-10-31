@@ -1073,7 +1073,7 @@ td {
 	background: #fff;
 }
 
-tr:nth-child(even) td {
+tr.even td {
 	background: #fbfcfd;
 }
 
@@ -1082,6 +1082,17 @@ tr.selected td {
 	border-bottom-color: #d5dce6;
 	color: #1f2c3d;
 	background: linear-gradient(#f6f8fc, #f0f3f9);
+}
+
+/* Spacers hold the place of rows rendered only near the viewport, showing the table's white until those rows render */
+tbody tr.row-spacer {
+	background: none;
+}
+
+tbody tr.row-spacer td {
+	padding: 0;
+	border: 0;
+	background: none;
 }
 
 /* Docked columns keep a deeper tint than the columns scrolling beneath them, and run statuses still show */
@@ -1101,11 +1112,11 @@ td.output-cell[data-run-status='failed'] {
 	background: #fbeeed;
 }
 
-tr:nth-child(even) td.output-cell[data-run-status='success'] {
+tr.even td.output-cell[data-run-status='success'] {
 	background: #e8f2ea;
 }
 
-tr:nth-child(even) td.output-cell[data-run-status='failed'] {
+tr.even td.output-cell[data-run-status='failed'] {
 	background: #f7e9e8;
 }
 
