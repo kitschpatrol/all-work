@@ -994,19 +994,6 @@ input[type='search']::-webkit-search-cancel-button {
 	--column-edge-shadow-width: calc(var(--docked-column-shadow-width) * 0.5);
 	--dragged-column-shadow-width: calc(var(--docked-column-shadow-width) * 0.75);
 	--column-shadow-stops: #00000016, #0000000c 25%, #00000005 55%, #0000;
-	--column-slot-shadow-width: min(
-		var(--column-edge-shadow-width),
-		var(--column-drag-slot-width, 0px)
-	);
-	--column-slot-shadow:
-		linear-gradient(to right, var(--column-shadow-stops)) var(--column-drag-slot-left, 0px) 0 /
-			var(--column-slot-shadow-width) 100% no-repeat,
-		linear-gradient(to left, var(--column-shadow-stops))
-			calc(
-				var(--column-drag-slot-left, 0px) + var(--column-drag-slot-width, 0px) -
-					var(--column-slot-shadow-width)
-			)
-			0 / var(--column-slot-shadow-width) 100% no-repeat;
 
 	overflow: auto;
 	display: flex;
@@ -1300,6 +1287,50 @@ th.column-dragged + th:not(.dock-edge) {
 /* Hover states and tooltips would flicker beneath the pointer while a column moves */
 .column-dragging {
 	user-select: none;
+}
+
+/*
+ * A drag sets the slot it leaves behind on the scroller. Only the rows and the
+ * header's backdrop take it, through explicit inheritance, so moving the slot
+ * restyles them and none of the cells.
+ */
+@property --column-drag-slot-left {
+	inherits: false;
+	initial-value: 0;
+	syntax: '<length>';
+}
+
+@property --column-drag-slot-width {
+	inherits: false;
+	initial-value: 0;
+	syntax: '<length>';
+}
+
+@property --column-slot-shadow {
+	inherits: false;
+	syntax: '*';
+}
+
+.table-scroll > table,
+thead,
+tbody,
+tbody tr,
+thead::after {
+	--column-drag-slot-left: inherit;
+	--column-drag-slot-width: inherit;
+}
+
+tbody tr,
+thead::after {
+	--column-slot-shadow:
+		linear-gradient(to right, var(--column-shadow-stops)) var(--column-drag-slot-left) 0 /
+			min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) 100% no-repeat,
+		linear-gradient(to left, var(--column-shadow-stops))
+			calc(
+				var(--column-drag-slot-left) + var(--column-drag-slot-width) -
+					min(var(--column-edge-shadow-width), var(--column-drag-slot-width))
+			)
+			0 / min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) 100% no-repeat;
 }
 
 /*
