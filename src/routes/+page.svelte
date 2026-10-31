@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { RowSelectionState } from '@tanstack/svelte-table'
 	import type { AppWindow } from '#lib/app-windows.js'
+	import type { DockedColumns, DockSide } from '#lib/column-order.js'
 	import type { MenuActions } from '#lib/electron-api.js'
 	import type { RequestedMetadata } from '#lib/metadata-requests.js'
 	import type { Preferences } from '#lib/preferences.js'
@@ -20,7 +21,15 @@
 	import { request } from '#lib/client-request.js'
 	import { startColumnDrag } from '#lib/column-drag.js'
 	import { createColumnMenu } from '#lib/column-menu.js'
-	import { moveColumnToEnd, resolveColumnOrder } from '#lib/column-order.js'
+	import {
+		dockNewestRun,
+		getDockPositions,
+		getDockSide,
+		moveColumnToEnd,
+		resolveColumnOrder,
+		toggleDock,
+		undockColumn,
+	} from '#lib/column-order.js'
 	import { createColumnPresets } from '#lib/column-preset-state.svelte.js'
 	import { defaultColumnPreset, isColumnPresetId } from '#lib/column-presets.js'
 	import { startColumnResize } from '#lib/column-resize.js'
@@ -83,6 +92,7 @@
 	let outputLines = $state(3)
 	let rowSelection: RowSelectionState = $state({})
 	let columnOrder: string[] = $state([])
+	let columnDocking: DockedColumns = $state({ start: ['relativePath'], end: [] })
 	let draggingColumnId = $state<string>()
 	let runs: CommandRun[] = $state([])
 	let searchInput = $state<HTMLInputElement>()
@@ -114,17 +124,19 @@
 	const lazyGroups: ReadonlySet<MetadataGroup> = new Set(['ci', 'git', 'github', 'registry'])
 
 	const defaultColumnIds = new Set(['relativePath', ...defaultColumnPreset.columns])
+	// The selection column leads the start dock and never docks, undocks, or moves
+	const fixedColumnIds = ['select']
 
 	const columns = $derived(createColumnDefs(runs, runSorting))
-	const pinnedColumns = $derived({
-		start: ['select', 'relativePath'],
-		end: runs.slice(-1).map((run) => run.id),
+	const dockedColumns = $derived<DockedColumns>({
+		start: [...fixedColumnIds, ...columnDocking.start],
+		end: columnDocking.end,
 	})
 	const resolvedColumnOrder = $derived(
 		resolveColumnOrder(
 			columns.flatMap((column) => column.id ?? []),
 			columnOrder,
-			pinnedColumns,
+			dockedColumns,
 		),
 	)
 	const columnVariables = $derived(getColumnVariables(runs))
@@ -204,11 +216,14 @@
 	})
 	const columnMenu = createColumnMenu({
 		beforeSort: tableRows.refresh,
+		docked: () => dockedColumns,
+		fixed: fixedColumnIds,
 		getColumn: (id) => table.getColumn(id),
 		getColumnOrder: () => table.getVisibleLeafColumns().map((column) => column.id),
 		getOptionalColumns: () => optionalColumns,
 		getRows: (selected) => (selected ? targets : visibleRepositories).map((row) => row.original),
 		getRuns: () => runs,
+		onDock: dockColumn,
 		onError: showError,
 		onFilter: rowFilter.addColumnRule,
 		onHide: async (id) => setColumnsVisible([id], false),
@@ -218,20 +233,20 @@
 			}
 		},
 		async onShow(id) {
-			columnOrder = moveColumnToEnd(resolvedColumnOrder, id, pinnedColumns)
+			columnOrder = moveColumnToEnd(resolvedColumnOrder, id, dockedColumns)
 			await setColumnsVisible([id], true)
 			await tick()
 			tableScroll.scrollLeft = tableScroll.scrollWidth
 		},
 		onSort: scheduleMetadata,
-		pinned: () => pinnedColumns,
 		sortByExitCode: runSorting.set,
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
-	// Spare width opens up before the pinned run column, which keeps it at the table's right edge
+	// Spare width opens up before the end dock, which keeps it at the table's right edge
 	const fillerAfterColumnId = $derived(
-		table.getVisibleLeafColumns().findLast((column) => !pinnedColumns.end.includes(column.id))?.id,
+		table.getVisibleLeafColumns().findLast((column) => !dockedColumns.end.includes(column.id))?.id,
 	)
+	const dockPositions = $derived(getDockPositions(table.getVisibleLeafColumns(), dockedColumns))
 	const selection = createRowSelection({
 		ids: () => visibleRepositories.map((row) => row.id),
 		onChange(next) {
@@ -255,6 +270,7 @@
 			workspace === undefined
 				? (savedView?.clearedRunIds ?? [])
 				: runHistory.cleared.map((run) => run.id),
+		columnDocking,
 		columnOrder,
 		columnPreset: columnPresets.selected?.id,
 		columnSizing: table.atoms.columnSizing.get(),
@@ -302,6 +318,7 @@
 		}
 
 		autoClear = view.autoClear
+		columnDocking = view.columnDocking
 		columnOrder = view.columnOrder
 		command = view.command
 		commandHistory = view.commandHistory
@@ -389,6 +406,7 @@
 		directory = workspace?.directory ?? data.defaultDirectory
 		recursive = false
 		autoClear = false
+		columnDocking = { start: ['relativePath'], end: runs.slice(-1).map((run) => run.id) }
 		columnOrder = []
 		command = ''
 		concurrency = 6
@@ -540,6 +558,10 @@
 				await Promise.all(runs.map(async (run) => request(`/api/runs/${run.id}`, {}, 'DELETE')))
 				closeStreams()
 				runs = []
+				columnDocking = {
+					start: columnDocking.start.filter((id) => repositoryColumnIds.has(id)),
+					end: columnDocking.end.filter((id) => repositoryColumnIds.has(id)),
+				}
 				autoClearPredecessors.clear()
 				rowSelection = {}
 				selectedOnly = false
@@ -789,6 +811,7 @@
 				sourceRunIds: runs.map((run) => run.id),
 				workspaceId: workspace.id,
 			})
+			columnDocking = dockNewestRun(columnDocking, run.id, runs.at(-1)?.id)
 			runs = [...runs, run]
 			runHistory.counted(run)
 			if (commandHistory.at(-1) !== run.command) {
@@ -837,6 +860,7 @@
 			table.setSorting((previous) => previous.filter((entry) => entry.id !== runId))
 			runSorting.set(runId, false)
 			runs = runs.filter((run) => run.id !== runId)
+			columnDocking = undockColumn(columnDocking, runId)
 			rowFilter.prune()
 			resizedColumns.delete(runId)
 			autoClearPredecessors.delete(runId)
@@ -873,10 +897,10 @@
 	function startResize(
 		event: MouseEvent | TouchEvent,
 		header: Parameters<typeof startColumnResize>[1],
-		pinned: boolean,
 	) {
 		resizedColumns.add(header.column.id)
-		startColumnResize(event, header, pinned, (size) => {
+		const fromLeftEdge = getDockSide(dockedColumns, header.column.id) === 'end'
+		startColumnResize(event, header, fromLeftEdge, (size) => {
 			table.setColumnSizing((previous) => ({ ...previous, [header.column.id]: size }))
 		})
 	}
@@ -888,18 +912,34 @@
 		) {
 			startColumnDrag(event, {
 				columns: () => table.getVisibleLeafColumns(),
+				docked: () => dockedColumns,
+				fixed: fixedColumnIds,
 				id: columnId,
 				onDragging(id) {
 					draggingColumnId = id
 				},
-				onReorder(order) {
-					columnOrder = order
+				onReorder(region, order) {
+					if (region === 'center') {
+						columnOrder = order
+					} else {
+						columnDocking = { ...columnDocking, [region]: order }
+					}
 				},
 				order: () => resolvedColumnOrder,
-				pinned: () => pinnedColumns,
 				scroller: tableScroll,
 			})
 		}
+	}
+
+	// Dock a column at an edge, or undock it back among the scrolling columns beside the dock it left
+	function dockColumn(id: string, side: DockSide) {
+		const next = toggleDock(columnDocking, id, side)
+		if (getDockSide(next, id) === undefined) {
+			const rest = resolvedColumnOrder.filter((entry) => entry !== id)
+			columnOrder = side === 'start' ? [id, ...rest] : [...rest, id]
+		}
+
+		columnDocking = next
 	}
 
 	function showError(error: unknown) {
@@ -1284,9 +1324,13 @@
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr
 								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
 										(item) => item.id === header.column.id,
-									)}{@const pinned = run !== undefined && run === runs.at(-1)}<th
+									)}{@const dock = dockPositions[header.column.id]}<th
+										style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
+										style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
 										class:column-dragged={draggingColumnId === header.column.id}
-										class:last-output-cell={pinned}
+										class:dock-edge={dock?.edge}
+										class:docked-end={dock?.side === 'end'}
+										class:docked-start={dock?.side === 'start'}
 										class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
 										class:output-header={run !== undefined}
 										class:repository-cell={header.column.id === 'relativePath'}
@@ -1349,8 +1393,8 @@
 													resizedColumns.delete(header.column.id)
 													fitColumns([header.column.id], { automatic: false })
 												}}
-												onmousedown={(event) => startResize(event, header, pinned)}
-												ontouchstart={(event) => startResize(event, header, pinned)}
+												onmousedown={(event) => startResize(event, header)}
+												ontouchstart={(event) => startResize(event, header)}
 												type="button"
 											></button>{/if}
 									</th>{#if header.column.id === fillerAfterColumnId}<th
@@ -1367,9 +1411,14 @@
 								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
 										row.original}{@const run = runs.find(
 										(item) => item.id === cell.column.id,
-									)}{@const display = getColumnDisplay(cell.column.id)}<td
+									)}{@const display = getColumnDisplay(cell.column.id)}{@const dock =
+										dockPositions[cell.column.id]}<td
+										style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
+										style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
 										class:column-dragged={draggingColumnId === cell.column.id}
-										class:last-output-cell={run !== undefined && run === runs.at(-1)}
+										class:dock-edge={dock?.edge}
+										class:docked-end={dock?.side === 'end'}
+										class:docked-start={dock?.side === 'start'}
 										class:numeric-cell={display === 'number'}
 										class:output-cell={run !== undefined}
 										class:repository-cell={cell.column.id === 'relativePath'}

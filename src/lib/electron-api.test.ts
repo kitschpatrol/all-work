@@ -41,10 +41,12 @@ describe('menu requests arriving over IPC', () => {
 
 	it('accepts a column menu request only when it says whether the column has a variable', () => {
 		const request = {
+			canDock: true,
 			canFilter: true,
 			canHide: true,
 			canSort: true,
 			columnId: 'branch',
+			dock: undefined,
 			hasFinishedRunsLeft: false,
 			hasFinishedRunsRight: true,
 			hasSelection: false,
@@ -56,6 +58,9 @@ describe('menu requests arriving over IPC', () => {
 		expect(isColumnMenuRequest({ ...request, hasFinishedRunsLeft: 1 })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, hasVariable: undefined })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, hasVariable: 'true' })).toBe(false)
+		expect(isColumnMenuRequest({ ...request, dock: 'start' })).toBe(true)
+		expect(isColumnMenuRequest({ ...request, dock: 'left' })).toBe(false)
+		expect(isColumnMenuRequest({ ...request, canDock: undefined })).toBe(false)
 	})
 
 	it('accepts hidden columns grouped under a category, and an empty list', () => {

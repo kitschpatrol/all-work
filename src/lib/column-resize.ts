@@ -13,7 +13,7 @@ function pointerX(event: MouseEvent | TouchEvent): number | undefined {
 
 /**
  * Start a column resize drag. Columns normally resize from their right edge
- * through TanStack's handler. A column pinned to the right edge resizes from
+ * through TanStack's handler. A column docked at the right edge resizes from
  * its left edge instead, so dragging left widens it.
  */
 export function startColumnResize(

@@ -275,7 +275,8 @@ async function main(): Promise<void> {
 				return
 			}
 
-			type ColumnMenuItem = 'separator' | [string, MenuCommand, boolean]
+			// A fourth entry makes a checkbox item, checked while the column is docked there
+			type ColumnMenuItem = 'separator' | [string, MenuCommand, boolean, boolean?]
 			const runItems: ColumnMenuItem[] = [
 				'separator',
 				['Clear Finished to Left', 'column.clearFinishedLeft', request.hasFinishedRunsLeft],
@@ -297,6 +298,9 @@ async function main(): Promise<void> {
 				['Hide Column', 'column.hide', request.canHide],
 				['Filter By…', 'column.filter', request.canFilter],
 				'separator',
+				['Dock Left', 'column.dockStart', request.canDock, request.dock === 'start'],
+				['Dock Right', 'column.dockEnd', request.canDock, request.dock === 'end'],
+				'separator',
 				['Copy', 'column.copy', true],
 				['Copy Selected', 'column.copySelected', request.hasSelection],
 				['Copy Variable', 'column.copyVariable', request.hasVariable],
@@ -308,13 +312,14 @@ async function main(): Promise<void> {
 						return { type: 'separator' } as const
 					}
 
-					const [label, command, enabled] = item
+					const [label, command, enabled, checked] = item
 					return {
 						click() {
 							event.sender.send('all-work:menu-command', command, request.columnId)
 						},
 						enabled,
 						label,
+						...(checked !== undefined && { checked, type: 'checkbox' as const }),
 					}
 				}),
 			).popup({ window })

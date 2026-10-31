@@ -1,6 +1,7 @@
-import type { PinnedColumns } from './column-order.js'
+import type { DockedColumns, DockSide } from './column-order.js'
 import type { MenuActions } from './electron-api.js'
 import type { CommandRun, Repository } from './workspace.js'
+import { getDockSide } from './column-order.js'
 import { getColumnVariableName } from './column-variables.js'
 import { focusLastFilterRule } from './filter-focus.js'
 import { getColumnCopyLines } from './table-formatting.js'
@@ -23,6 +24,10 @@ type OptionalColumn = {
 
 type ColumnMenuOptions = {
 	beforeSort: () => void
+	/** Columns docked at either edge, fixed ones included. */
+	docked: () => DockedColumns
+	/** Columns that never dock, undock, or move. */
+	fixed: readonly string[]
 	getColumn: (id: string) => MenuColumn | undefined
 	/** Visible column ids in display order. */
 	getColumnOrder: () => readonly string[]
@@ -31,6 +36,7 @@ type ColumnMenuOptions = {
 	/** Rows shown by the table, or only the selected ones, in table order. */
 	getRows: (selected: boolean) => readonly Repository[]
 	getRuns: () => readonly CommandRun[]
+	onDock: (id: string, side: DockSide) => void
 	onError: (error: unknown) => void
 	onFilter: (id: string) => void
 	onHide: (id: string) => Promise<void>
@@ -38,27 +44,23 @@ type ColumnMenuOptions = {
 	/** Show a hidden column at the end of the table, where its menu opened. */
 	onShow: (id: string) => Promise<void>
 	onSort: () => void
-	pinned: () => PinnedColumns
 	/** Sort a run column by its commands' exit codes, or by their output. */
 	sortByExitCode: (runId: string, byExitCode: boolean) => void
 }
 
 /**
- * Connect a column's native menu to sorting, visibility, filter rules, copying
- * its plain text or shell variable, and, for a run column, sorting by exit code
- * and clearing finished runs beside it, and the empty header space's menu to
- * showing hidden columns.
+ * Connect a column's native menu to sorting, visibility, docking, filter rules,
+ * copying its plain text or shell variable, and, for a run column, sorting by
+ * exit code and clearing finished runs beside it, and the empty header space's
+ * menu to showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
 		return id === undefined ? undefined : options.getColumn(id)
 	}
 
-	function canHide(column: MenuColumn) {
-		const pinned = options.pinned()
-		return (
-			column.getCanHide() && !pinned.start.includes(column.id) && !pinned.end.includes(column.id)
-		)
+	function canDock(id: string) {
+		return !options.fixed.includes(id)
 	}
 
 	function getFinishedRunsBeside(id: string | undefined, side: 'left' | 'right') {
@@ -162,6 +164,16 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		'column.copyVariable'(payload) {
 			void copyVariable(payload)
 		},
+		'column.dockEnd'(payload) {
+			if (payload !== undefined && canDock(payload)) {
+				options.onDock(payload, 'end')
+			}
+		},
+		'column.dockStart'(payload) {
+			if (payload !== undefined && canDock(payload)) {
+				options.onDock(payload, 'start')
+			}
+		},
 		'column.filter'(payload) {
 			const column = getColumn(payload)
 			if (column?.getCanFilter()) {
@@ -170,7 +182,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		},
 		'column.hide'(payload) {
 			const column = getColumn(payload)
-			if (column !== undefined && canHide(column)) {
+			if (column?.getCanHide()) {
 				void changeVisibility(options.onHide, column.id)
 			}
 		},
@@ -205,10 +217,12 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			event.preventDefault()
 			try {
 				await globalThis._allWork.showColumnMenu({
+					canDock: canDock(columnId),
 					canFilter: column.getCanFilter(),
-					canHide: canHide(column),
+					canHide: column.getCanHide(),
 					canSort: column.getCanSort(),
 					columnId,
+					dock: getDockSide(options.docked(), columnId),
 					hasFinishedRunsLeft: getFinishedRunsBeside(columnId, 'left').length > 0,
 					hasFinishedRunsRight: getFinishedRunsBeside(columnId, 'right').length > 0,
 					hasSelection: options.getRows(true).length > 0,

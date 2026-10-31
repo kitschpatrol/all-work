@@ -16,6 +16,8 @@ export type MenuCommand =
 	| 'column.copy'
 	| 'column.copySelected'
 	| 'column.copyVariable'
+	| 'column.dockEnd'
+	| 'column.dockStart'
 	| 'column.filter'
 	| 'column.hide'
 	| 'column.show'
@@ -102,10 +104,13 @@ export type AppWindowRequest = {
 
 /** Available actions for the column whose native context menu is opening. */
 export type ColumnMenuRequest = {
+	canDock: boolean
 	canFilter: boolean
 	canHide: boolean
 	canSort: boolean
 	columnId: string
+	/** The edge the column is docked at, if any. */
+	dock: 'end' | 'start' | undefined
 	hasFinishedRunsLeft: boolean
 	hasFinishedRunsRight: boolean
 	hasSelection: boolean
@@ -167,7 +172,9 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 	return (
 		typeof request.columnId === 'string' &&
 		request.columnId !== '' &&
+		['end', 'start', undefined].includes(request.dock as string | undefined) &&
 		typeof request.canFilter === 'boolean' &&
+		typeof request.canDock === 'boolean' &&
 		typeof request.canHide === 'boolean' &&
 		typeof request.canSort === 'boolean' &&
 		typeof request.hasFinishedRunsLeft === 'boolean' &&

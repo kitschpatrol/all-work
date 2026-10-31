@@ -124,6 +124,30 @@ describe('shared JSON view persistence', () => {
 		})
 	})
 
+	it('docks the repository column and the newest run for a view saved before docking existed', () => {
+		expect(parseSavedView({ runIds: ['run-1', 'run-2'] }, '/default').columnDocking).toEqual({
+			start: ['relativePath'],
+			end: ['run-2'],
+		})
+		expect(parseSavedView({}, '/default').columnDocking).toEqual({
+			start: ['relativePath'],
+			end: [],
+		})
+	})
+
+	it('restores saved docking, keeping each column at one edge', () => {
+		expect(
+			parseSavedView(
+				{ columnDocking: { start: ['name', 4], end: ['name', 'run-1'] }, runIds: ['run-2'] },
+				'/default',
+			).columnDocking,
+		).toEqual({ start: ['name'], end: ['run-1'] })
+		expect(parseSavedView({ columnDocking: {} }, '/default').columnDocking).toEqual({
+			start: [],
+			end: [],
+		})
+	})
+
 	it('discards queued snapshots on reset and prevents them from resurrecting the old view', async () => {
 		vi.useFakeTimers()
 		vi.mocked(request).mockResolvedValue({ reset: true })

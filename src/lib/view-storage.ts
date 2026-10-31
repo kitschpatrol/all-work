@@ -1,3 +1,4 @@
+import type { DockedColumns } from './column-order.js'
 import type { ColumnPresetId } from './column-presets.js'
 import type { FilterPresetId } from './filter-presets.js'
 import type { Preferences } from './preferences.js'
@@ -13,6 +14,8 @@ export type SavedView = {
 	autoClearPredecessors: Record<string, string>
 	/** Runs whose columns were cleared while filter rules still read them. */
 	clearedRunIds: string[]
+	/** Columns docked at either table edge, in dock order. */
+	columnDocking: DockedColumns
 	columnOrder: string[]
 	columnPreset: ColumnPresetId | undefined
 	columnSizing: Record<string, number>
@@ -51,6 +54,21 @@ function integer(value: unknown, fallback: number, min: number, max = Number.MAX
 		: fallback
 }
 
+/**
+ * A view saved before docking existed keeps the repository column at the left
+ * edge and its newest run at the right, as the table always showed them.
+ */
+function parseDocking(value: unknown, runIds: string[]): DockedColumns {
+	const record = asRecord(value)
+	if (record === undefined) {
+		return { start: ['relativePath'], end: runIds.slice(-1) }
+	}
+
+	const start = strings(record.start)
+	const end = strings(record.end).filter((id) => !start.includes(id))
+	return { start, end }
+}
+
 function booleanRecord(value: unknown): Record<string, boolean> {
 	return Object.fromEntries(
 		Object.entries(asRecord(value) ?? {}).filter(
@@ -71,6 +89,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 			),
 		),
 		clearedRunIds: strings(record.clearedRunIds).slice(-1000),
+		columnDocking: parseDocking(record.columnDocking, strings(record.runIds)),
 		columnOrder: strings(record.columnOrder),
 		// A view saved before presets existed, or a fresh one, starts on Default
 		columnPreset: isColumnPresetId(record.columnPreset)

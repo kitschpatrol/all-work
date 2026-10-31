@@ -986,9 +986,9 @@ input[type='search']::-webkit-search-cancel-button {
 
 /* Space below the last row reads as a floor behind the table, darker than the toolbars */
 .table-scroll {
-	--pinned-column-shadow-width: 20px;
-	--column-edge-shadow-width: calc(var(--pinned-column-shadow-width) * 0.5);
-	--dragged-column-shadow-width: calc(var(--pinned-column-shadow-width) * 0.75);
+	--docked-column-shadow-width: 20px;
+	--column-edge-shadow-width: calc(var(--docked-column-shadow-width) * 0.5);
+	--dragged-column-shadow-width: calc(var(--docked-column-shadow-width) * 0.75);
 	--column-shadow-stops: #00000016, #0000000c 25%, #00000005 55%, #0000;
 	--column-slot-shadow-width: min(
 		var(--column-edge-shadow-width),
@@ -1080,8 +1080,8 @@ tr.selected td {
 	background: linear-gradient(#f6f8fc, #f0f3f9);
 }
 
-/* Pinned columns keep a deeper tint than the columns scrolling beneath them, and run statuses still show */
-tr.selected :is(.selection-cell, .repository-cell, .last-output-cell) {
+/* Docked columns keep a deeper tint than the columns scrolling beneath them, and run statuses still show */
+tr.selected :is(.docked-start, .docked-end) {
 	background: linear-gradient(#f2f5fa, #ecf0f7);
 }
 
@@ -1126,15 +1126,23 @@ td.output-cell[data-run-status='running'] {
 	}
 }
 
-/* The newest run stays in view at the right edge, as the repository column does at the left */
-.last-output-cell {
+/* Docked columns stick to the scroller's edges, where each dock's innermost column casts a shadow onto the scrolling columns */
+.docked-start,
+.docked-end {
 	position: sticky;
 	z-index: 2;
-	right: 0;
+}
+
+.docked-start.dock-edge {
+	box-shadow: 1px 0 #00000026;
+}
+
+.docked-end.dock-edge {
 	box-shadow: -1px 0 #00000026;
 }
 
-th.last-output-cell {
+th.docked-start,
+th.docked-end {
 	z-index: 5;
 }
 
@@ -1162,24 +1170,14 @@ th.last-output-cell {
 /* Shift-clicking checkboxes extends the row selection, never a text selection */
 .selection-cell {
 	user-select: none;
-	position: sticky;
-	z-index: 2;
-	left: 0;
 	padding-inline: 6px;
 	text-align: center;
 }
 
-.repository-cell {
-	position: sticky;
-	z-index: 2;
-	left: 32px;
-	box-shadow: 1px 0 #00000026;
-}
-
-/* Column shadows join across rows, with the pinned columns casting the widest shadows */
-.repository-cell::after,
-.last-output-cell::after,
-:where(:not(.repository-cell) + .table-filler)::before,
+/* Column shadows join across rows, with the docked columns casting the widest shadows */
+.docked-start.dock-edge::after,
+.docked-end.dock-edge::after,
+:where(:not(.docked-start) + .table-filler)::before,
 .column-dragged::before,
 .column-dragged::after {
 	pointer-events: none;
@@ -1187,31 +1185,26 @@ th.last-output-cell {
 	position: absolute;
 	top: 0;
 	bottom: -1px;
-	width: var(--pinned-column-shadow-width);
+	width: var(--docked-column-shadow-width);
 }
 
-.repository-cell::after,
+.docked-start.dock-edge::after,
 .column-dragged::after {
 	left: calc(100% + 1px);
 	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
-.last-output-cell::after,
+.docked-end.dock-edge::after,
 .column-dragged::before {
 	right: calc(100% + 1px);
 	background: linear-gradient(to left, var(--column-shadow-stops));
 }
 
 /* The resting edge shadow stays on the filler while the dragged column's shadows fade away */
-:where(:not(.repository-cell) + .table-filler)::before {
+:where(:not(.docked-start) + .table-filler)::before {
 	left: 0;
 	width: var(--column-edge-shadow-width);
 	background: linear-gradient(to right, var(--column-shadow-stops));
-}
-
-th.selection-cell,
-th.repository-cell {
-	z-index: 5;
 }
 
 /* Clicking anywhere in a selection cell toggles its checkbox */
@@ -1224,7 +1217,7 @@ th.repository-cell {
 	justify-content: center;
 }
 
-/* A dragged column floats over its neighbors but passes beneath the pinned columns */
+/* A dragged column floats over its neighbors: beneath the docks when it scrolls, above them when it is docked */
 .column-dragged {
 	box-shadow:
 		-1px 0 #0000001f,
@@ -1238,6 +1231,15 @@ td.column-dragged {
 
 th.column-dragged {
 	z-index: 4;
+}
+
+td.column-dragged:is(.docked-start, .docked-end) {
+	position: sticky;
+	z-index: 3;
+}
+
+th.column-dragged:is(.docked-start, .docked-end) {
+	z-index: 6;
 }
 
 .column-dragging .column-dragged {
@@ -1270,11 +1272,11 @@ th.column-dragged {
 }
 
 /* Cells draw only their right border, so the dragged column carries away its neighbor's left edge */
-td.column-dragged + td:not(.last-output-cell) {
+td.column-dragged + td:not(.dock-edge) {
 	box-shadow: inset 1px 0 #eceef1;
 }
 
-th.column-dragged + th:not(.last-output-cell) {
+th.column-dragged + th:not(.dock-edge) {
 	box-shadow:
 		inset 1px 0 #d3d3d3,
 		inset 2px 0 #fff;
@@ -1379,8 +1381,8 @@ th[aria-sort='descending'] {
 	background: transparent;
 }
 
-/* The pinned column resizes from its left edge; a right-side handle would overflow the table */
-.last-output-cell .resize-handle {
+/* Columns docked at the right edge resize from their left edge; a right-side handle would overflow the table */
+.docked-end .resize-handle {
 	right: auto;
 	left: -3px;
 }

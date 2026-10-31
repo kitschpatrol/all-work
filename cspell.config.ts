@@ -14,6 +14,7 @@ export default cspellConfig({
 		'pycache',
 		'slopforest',
 		'togglefullscreen',
+		'undock',
 		'wezterm',
 		'ZDOTDIR',
 	],

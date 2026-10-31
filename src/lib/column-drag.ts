@@ -1,28 +1,41 @@
 import { tick } from 'svelte'
-import type { PinnedColumns } from './column-order.js'
+import type { DockedColumns } from './column-order.js'
 import { moveColumn, nearestSlot } from './column-order.js'
 
 type DragColumn = { getSize: () => number; id: string }
 
+/** Where a column sits: docked at an edge, or scrolling between the docks. */
+type ColumnRegion = 'center' | keyof DockedColumns
+
 type ColumnDragOptions = {
 	/** Visible leaf columns in display order. */
 	columns: () => DragColumn[]
+	/** Columns docked at either edge, fixed ones included. */
+	docked: () => DockedColumns
+	/** Columns at the front of the start dock that never move. */
+	fixed: readonly string[]
 	/** The column being dragged. */
 	id: string
 	/** Receives the dragged column id as a drag begins, then `undefined`. */
 	onDragging: (id: string | undefined) => void
-	/** Receives the new order of the movable columns, hidden ones included. */
-	onReorder: (order: string[]) => void
-	/** The full display order, pinned columns included. */
+	/**
+	 * Receives the new order of the region's movable columns, hidden ones
+	 * included and fixed ones left out.
+	 */
+	onReorder: (region: ColumnRegion, order: string[]) => void
+	/** The full display order, docked columns included. */
 	order: () => string[]
-	pinned: () => PinnedColumns
 	/** The table's scroller, whose cells carry `data-column-id`. */
 	scroller: HTMLElement
 }
 
 type Layout = {
+	/** The region's movable visible columns in order. */
 	columns: Array<{ id: string; width: number }>
 	endWidth: number
+	/** Visible width before the region's first movable column. */
+	leading: number
+	region: ColumnRegion
 	startWidth: number
 }
 
@@ -85,45 +98,78 @@ function suppressNextClick() {
 	}, 0)
 }
 
-function measure(columns: DragColumn[], pinned: PinnedColumns): Layout {
-	const fixed = new Set([...pinned.start, ...pinned.end])
-	const width = (ids: string[]) =>
+function measure(
+	columns: DragColumn[],
+	docked: DockedColumns,
+	fixed: readonly string[],
+	id: string,
+): Layout {
+	const region: ColumnRegion = docked.start.includes(id)
+		? 'start'
+		: docked.end.includes(id)
+			? 'end'
+			: 'center'
+	const width = (ids: readonly string[]) =>
 		columns
 			.filter((column) => ids.includes(column.id))
 			.reduce((sum, column) => sum + column.getSize(), 0)
+	const inRegion = (columnId: string) =>
+		region === 'center'
+			? !docked.start.includes(columnId) && !docked.end.includes(columnId)
+			: docked[region].includes(columnId)
 	return {
 		columns: columns
-			.filter((column) => !fixed.has(column.id))
+			.filter((column) => inRegion(column.id) && !fixed.includes(column.id))
 			.map((column) => ({ id: column.id, width: column.getSize() })),
-		endWidth: width(pinned.end),
-		startWidth: width(pinned.start),
+		endWidth: width(docked.end),
+		leading: region === 'center' ? width(docked.start) : region === 'start' ? width(fixed) : 0,
+		region,
+		startWidth: width(docked.start),
 	}
 }
 
 /**
- * Track a press on an unpinned column header and reorder the column as in the
- * macOS Finder. Past a small threshold the column follows the pointer within
- * the movable region, neighbors slide aside once it covers half their width,
- * and the table scrolls while the pointer is near either pinned edge. Releasing
- * settles the column into its slot and swallows the click, so a drag never
- * sorts. A press that never crosses the threshold stays a click.
+ * Where a region's first movable column rests, measured from the table's left
+ * edge. The docks stick to the scroller's edges, so theirs move with the scroll
+ * position.
+ */
+function regionLeft(scroller: HTMLElement, layout: Layout) {
+	switch (layout.region) {
+		case 'center': {
+			return layout.leading
+		}
+
+		case 'end': {
+			return scroller.scrollLeft + scroller.clientWidth - layout.endWidth
+		}
+
+		case 'start': {
+			return scroller.scrollLeft + layout.leading
+		}
+	}
+}
+
+/**
+ * Track a press on a column header and reorder the column as in the macOS
+ * Finder. Past a small threshold the column follows the pointer within its
+ * region, neighbors slide aside once it covers half their width, and the table
+ * scrolls while a scrolling column nears either dock. Releasing settles the
+ * column into its slot and swallows the click, so a drag never sorts. A press
+ * that never crosses the threshold stays a click.
  */
 export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions): void {
 	const { id, scroller } = options
-	if (
-		event.button !== 0 ||
-		options.pinned().start.includes(id) ||
-		options.pinned().end.includes(id)
-	) {
+	if (event.button !== 0 || options.fixed.includes(id)) {
 		return
 	}
 
-	const layout = () => measure(options.columns(), options.pinned())
+	const layout = () => measure(options.columns(), options.docked(), options.fixed, id)
 	const originX = event.clientX
 	const originScroll = scroller.scrollLeft
-	let originLeft = 0
+	let originPosition = 0
 	let pointerX = originX
 	let offset = 0
+	let slotLeft: number | undefined
 	let drag: number | undefined
 	let frame: number | undefined
 	// Measured once as the drag begins, so each frame avoids a forced layout
@@ -143,19 +189,32 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		scroller.scrollLeft += Math.max(-1, Math.min(1, depth / edgeZone)) * maxScrollStep
 	}
 
+	function regionOrder(current: Layout) {
+		const docked = options.docked()
+		switch (current.region) {
+			case 'center': {
+				const fixed = new Set([...docked.start, ...docked.end])
+				return options.order().filter((columnId) => !fixed.has(columnId))
+			}
+
+			case 'end': {
+				return docked.end
+			}
+
+			case 'start': {
+				return docked.start.filter((columnId) => !options.fixed.includes(columnId))
+			}
+		}
+	}
+
 	function reorder(current: Layout, slot: number) {
 		const index = current.columns.findIndex((column) => column.id === id)
 		const others = current.columns.filter((column) => column.id !== id)
 		const displaced = others.slice(Math.min(index, slot), Math.max(index, slot))
 		const before = new Map(displaced.map((column) => [column.id, headerLeft(scroller, column.id)]))
-		const fixed = new Set([...options.pinned().start, ...options.pinned().end])
 		options.onReorder(
-			moveColumn(
-				options.order().filter((columnId) => !fixed.has(columnId)),
-				id,
-				slot,
-				new Set(others.map((column) => column.id)),
-			),
+			current.region,
+			moveColumn(regionOrder(current), id, slot, new Set(others.map((column) => column.id))),
 		)
 		void tick().then(() => {
 			for (const [columnId, left] of before) {
@@ -177,25 +236,34 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			return
 		}
 
-		autoScroll(current)
+		if (current.region === 'center') {
+			autoScroll(current)
+		}
+
 		const others = current.columns.filter((column) => column.id !== id)
-		const shift = pointerX - originX + scroller.scrollLeft - originScroll
-		const left = Math.min(
-			Math.max(originLeft + shift, current.startWidth),
-			current.startWidth + totalWidth(others),
+		// Docked columns stick to the scroller's edge, so only the scrolling region moves with the scroll
+		const scrolled = current.region === 'center' ? scroller.scrollLeft - originScroll : 0
+		const position = Math.min(
+			Math.max(originPosition + pointerX - originX + scrolled, 0),
+			totalWidth(others),
 		)
 		const slot = nearestSlot(
 			others.map((column) => column.width),
-			left - current.startWidth,
+			position,
 		)
 		if (slot !== index) {
 			reorder(current, slot)
 		}
 
-		const resting = current.startWidth + totalWidth(others.slice(0, slot))
-		if (slot !== index || left - resting !== offset) {
-			scroller.style.setProperty('--column-drag-slot-left', `${resting}px`)
-			setOffset(left - resting)
+		const resting = totalWidth(others.slice(0, slot))
+		const left = regionLeft(scroller, current) + resting
+		if (left !== slotLeft) {
+			slotLeft = left
+			scroller.style.setProperty('--column-drag-slot-left', `${left}px`)
+		}
+
+		if (slot !== index || position - resting !== offset) {
+			setOffset(position - resting)
 		}
 
 		frame = requestAnimationFrame(update)
@@ -210,15 +278,16 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		const current = layout()
 		const index = current.columns.findIndex((column) => column.id === id)
 		const column = current.columns[index]
-		if (column === undefined) {
+		if (column === undefined || current.columns.length < 2) {
 			return
 		}
 
 		latestDrag += 1
 		drag = latestDrag
 		bounds = scroller.getBoundingClientRect()
-		originLeft = current.startWidth + totalWidth(current.columns.slice(0, index))
-		scroller.style.setProperty('--column-drag-slot-left', `${originLeft}px`)
+		originPosition = totalWidth(current.columns.slice(0, index))
+		slotLeft = regionLeft(scroller, current) + originPosition
+		scroller.style.setProperty('--column-drag-slot-left', `${slotLeft}px`)
 		scroller.style.setProperty('--column-drag-slot-width', `${column.width}px`)
 		document.documentElement.classList.add('column-dragging')
 		options.onDragging(id)

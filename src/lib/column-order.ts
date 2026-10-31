@@ -1,19 +1,70 @@
-/** Column ids held at either edge of the table, outside the reorderable region. */
-export type PinnedColumns = { start: string[]; end: string[] }
+/**
+ * Column ids docked at either edge of the table, in display order, outside the
+ * scrolling region.
+ */
+export type DockedColumns = { start: string[]; end: string[] }
+
+/** The table edge a column is docked at. */
+export type DockSide = keyof DockedColumns
+
+/** The edge `id` is docked at, or `undefined` while it scrolls with the table. */
+export function getDockSide(docked: DockedColumns, id: string): DockSide | undefined {
+	return docked.start.includes(id) ? 'start' : docked.end.includes(id) ? 'end' : undefined
+}
+
+/** Take `id` out of both docks. */
+export function undockColumn(docked: DockedColumns, id: string): DockedColumns {
+	return {
+		start: docked.start.filter((entry) => entry !== id),
+		end: docked.end.filter((entry) => entry !== id),
+	}
+}
 
 /**
- * Arrange every column id for display. Pinned columns keep their edges, the
- * movable columns follow `preferred`, and movable columns missing from it (such
- * as new command runs) keep their definition order after the preferred ones.
- * Ids in `preferred` that no longer exist or are pinned are ignored.
+ * Dock `id` at `side`, beside the scrolling columns, or undock it when it is
+ * docked there already.
+ */
+export function toggleDock(docked: DockedColumns, id: string, side: DockSide): DockedColumns {
+	const without = undockColumn(docked, id)
+	if (docked[side].includes(id)) {
+		return without
+	}
+
+	return side === 'start'
+		? { ...without, start: [...without.start, id] }
+		: { ...without, end: [id, ...without.end] }
+}
+
+/**
+ * Dock a run that just started at the table's right edge, where the run docked
+ * there before scrolls free, so the newest output stays in view.
+ */
+export function dockNewestRun(
+	docked: DockedColumns,
+	runId: string,
+	previousRunId: string | undefined,
+): DockedColumns {
+	const without = undockColumn(docked, runId)
+	return {
+		...without,
+		end: [...without.end.filter((entry) => entry !== previousRunId), runId],
+	}
+}
+
+/**
+ * Arrange every column id for display. Docked columns keep their edges in dock
+ * order, the scrolling columns follow `preferred`, and scrolling columns
+ * missing from it (such as new command runs) keep their definition order after
+ * the preferred ones. Ids in `preferred` that no longer exist or are docked are
+ * ignored.
  */
 export function resolveColumnOrder(
 	ids: string[],
 	preferred: string[],
-	pinned: PinnedColumns,
+	docked: DockedColumns,
 ): string[] {
 	const available = new Set(ids)
-	const fixed = new Set([...pinned.start, ...pinned.end])
+	const fixed = new Set([...docked.start, ...docked.end])
 	const movable = ids.filter((id) => !fixed.has(id))
 	const movableIds = new Set(movable)
 	// Set#intersection may iterate the other set, which would lose the preferred order
@@ -21,10 +72,10 @@ export function resolveColumnOrder(
 	const placed = [...new Set(preferred)].filter((id) => movableIds.has(id))
 	const placedIds = new Set(placed)
 	return [
-		...pinned.start.filter((id) => available.has(id)),
+		...docked.start.filter((id) => available.has(id)),
 		...placed,
 		...movable.filter((id) => !placedIds.has(id)),
-		...pinned.end.filter((id) => available.has(id)),
+		...docked.end.filter((id) => available.has(id)),
 	]
 }
 
@@ -52,17 +103,17 @@ export function moveColumn(
 }
 
 /**
- * Move `id` after every movable column in `order`, hidden ones included. Like a
- * drag, the result leaves out pinned ids, which keep their edges.
+ * Move `id` after every scrolling column in `order`, hidden ones included. Like
+ * a drag, the result leaves out docked ids, which keep their edges.
  */
-export function moveColumnToEnd(order: string[], id: string, pinned: PinnedColumns): string[] {
-	const fixed = new Set([...pinned.start, ...pinned.end])
+export function moveColumnToEnd(order: string[], id: string, docked: DockedColumns): string[] {
+	const fixed = new Set([...docked.start, ...docked.end])
 	return [...order.filter((entry) => entry !== id), id].filter((entry) => !fixed.has(entry))
 }
 
 /**
  * Choose the slot for a dragged column whose left edge sits `offset` pixels
- * into the movable region. `widths` are the other visible movable columns in
+ * into its region. `widths` are the other visible columns of the region in
  * order, so slot `n` rests after the first `n` of them. The closest resting
  * position wins, which swaps a neighbor once the drag covers half of its
  * width.
@@ -83,4 +134,40 @@ export function nearestSlot(widths: number[], offset: number): number {
 	}
 
 	return slot
+}
+
+type DockPosition = {
+	/**
+	 * Whether the column is the dock's innermost, casting a shadow onto the
+	 * scrolling columns.
+	 */
+	edge: boolean
+	/** Distance from the dock's edge of the scroller, where the column sticks. */
+	offset: number
+	side: DockSide
+}
+
+/**
+ * Where each visible docked column sticks: its offset from the scroller edge is
+ * the width of the dock's columns outside it.
+ */
+export function getDockPositions(
+	columns: Array<{ getSize: () => number; id: string }>,
+	docked: DockedColumns,
+): Record<string, DockPosition> {
+	const positions: Record<string, DockPosition> = {}
+	const start = columns.filter((column) => docked.start.includes(column.id))
+	const end = columns.filter((column) => docked.end.includes(column.id)).toReversed()
+	for (const [side, dock] of [
+		['start', start],
+		['end', end],
+	] as const) {
+		let offset = 0
+		for (const [index, column] of dock.entries()) {
+			positions[column.id] = { edge: index === dock.length - 1, offset, side }
+			offset += column.getSize()
+		}
+	}
+
+	return positions
 }

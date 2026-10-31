@@ -34,6 +34,8 @@ function menu(
 ) {
 	return createColumnMenu({
 		beforeSort: vi.fn<() => void>(),
+		docked: () => ({ start: ['select'], end: [] }),
+		fixed: ['select'],
 		getColumn: (id) => ({
 			getCanFilter: () => true,
 			getCanHide: () => id !== 'select',
@@ -45,13 +47,13 @@ function menu(
 		getOptionalColumns: () => optionalColumns,
 		getRows: () => [],
 		getRuns: () => runs,
+		onDock: vi.fn<(id: string, side: 'end' | 'start') => void>(),
 		onError,
 		onFilter: vi.fn<(id: string) => void>(),
 		onHide: vi.fn<(id: string) => Promise<void>>(),
 		onRemoveRuns: vi.fn<(ids: readonly string[]) => void>(),
 		onShow,
 		onSort: vi.fn<() => void>(),
-		pinned: () => ({ start: ['select'], end: [] }),
 		sortByExitCode: vi.fn<(runId: string, byExitCode: boolean) => void>(),
 		...overrides,
 	})
@@ -244,5 +246,41 @@ describe('sorting from a column menu', () => {
 		await columnMenu.show(event, 'run-id')
 		await columnMenu.show(event, 'branch')
 		expect(showColumnMenu.mock.calls.map(([request]) => request.isRun)).toEqual([true, false])
+	})
+})
+
+describe('docking from a column menu', () => {
+	it('docks a column at either edge and reports where it is docked', async () => {
+		const onDock = vi.fn<(id: string, side: 'end' | 'start') => void>()
+		const docked = menu(undefined, {
+			docked: () => ({ start: ['select', 'branch'], end: ['run-id'] }),
+			onDock,
+		})
+		docked.actions['column.dockStart']('name')
+		docked.actions['column.dockEnd']('branch')
+		expect(onDock.mock.calls).toEqual([
+			['name', 'start'],
+			['branch', 'end'],
+		])
+
+		const rightClick = { preventDefault: vi.fn() } as unknown as MouseEvent
+		await docked.show(rightClick, 'branch')
+		await docked.show(rightClick, 'run-id')
+		await docked.show(rightClick, 'name')
+		expect(showColumnMenu.mock.calls.map(([request]) => request)).toMatchObject([
+			{ canDock: true, dock: 'start' },
+			{ canDock: true, dock: 'end' },
+			{ canDock: true, dock: undefined },
+		])
+	})
+
+	it('never docks or undocks a fixed column', async () => {
+		const onDock = vi.fn<(id: string, side: 'end' | 'start') => void>()
+		const fixed = menu(undefined, { onDock })
+		fixed.actions['column.dockEnd']('select')
+		fixed.actions['column.dockStart']()
+		expect(onDock).not.toHaveBeenCalled()
+		await fixed.show({ preventDefault: vi.fn() } as unknown as MouseEvent, 'select')
+		expect(showColumnMenu).toHaveBeenCalledWith(expect.objectContaining({ canDock: false }))
 	})
 })

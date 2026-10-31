@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { moveColumn, moveColumnToEnd, nearestSlot, resolveColumnOrder } from './column-order.js'
+import {
+	dockNewestRun,
+	getDockPositions,
+	getDockSide,
+	moveColumn,
+	moveColumnToEnd,
+	nearestSlot,
+	resolveColumnOrder,
+	toggleDock,
+	undockColumn,
+} from './column-order.js'
 
-const pinned = { start: ['select', 'path'], end: ['run2'] }
+const docked = { start: ['select', 'path'], end: ['run2'] }
 const ids = ['select', 'path', 'name', 'branch', 'version', 'run1', 'run2']
 
 describe('resolveColumnOrder', () => {
 	it('keeps definition order when nothing has been rearranged', () => {
-		expect(resolveColumnOrder(ids, [], pinned)).toEqual(ids)
+		expect(resolveColumnOrder(ids, [], docked)).toEqual(ids)
 	})
 
-	it('holds pinned columns at their edges regardless of the preferred order', () => {
-		expect(resolveColumnOrder(ids, ['run2', 'version', 'path', 'name'], pinned)).toEqual([
+	it('holds docked columns at their edges regardless of the preferred order', () => {
+		expect(resolveColumnOrder(ids, ['run2', 'version', 'path', 'name'], docked)).toEqual([
 			'select',
 			'path',
 			'version',
@@ -23,40 +33,40 @@ describe('resolveColumnOrder', () => {
 
 	it('appends new columns after the preferred ones and drops stale or duplicate ids', () => {
 		expect(
-			resolveColumnOrder(ids, ['branch', 'removed-run', 'name', 'branch', 'version'], pinned),
+			resolveColumnOrder(ids, ['branch', 'removed-run', 'name', 'branch', 'version'], docked),
 		).toEqual(['select', 'path', 'branch', 'name', 'version', 'run1', 'run2'])
 	})
 
-	it('moves a formerly movable column to the end edge once it becomes pinned', () => {
+	it('moves a formerly movable column to the end edge once it becomes docked', () => {
 		const withoutLatest = ids.filter((id) => id !== 'run2')
 		expect(
 			resolveColumnOrder(withoutLatest, ['run1', 'name', 'branch', 'version'], {
-				...pinned,
+				...docked,
 				end: ['run1'],
 			}),
 		).toEqual(['select', 'path', 'name', 'branch', 'version', 'run1'])
 	})
 
-	it('ignores pinned ids that are not present', () => {
-		expect(resolveColumnOrder(['name', 'branch'], ['branch'], pinned)).toEqual(['branch', 'name'])
+	it('ignores docked ids that are not present', () => {
+		expect(resolveColumnOrder(['name', 'branch'], ['branch'], docked)).toEqual(['branch', 'name'])
 	})
 })
 
 describe('moveColumnToEnd', () => {
 	it('moves a column after the other movable columns, hidden ones included', () => {
-		expect(moveColumnToEnd(ids, 'name', pinned)).toEqual(['branch', 'version', 'run1', 'name'])
+		expect(moveColumnToEnd(ids, 'name', docked)).toEqual(['branch', 'version', 'run1', 'name'])
 	})
 
 	it('appends a column missing from the order', () => {
-		expect(moveColumnToEnd(['name', 'branch'], 'version', pinned)).toEqual([
+		expect(moveColumnToEnd(['name', 'branch'], 'version', docked)).toEqual([
 			'name',
 			'branch',
 			'version',
 		])
 	})
 
-	it('leaves a pinned column at its edge', () => {
-		expect(moveColumnToEnd(ids, 'run2', pinned)).toEqual(['name', 'branch', 'version', 'run1'])
+	it('leaves a docked column at its edge', () => {
+		expect(moveColumnToEnd(ids, 'run2', docked)).toEqual(['name', 'branch', 'version', 'run1'])
 	})
 })
 
@@ -125,5 +135,78 @@ describe('nearestSlot', () => {
 		expect(nearestSlot(widths, -500)).toBe(0)
 		expect(nearestSlot(widths, 5000)).toBe(3)
 		expect(nearestSlot([], 80)).toBe(0)
+	})
+})
+
+describe('docking', () => {
+	it('reports the edge a column is docked at', () => {
+		expect(getDockSide(docked, 'path')).toBe('start')
+		expect(getDockSide(docked, 'run2')).toBe('end')
+		expect(getDockSide(docked, 'name')).toBeUndefined()
+	})
+
+	it('docks a column beside the scrolling columns on either side', () => {
+		expect(toggleDock(docked, 'name', 'start')).toEqual({
+			start: ['select', 'path', 'name'],
+			end: ['run2'],
+		})
+		expect(toggleDock(docked, 'name', 'end')).toEqual({
+			start: ['select', 'path'],
+			end: ['name', 'run2'],
+		})
+	})
+
+	it('moves a docked column straight to the other edge', () => {
+		expect(toggleDock(docked, 'path', 'end')).toEqual({ start: ['select'], end: ['path', 'run2'] })
+	})
+
+	it('undocks a column docked at the chosen edge', () => {
+		expect(toggleDock(docked, 'path', 'start')).toEqual({ start: ['select'], end: ['run2'] })
+		expect(undockColumn(docked, 'run2')).toEqual({ start: ['select', 'path'], end: [] })
+	})
+
+	it('docks the newest run at the right edge in place of the run before it', () => {
+		expect(dockNewestRun(docked, 'run3', 'run2')).toEqual({
+			start: ['select', 'path'],
+			end: ['run3'],
+		})
+		expect(dockNewestRun({ start: [], end: ['name', 'run2'] }, 'run3', 'run2')).toEqual({
+			start: [],
+			end: ['name', 'run3'],
+		})
+		expect(dockNewestRun({ start: [], end: [] }, 'run1', undefined)).toEqual({
+			start: [],
+			end: ['run1'],
+		})
+	})
+})
+
+describe('getDockPositions', () => {
+	const column = (id: string, size: number) => ({ getSize: () => size, id })
+	const visible = [
+		column('select', 32),
+		column('path', 200),
+		column('name', 100),
+		column('branch', 80),
+		column('run1', 240),
+		column('run2', 300),
+	]
+
+	it('offsets each docked column by the dock columns outside it, marking the innermost', () => {
+		expect(getDockPositions(visible, { start: ['select', 'path'], end: ['run1', 'run2'] })).toEqual(
+			{
+				path: { edge: true, offset: 32, side: 'start' },
+				run1: { edge: true, offset: 300, side: 'end' },
+				run2: { edge: false, offset: 0, side: 'end' },
+				select: { edge: false, offset: 0, side: 'start' },
+			},
+		)
+	})
+
+	it('skips hidden docked columns and leaves scrolling columns out', () => {
+		expect(getDockPositions(visible, { start: ['select', 'hidden', 'name'], end: [] })).toEqual({
+			name: { edge: true, offset: 32, side: 'start' },
+			select: { edge: false, offset: 0, side: 'start' },
+		})
 	})
 })
