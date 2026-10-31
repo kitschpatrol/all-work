@@ -4,8 +4,8 @@
 	--font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
 	--text: #1f2124;
 	--text-secondary: #4d535c;
-	--text-tertiary: #6b727d;
-	--text-placeholder: #a3a8b0;
+	--text-tertiary: #b9bec7;
+	--text-placeholder: #b9bec7;
 	--accent: #2468dc;
 	--focus-ring: #3b84f080;
 	--selected-face: linear-gradient(#5196f4, #2468dc);
