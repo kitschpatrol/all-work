@@ -66,9 +66,9 @@
 	import { createRunSorting } from '#lib/run-sorting.js'
 	import RunHeader from '#lib/RunHeader.svelte'
 	import { createColumnDefs, features } from '#lib/table-columns.js'
-	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
+	import { runCellStatus } from '#lib/table-formatting.js'
 	import { createTableRows } from '#lib/table-rows.svelte.js'
-	import { measureColumns } from '#lib/table-sizing.js'
+	import { createColumnFitting } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
 	import { createVirtualRows } from '#lib/virtual-rows.svelte.js'
@@ -242,6 +242,12 @@
 		},
 		onSort: scheduleMetadata,
 		sortByExitCode: runSorting.set,
+	})
+	const { fit: fitColumns, fitRun: sizeRunColumn } = createColumnFitting({
+		isRepositoryColumn: (id) => repositoryColumnIds.has(id),
+		runs: () => runs,
+		scroller: () => tableScroll,
+		table,
 	})
 	const visibleRepositories = $derived(table.getRowModel().rows)
 	const virtualRows = createVirtualRows({ ids: () => visibleRepositories.map((row) => row.id) })
@@ -444,69 +450,6 @@
 		tableRows.dispose()
 		clearTimeout(metadataTimer)
 		clearTimeout(sizingTimer)
-	}
-
-	function fitColumns(columnIds?: string[], { automatic = true, growOnly = false } = {}) {
-		const followEnd =
-			runs.length > 0 &&
-			tableScroll.scrollLeft > 0 &&
-			tableScroll.scrollLeft + tableScroll.clientWidth >= tableScroll.scrollWidth - 2
-		const maxWidth = automatic
-			? Math.min(180, Math.floor(tableScroll.clientWidth * 0.12))
-			: Infinity
-		const maxRunWidth = automatic ? Math.floor(tableScroll.clientWidth * 0.2) : Infinity
-		const selected = table
-			.getVisibleLeafColumns()
-			.filter(
-				(column) =>
-					column.getCanResize() && (columnIds === undefined || columnIds.includes(column.id)),
-			)
-		const { rows } = table.getRowModel()
-		const sizes = measureColumns(
-			tableScroll,
-			selected.map((column) => ({
-				header: String(column.columnDef.header),
-				id: column.id,
-				maxSize: Math.min(
-					column.columnDef.maxSize ?? 4000,
-					column.id === 'relativePath'
-						? maxWidth * 2
-						: repositoryColumnIds.has(column.id)
-							? maxWidth
-							: maxRunWidth,
-				),
-				values: rows.map((row) => getColumnSizingValue(row.original, column.id, runs)),
-			})),
-		)
-		for (const column of selected) {
-			sizes[column.id] = Math.max(
-				column.columnDef.minSize ?? 24,
-				sizes[column.id] ?? column.getSize(),
-				growOnly ? column.getSize() : 0,
-			)
-		}
-
-		if (selected.every((column) => sizes[column.id] === column.getSize())) {
-			return
-		}
-
-		table.setColumnSizing((previous) => ({ ...previous, ...sizes }))
-		if (followEnd) {
-			void tick().then(() => {
-				tableScroll.scrollLeft = tableScroll.scrollWidth
-			})
-		}
-	}
-
-	async function sizeRunColumn(runId: string, reveal = false) {
-		const followEnd =
-			reveal || tableScroll.scrollLeft + tableScroll.clientWidth >= tableScroll.scrollWidth - 2
-		await tick()
-		fitColumns([runId])
-		await tick()
-		if (followEnd) {
-			tableScroll.scrollLeft = tableScroll.scrollWidth
-		}
 	}
 
 	function sortOutput(runId: string, multiple: boolean) {
