@@ -32,7 +32,11 @@
 
 		input.stepUp(direction)
 		publish()
-		input.focus()
+	}
+
+	// Like an AppKit stepper, pressing an arrow leaves keyboard focus where it was
+	function keepFocus(event: PointerEvent) {
+		event.preventDefault()
 	}
 </script>
 
@@ -57,6 +61,7 @@
 			aria-label="Increase {label.toLowerCase()}"
 			disabled={max !== undefined && value >= max}
 			onclick={() => step(1)}
+			onpointerdown={keepFocus}
 			tabindex="-1"
 			type="button"
 			><svg aria-hidden="true" fill="none" height="4" viewBox="0 0 8 5" width="6"
@@ -72,6 +77,7 @@
 			aria-label="Decrease {label.toLowerCase()}"
 			disabled={value <= min}
 			onclick={() => step(-1)}
+			onpointerdown={keepFocus}
 			tabindex="-1"
 			type="button"
 			><svg aria-hidden="true" fill="none" height="4" viewBox="0 0 8 5" width="6"

@@ -1395,6 +1395,7 @@
 												}}
 												onmousedown={(event) => startResize(event, header)}
 												ontouchstart={(event) => startResize(event, header)}
+												tabindex="-1"
 												type="button"
 											></button>{/if}
 									</th>{#if header.column.id === fillerAfterColumnId}<th

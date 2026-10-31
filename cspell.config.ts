@@ -11,6 +11,8 @@ export default cspellConfig({
 		'maximizable',
 		'mitchellh',
 		'NSURL',
+		'onkeydowncapture',
+		'onpointerdowncapture',
 		'pycache',
 		'slopforest',
 		'togglefullscreen',
