@@ -218,7 +218,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	// Whether a column borders the slot on each side, as last set on the scroller
 	const slotSides = new Map<string, boolean>()
 	let tableWidth = 0
-	let blankBeside = false
+	// The column carrying the blank space's edge shadow while the drag rearranges the columns before it
+	let blankEdge: string | undefined
+	let shadowCarried = false
 	let drag: number | undefined
 	let frame: number | undefined
 	// Measured once as the drag begins, so each frame avoids a forced layout
@@ -234,8 +236,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		markSlotEdge(slotEdge)
 		markDockEdge(layout())
-		if (blankBeside) {
-			markBlankBeside(true)
+		markBlankEdge(layout())
+		if (shadowCarried) {
+			markFillers(true)
 		}
 	})
 
@@ -323,10 +326,6 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			'--column-drag-slot-left-edge': borders.left === 'column',
 			'--column-drag-slot-right-edge': borders.right === 'column',
 		}
-		if ((borders.right === 'blank') !== blankBeside) {
-			markBlankBeside(borders.right === 'blank')
-		}
-
 		for (const [property, bordered] of Object.entries(sides)) {
 			if (slotSides.get(property) === bordered) {
 				continue
@@ -337,20 +336,60 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		}
 	}
 
-	// The blank space's edge shadow falls from the column before it, so it waits while the slot sits there empty
-	function markBlankBeside(beside: boolean) {
-		blankBeside = beside
-		for (const element of scroller.querySelectorAll<HTMLElement>('.table-filler')) {
-			if (beside === (element.dataset.slotBeside !== undefined)) {
-				continue
+	/*
+	 * Before blank space, the column showing last casts the blank space's edge
+	 * shadow itself, so the shadow slides along with it, while the blank space's
+	 * own waits for the drop to settle.
+	 */
+	function markBlankEdge(current: Layout) {
+		const others = current.columns.filter((column) => column.id !== id)
+		const carrier =
+			current.region === 'center' && tableWidth - current.totalWidth >= 1
+				? slot === others.length
+					? id
+					: others.at(-1)?.id
+				: undefined
+		if (carrier !== blankEdge) {
+			for (const element of scroller.querySelectorAll<HTMLElement>('[data-blank-edge]')) {
+				delete element.dataset.blankEdge
 			}
 
-			if (beside) {
-				element.dataset.slotBeside = ''
-			} else {
-				delete element.dataset.slotBeside
+			blankEdge = carrier
+		}
+
+		if (carrier !== undefined) {
+			for (const element of columnElements(scroller, carrier)) {
+				element.dataset.blankEdge ??= ''
 			}
 		}
+
+		if ((carrier !== undefined) !== shadowCarried) {
+			markFillers(carrier !== undefined)
+		}
+	}
+
+	// The blank space's cells hide their edge shadow and highlight while a column carries them
+	function markFillers(carried: boolean) {
+		shadowCarried = carried
+		for (const element of scroller.querySelectorAll<HTMLElement>('.table-filler')) {
+			const marked = element.dataset.shadowCarried !== undefined
+			if (marked !== carried) {
+				element.toggleAttribute('data-shadow-carried', carried)
+			}
+		}
+	}
+
+	// Also clears marks a drag still settling left behind for this one to replace
+	function clearBlankMarks() {
+		for (const element of scroller.querySelectorAll<HTMLElement>(
+			'[data-blank-edge], [data-shadow-carried]',
+		)) {
+			delete element.dataset.blankEdge
+			delete element.dataset.shadowCarried
+		}
+
+		blankEdge = undefined
+		shadowCarried = false
 	}
 
 	function autoScroll(current: Layout) {
@@ -402,6 +441,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		markSlotEdge(others[next]?.id)
 		markDockEdge(current)
 		markSlotSides(current)
+		markBlankEdge(current)
 	}
 
 	function update() {
@@ -470,7 +510,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		scroller.style.setProperty('--column-drag-slot-width', `${column.width}px`)
 		// The table fills the scroller at least, and its width holds still while a column moves
 		tableWidth = Math.max(scroller.clientWidth, current.totalWidth)
+		clearBlankMarks()
 		markSlotSides(current)
+		markBlankEdge(current)
 		// Hover states and tooltips would flicker beneath the pointer while the column moves, so the header keeps the pointer
 		scroller
 			.querySelector(`th[data-column-id="${CSS.escape(id)}"]`)
@@ -506,11 +548,6 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			delete element.dataset.dockEdge
 		}
 
-		// The dragged column lands in the slot beside the blank space and casts its edge shadow again
-		if (blankBeside) {
-			markBlankBeside(false)
-		}
-
 		for (const columnId of ids) {
 			cancelSlide(columnId)
 			setTransform(columnId, 0)
@@ -544,6 +581,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			return
 		}
 
+		// Every column has landed, so the blank space casts its own edge shadow again
+		clearBlankMarks()
 		scroller.style.removeProperty('--column-drag-slot-left')
 		scroller.style.removeProperty('--column-drag-slot-width')
 		scroller.style.removeProperty('--column-drag-slot-left-edge')

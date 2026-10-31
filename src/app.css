@@ -1214,9 +1214,14 @@ th.docked-end {
 	background: linear-gradient(to right, var(--column-shadow-stops));
 }
 
-/* While a dragged column's slot sits against the blank space, no column casts this edge shadow until one lands there */
-.table-filler[data-slot-beside]::before {
+/* While a drag rearranges the columns before the blank space, the column showing last casts this edge shadow itself, so it slides along */
+.table-filler[data-shadow-carried]::before {
 	opacity: 0;
+}
+
+/* Header cells light their left edge beside the column before them, which the column carrying the edge shadow lights instead */
+.table-scroll th.table-filler[data-shadow-carried] {
+	box-shadow: none;
 }
 
 /* Clicking anywhere in a selection cell toggles its checkbox */
@@ -1289,11 +1294,59 @@ th.column-dragged:is(.docked-start, .docked-end) {
 		1px 0 #0000001f;
 }
 
+td[data-blank-edge] {
+	position: relative;
+}
+
+/* A displaced header carries the blank space's highlight beside its right edge; the dragged one floats without it */
+th[data-blank-edge]:not(.column-dragged) {
+	box-shadow:
+		inset 1px 0 #fff,
+		1px 0 #fff;
+}
+
+[data-blank-edge]::after {
+	pointer-events: none;
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: -1px;
+	left: 100%;
+	width: var(--column-edge-shadow-width);
+	opacity: 1;
+	background: linear-gradient(to right, var(--column-shadow-stops));
+}
+
+/* A shadow passing to a column the drag displaced fades in there, through a property animated off the compositor so the cells gain no layers */
+@property --column-shadow-fade {
+	inherits: false;
+	initial-value: 1;
+	syntax: '<number>';
+}
+
+@keyframes column-shadow-fade-in {
+	from {
+		--column-shadow-fade: 0;
+	}
+}
+
+[data-blank-edge]:not(.column-dragged)::after,
+.docked-start[data-dock-edge='true']:not(.column-dragged)::after,
+.docked-end[data-dock-edge='true']:not(.column-dragged)::before {
+	opacity: var(--column-shadow-fade);
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	th {
 		transition:
 			--column-drag-shade 150ms ease-out,
 			--column-drag-shadow-opacity 300ms ease-out;
+	}
+
+	[data-blank-edge]:not(.column-dragged)::after,
+	.docked-start[data-dock-edge='true']:not(.column-dragged)::after,
+	.docked-end[data-dock-edge='true']:not(.column-dragged)::before {
+		animation: column-shadow-fade-in 300ms ease-out;
 	}
 
 	td.column-dragged,
@@ -1311,6 +1364,13 @@ th[data-slot-edge] {
 	box-shadow:
 		inset 1px 0 #d3d3d3,
 		inset 2px 0 #fff;
+}
+
+th[data-slot-edge][data-blank-edge]:not(.column-dragged) {
+	box-shadow:
+		inset 1px 0 #d3d3d3,
+		inset 2px 0 #fff,
+		1px 0 #fff;
 }
 
 /* Only the left dock's innermost column can sit right of the slot, keeping its own edge too */
