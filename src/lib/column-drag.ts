@@ -37,6 +37,8 @@ type Layout = {
 	leading: number
 	region: ColumnRegion
 	startWidth: number
+	/** The width of every visible column. */
+	totalWidth: number
 }
 
 const dragThreshold = 4
@@ -83,6 +85,33 @@ function slide(scroller: HTMLElement, id: string, from: number) {
 	return animations
 }
 
+/**
+ * Decide which sides of a dragged column's slot another column borders, to cast
+ * an inner shadow into it. Blank space before the right dock and the table's
+ * edges cast none.
+ *
+ * @param left The slot's left edge, measured from the table's left edge.
+ * @param right The slot's right edge.
+ * @param table The table.
+ * @param table.blankStart Where the blank space before the right dock starts.
+ * @param table.blankEnd Where that blank space ends, matching its start when
+ *   there is none.
+ * @param table.width The table's width.
+ *
+ * @returns Whether a column borders the slot on its left and on its right.
+ */
+export function slotBorders(
+	left: number,
+	right: number,
+	table: { blankEnd: number; blankStart: number; width: number },
+): { left: boolean; right: boolean } {
+	const blank = table.blankEnd - table.blankStart >= 1
+	return {
+		left: left >= 1 && (!blank || Math.abs(left - table.blankEnd) >= 1),
+		right: right <= table.width - 1 && (!blank || Math.abs(right - table.blankStart) >= 1),
+	}
+}
+
 function totalWidth(columns: Layout['columns']) {
 	return columns.reduce((sum, column) => sum + column.width, 0)
 }
@@ -126,6 +155,7 @@ function measure(
 		leading: region === 'center' ? width(docked.start) : region === 'start' ? width(fixed) : 0,
 		region,
 		startWidth: width(docked.start),
+		totalWidth: columns.reduce((sum, column) => sum + column.getSize(), 0),
 	}
 }
 
@@ -176,6 +206,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	let slot = 0
 	let slotEdge: string | undefined
 	let slotLeft: number | undefined
+	// Whether a column borders the slot on each side, as last set on the scroller
+	const slotSides = new Map<string, boolean>()
+	let tableWidth = 0
 	let drag: number | undefined
 	let frame: number | undefined
 	// Measured once as the drag begins, so each frame avoids a forced layout
@@ -258,6 +291,35 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		}
 	}
 
+	/*
+	 * The slot's inner shadows fall from the columns beside it. A side bordering
+	 * the blank space before the right dock, or the table's edge, has no column
+	 * to cast one.
+	 */
+	function markSlotSides(current: Layout) {
+		const others = current.columns.filter((column) => column.id !== id)
+		const blankEnd = tableWidth - current.endWidth
+		const left =
+			(current.region === 'end' ? blankEnd : current.leading) + totalWidth(others.slice(0, slot))
+		const borders = slotBorders(left, left + (current.columns[originIndex]?.width ?? 0), {
+			blankEnd,
+			blankStart: current.totalWidth - current.endWidth,
+			width: tableWidth,
+		})
+		const sides = {
+			'--column-drag-slot-left-edge': borders.left,
+			'--column-drag-slot-right-edge': borders.right,
+		}
+		for (const [property, bordered] of Object.entries(sides)) {
+			if (slotSides.get(property) === bordered) {
+				continue
+			}
+
+			slotSides.set(property, bordered)
+			scroller.style.setProperty(property, bordered ? '1' : '0')
+		}
+	}
+
 	function autoScroll(current: Layout) {
 		const leftEdge = bounds.left + current.startWidth + edgeZone
 		const rightEdge = bounds.right - current.endWidth - edgeZone
@@ -306,6 +368,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		markSlotEdge(others[next]?.id)
 		markDockEdge(current)
+		markSlotSides(current)
 	}
 
 	function update() {
@@ -372,6 +435,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		slotLeft = regionLeft(scroller, current) + originPosition
 		scroller.style.setProperty('--column-drag-slot-left', `${slotLeft}px`)
 		scroller.style.setProperty('--column-drag-slot-width', `${column.width}px`)
+		// The table fills the scroller at least, and its width holds still while a column moves
+		tableWidth = Math.max(scroller.clientWidth, current.totalWidth)
+		markSlotSides(current)
 		// Hover states and tooltips would flicker beneath the pointer while the column moves, so the header keeps the pointer
 		scroller
 			.querySelector(`th[data-column-id="${CSS.escape(id)}"]`)
@@ -442,6 +508,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		scroller.style.removeProperty('--column-drag-slot-left')
 		scroller.style.removeProperty('--column-drag-slot-width')
+		scroller.style.removeProperty('--column-drag-slot-left-edge')
+		scroller.style.removeProperty('--column-drag-slot-right-edge')
 		options.onDragging(undefined)
 	}
 

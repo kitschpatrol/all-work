@@ -1339,6 +1339,19 @@ th[data-slot-edge].docked-start:is(.dock-edge:not([data-dock-edge]), [data-dock-
 	syntax: '<length>';
 }
 
+/* 1 while a column borders the slot on that side to cast its inner shadow, 0 beside blank space or the table's edge */
+@property --column-drag-slot-left-edge {
+	inherits: false;
+	initial-value: 1;
+	syntax: '<number>';
+}
+
+@property --column-drag-slot-right-edge {
+	inherits: false;
+	initial-value: 1;
+	syntax: '<number>';
+}
+
 @property --column-slot-shadow {
 	inherits: false;
 	syntax: '*';
@@ -1351,19 +1364,30 @@ tbody tr,
 thead::after {
 	--column-drag-slot-left: inherit;
 	--column-drag-slot-width: inherit;
+	--column-drag-slot-left-edge: inherit;
+	--column-drag-slot-right-edge: inherit;
 }
 
 tbody tr,
 thead::after {
 	--column-slot-shadow:
 		linear-gradient(to right, var(--column-shadow-stops)) var(--column-drag-slot-left) 0 /
-			min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) 100% no-repeat,
+			calc(
+				min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) *
+					var(--column-drag-slot-left-edge)
+			)
+			100% no-repeat,
 		linear-gradient(to left, var(--column-shadow-stops))
 			calc(
 				var(--column-drag-slot-left) + var(--column-drag-slot-width) -
 					min(var(--column-edge-shadow-width), var(--column-drag-slot-width))
 			)
-			0 / min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) 100% no-repeat;
+			0 /
+			calc(
+				min(var(--column-edge-shadow-width), var(--column-drag-slot-width)) *
+					var(--column-drag-slot-right-edge)
+			)
+			100% no-repeat;
 }
 
 /*
