@@ -227,8 +227,19 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	let bounds = new DOMRect()
 	// Columns slid aside to open the slot, by how far
 	const shifts = new Map<string, number>()
-	// Rows that render mid-drag, as the table scrolls, take on the columns' transforms
-	const rows = new MutationObserver(() => {
+	// Rows and columns that render mid-drag, as the table scrolls, take on the columns' transforms and marks
+	const rendered = new MutationObserver((records) => {
+		const added = records.some((record) =>
+			[...record.addedNodes].some(
+				(node) =>
+					node instanceof HTMLElement &&
+					(node.tagName === 'TR' || node.dataset.columnId !== undefined),
+			),
+		)
+		if (!added) {
+			return
+		}
+
 		setTransform(id, offset)
 		for (const [columnId, shift] of shifts) {
 			setTransform(columnId, shift)
@@ -520,9 +531,9 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		document.documentElement.classList.add('column-dragging')
 		options.onDragging(id)
 		markSlotEdge(current.columns[index + 1]?.id)
-		const body = scroller.querySelector('tbody')
-		if (body !== null) {
-			rows.observe(body, { childList: true })
+		const table = scroller.querySelector('table')
+		if (table !== null) {
+			rendered.observe(table, { childList: true, subtree: true })
 		}
 
 		frame = requestAnimationFrame(update)
@@ -595,7 +606,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		removeEventListener('pointerup', finish)
 		removeEventListener('pointercancel', finish)
 		removeEventListener('blur', finish)
-		rows.disconnect()
+		rendered.disconnect()
 		if (frame !== undefined) {
 			cancelAnimationFrame(frame)
 			frame = undefined

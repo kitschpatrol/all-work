@@ -1,8 +1,53 @@
 import { tick } from 'svelte'
 import type { CommandRun, Repository } from './workspace.js'
+import { getColumnDisplay } from './column-variables.js'
 import { getColumnSizingValue } from './table-formatting.js'
 
-type SizingColumn = { header: string; id: string; maxSize: number; values: string[] }
+type SizingColumn = {
+	header: string
+	id: string
+	maxSize: number
+	/**
+	 * Where a cell of the same kind shows its value, for a column whose own cells
+	 * aren't rendered.
+	 */
+	sample: string
+	values: string[]
+}
+
+// Where a column's values show within a row, by the classes CellContent gives them
+function contentSample(id: string, repository: boolean): string {
+	if (!repository) {
+		return '.output-preview pre'
+	}
+
+	switch (id) {
+		case 'branch': {
+			return '.branch'
+		}
+
+		case 'changedFiles':
+		case 'sync': {
+			return 'td'
+		}
+
+		case 'lastCommitDate': {
+			return '.date-value'
+		}
+
+		case 'name': {
+			return '.project-name'
+		}
+
+		case 'relativePath': {
+			return '.repository-name strong'
+		}
+
+		default: {
+			return getColumnDisplay(id) === 'text' ? '.cell-text:not(.monospace)' : '.cell-text.monospace'
+		}
+	}
+}
 
 /**
  * Describe an element's font for the canvas from its individual font
@@ -13,6 +58,22 @@ type SizingColumn = { header: string; id: string; maxSize: number; values: strin
 function canvasFont(element: HTMLElement): string {
 	const { fontFamily, fontSize, fontStyle, fontWeight } = getComputedStyle(element)
 	return `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`
+}
+
+// The element a column's values show in, whose font they're measured in
+function valueElement(
+	row: HTMLElement | undefined,
+	cell: HTMLElement | undefined,
+	sample: string,
+): HTMLElement | undefined {
+	// A column outside the viewport has no cells rendered, so it reads a cell showing the same kind of value
+	return cell === undefined
+		? (row?.querySelector<HTMLElement>(sample) ??
+				row?.querySelector<HTMLElement>('td') ??
+				undefined)
+		: (cell.querySelector<HTMLElement>(
+				'.cell-text, .project-name, .branch, .date-value, strong, pre',
+			) ?? cell)
 }
 
 // Measure text without cloning the entire table or forcing a layout per cell
@@ -28,27 +89,23 @@ function measureColumns(container: HTMLElement, columns: SizingColumn[]): Record
 		return {}
 	}
 
-	const headers = [...table.querySelectorAll<HTMLElement>(':scope > thead > tr > th')]
-	const cells = [
-		...(table
-			.querySelector(':scope > tbody > tr[data-repository-id]')
-			?.querySelectorAll<HTMLElement>('td') ?? []),
-	]
+	const row =
+		table.querySelector<HTMLElement>(':scope > tbody > tr[data-repository-id]') ?? undefined
+	// Every header shares one font, so a column outside the viewport reads another's
+	const anyHeader = table.querySelector<HTMLElement>(':scope > thead th[data-column-id]')
 	const sizes: Record<string, number> = {}
 	for (const column of columns) {
-		const header = headers.find((entry) => entry.dataset.columnId === column.id)
-		const index = header === undefined ? -1 : headers.indexOf(header)
-		const cell = cells[index]
-		context.font = header === undefined ? '11px sans-serif' : canvasFont(header)
+		const selector = `[data-column-id="${CSS.escape(column.id)}"]`
+		const header = table.querySelector<HTMLElement>(`:scope > thead th${selector}`) ?? anyHeader
+		const cell = row?.querySelector<HTMLElement>(`td${selector}`) ?? undefined
+		context.font = header === null ? '11px sans-serif' : canvasFont(header)
 		let width = context.measureText(column.header).width + 30
-		const content =
-			cell?.querySelector<HTMLElement>(
-				'.cell-text, .project-name, .branch, .date-value, strong, pre',
-			) ?? cell
+		const content = valueElement(row, cell, column.sample)
 		context.font = content === undefined ? '10px sans-serif' : canvasFont(content)
 		const extra =
 			column.id === 'relativePath'
-				? (cell?.querySelector('.repository-actions')?.getBoundingClientRect().width ?? 110) + 42
+				? ((cell ?? row)?.querySelector('.repository-actions')?.getBoundingClientRect().width ??
+						110) + 42
 				: 18
 		for (const value of column.values) {
 			for (const line of value.split('\n').slice(0, 3)) {
@@ -127,6 +184,7 @@ export function createColumnFitting(options: ColumnFittingOptions) {
 							? maxWidth
 							: maxRunWidth,
 				),
+				sample: contentSample(column.id, options.isRepositoryColumn(column.id)),
 				values: rows.map((row) => getColumnSizingValue(row.original, column.id, runs)),
 			})),
 		)

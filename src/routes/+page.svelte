@@ -71,6 +71,7 @@
 	import { createColumnFitting } from '#lib/table-sizing.js'
 	import { getVisibleRepositoryIds } from '#lib/table-viewport.js'
 	import ViewPersistence from '#lib/ViewPersistence.svelte'
+	import { createVirtualColumns } from '#lib/virtual-columns.svelte.js'
 	import { createVirtualRows } from '#lib/virtual-rows.svelte.js'
 	import { listenForWindowMessages, postWindowMessage } from '#lib/window-messages.js'
 	import { onMount, tick } from 'svelte'
@@ -257,6 +258,12 @@
 		table.getVisibleLeafColumns().findLast((column) => !dockedColumns.end.includes(column.id))?.id,
 	)
 	const dockPositions = $derived(getDockPositions(table.getVisibleLeafColumns(), dockedColumns))
+	// Command output sets row heights, and the dragged column must stay as it scrolls away
+	const virtualColumns = createVirtualColumns({
+		columns: () => table.getVisibleLeafColumns(),
+		docked: () => dockedColumns,
+		keep: (id) => id === draggingColumnId || runs.some((run) => run.id === id),
+	})
 	const tableColumnCount = $derived(
 		table.getVisibleLeafColumns().length + (fillerAfterColumnId === undefined ? 0 : 1),
 	)
@@ -1247,6 +1254,7 @@
 				class="table-scroll"
 				{@attach titleOnHover(describeCell)}
 				{@attach virtualRows.scroller}
+				{@attach virtualColumns.scroller}
 				aria-label="Repository table"
 				onpointerdown={() => {
 					pendingScroll = undefined
@@ -1275,143 +1283,156 @@
 					</colgroup>
 					<thead
 						>{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}<tr aria-rowindex={1}
-								>{#each headerGroup.headers as header (header.id)}{@const run = runs.find(
-										(item) => item.id === header.column.id,
-									)}{@const dock = dockPositions[header.column.id]}<th
-										style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
-										style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
-										class:column-dragged={draggingColumnId === header.column.id}
-										class:dock-edge={dock?.edge}
-										class:docked-end={dock?.side === 'end'}
-										class:docked-start={dock?.side === 'start'}
-										class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
-										class:output-header={run !== undefined}
-										class:repository-cell={header.column.id === 'relativePath'}
-										class:selection-cell={header.column.id === 'select'}
-										aria-sort={header.column.getIsSorted() === 'asc'
-											? 'ascending'
-											: header.column.getIsSorted() === 'desc'
-												? 'descending'
-												: undefined}
-										data-column-id={header.column.id}
-										oncontextmenu={async (event) => columnMenu.show(event, header.column.id)}
-										onpointerdown={(event) => {
-											startDrag(event, header.column.id)
-										}}
-									>
-										{#if header.column.id === 'select'}<label class="selection-hit-area"
-												><input
-													aria-label="Select all matching repositories"
-													checked={visibleRepositories.length > 0 &&
-														targets.length === visibleRepositories.length}
-													disabled={visibleRepositories.length === 0}
-													indeterminate={targets.length > 0 &&
-														targets.length < visibleRepositories.length}
-													onchange={() => {
-														selection.setAll(targets.length < visibleRepositories.length)
-													}}
-													type="checkbox"
-												/></label
-											>
-										{:else if run !== undefined}<RunHeader
-												number={run.number}
-												onRemove={async () => removeRun(run.id)}
-												onSort={(multiple: boolean) => {
-													sortOutput(run.id, multiple)
-												}}
-												onStop={async () => stop(run.id)}
-												{run}
-												sorted={header.column.getIsSorted()}
-											/>
-										{:else}<button
-												class="sort-button"
-												disabled={!header.column.getCanSort()}
-												onclick={(event) => {
-													tableRows.refresh()
-													header.column.toggleSorting(undefined, event.shiftKey)
-													scheduleMetadata()
-												}}
-												type="button"
-												><span class="header-label">{String(header.column.columnDef.header)}</span
-												>{#if header.column.getIsSorted() !== false}<span
-														class="sort-indicator"
-														class:descending={header.column.getIsSorted() === 'desc'}
-														aria-hidden="true"
-													></span>{/if}</button
-											>{/if}
-										{#if header.column.getCanResize()}<button
-												class="resize-handle"
-												aria-label="Resize column"
-												ondblclick={() => {
-													resizedColumns.delete(header.column.id)
-													fitColumns([header.column.id], { automatic: false })
-												}}
-												onmousedown={(event) => startResize(event, header)}
-												ontouchstart={(event) => startResize(event, header)}
-												tabindex="-1"
-												type="button"
-											></button>{/if}
-									</th>{#if header.column.id === fillerAfterColumnId}<th
+								>{#each virtualColumns.slots as slot (slot.id)}{#if slot.kind === 'spacer'}<th
+											class="column-spacer"
+											aria-hidden="true"
+											colspan={slot.span}
+										></th>{:else if slot.kind === 'filler'}<th
 											class="table-filler"
 											aria-hidden="true"
 											oncontextmenu={async (event) => columnMenu.showHidden(event)}
-										></th>{/if}{/each}</tr
+										></th>{:else}{@const header = headerGroup.headers.find(
+											(entry) => entry.column.id === slot.id,
+										)}{#if header !== undefined}{@const run = runs.find(
+												(item) => item.id === header.column.id,
+											)}{@const dock = dockPositions[header.column.id]}<th
+												style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
+												style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
+												class:column-dragged={draggingColumnId === header.column.id}
+												class:dock-edge={dock?.edge}
+												class:docked-end={dock?.side === 'end'}
+												class:docked-start={dock?.side === 'start'}
+												class:numeric-cell={getColumnDisplay(header.column.id) === 'number'}
+												class:output-header={run !== undefined}
+												class:repository-cell={header.column.id === 'relativePath'}
+												class:selection-cell={header.column.id === 'select'}
+												aria-sort={header.column.getIsSorted() === 'asc'
+													? 'ascending'
+													: header.column.getIsSorted() === 'desc'
+														? 'descending'
+														: undefined}
+												data-column-id={header.column.id}
+												oncontextmenu={async (event) => columnMenu.show(event, header.column.id)}
+												onpointerdown={(event) => {
+													startDrag(event, header.column.id)
+												}}
+											>
+												{#if header.column.id === 'select'}<label class="selection-hit-area"
+														><input
+															aria-label="Select all matching repositories"
+															checked={visibleRepositories.length > 0 &&
+																targets.length === visibleRepositories.length}
+															disabled={visibleRepositories.length === 0}
+															indeterminate={targets.length > 0 &&
+																targets.length < visibleRepositories.length}
+															onchange={() => {
+																selection.setAll(targets.length < visibleRepositories.length)
+															}}
+															type="checkbox"
+														/></label
+													>
+												{:else if run !== undefined}<RunHeader
+														number={run.number}
+														onRemove={async () => removeRun(run.id)}
+														onSort={(multiple: boolean) => {
+															sortOutput(run.id, multiple)
+														}}
+														onStop={async () => stop(run.id)}
+														{run}
+														sorted={header.column.getIsSorted()}
+													/>
+												{:else}<button
+														class="sort-button"
+														disabled={!header.column.getCanSort()}
+														onclick={(event) => {
+															tableRows.refresh()
+															header.column.toggleSorting(undefined, event.shiftKey)
+															scheduleMetadata()
+														}}
+														type="button"
+														><span class="header-label"
+															>{String(header.column.columnDef.header)}</span
+														>{#if header.column.getIsSorted() !== false}<span
+																class="sort-indicator"
+																class:descending={header.column.getIsSorted() === 'desc'}
+																aria-hidden="true"
+															></span>{/if}</button
+													>{/if}
+												{#if header.column.getCanResize()}<button
+														class="resize-handle"
+														aria-label="Resize column"
+														ondblclick={() => {
+															resizedColumns.delete(header.column.id)
+															fitColumns([header.column.id], { automatic: false })
+														}}
+														onmousedown={(event) => startResize(event, header)}
+														ontouchstart={(event) => startResize(event, header)}
+														tabindex="-1"
+														type="button"
+													></button>{/if}
+											</th>{/if}{/if}{/each}</tr
 							>{/each}</thead
 					>
 					<tbody
 						>{#if virtualRows.before > 0}<tr class="row-spacer" aria-hidden="true"
 								><td style:height="{virtualRows.before}px" colspan={tableColumnCount}></td></tr
-							>{/if}{#each renderedRows as row, index (row.id)}<tr
+							>{/if}{#each renderedRows as row, index (row.id)}{@const cells =
+								row.getAllCellsByColumnId()}<tr
 								class:even={(virtualRows.start + index) % 2 === 1}
 								class:selected={row.getIsSelected()}
 								{@attach virtualRows.row}
 								aria-rowindex={virtualRows.start + index + 2}
 								data-repository-id={row.id}
-								>{#each row.getVisibleCells() as cell (cell.id)}{@const repository =
-										row.original}{@const run = runs.find(
-										(item) => item.id === cell.column.id,
-									)}{@const display = getColumnDisplay(cell.column.id)}{@const dock =
-										dockPositions[cell.column.id]}<td
-										style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
-										style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
-										class:column-dragged={draggingColumnId === cell.column.id}
-										class:dock-edge={dock?.edge}
-										class:docked-end={dock?.side === 'end'}
-										class:docked-start={dock?.side === 'start'}
-										class:numeric-cell={display === 'number'}
-										class:output-cell={run !== undefined}
-										class:repository-cell={cell.column.id === 'relativePath'}
-										class:selection-cell={cell.column.id === 'select'}
-										data-column-id={cell.column.id}
-										data-run-status={run === undefined
-											? undefined
-											: runCellStatus(run, repository.id)}
-									>
-										{#if cell.column.id === 'select'}<label
-												class="selection-hit-area"
-												{@attach selection.checkbox(row.id)}
-												><input
-													aria-label="Select {repository.name}"
-													checked={row.getIsSelected()}
-													type="checkbox"
-												/></label
-											>
-										{:else}<CellContent
-												columnId={cell.column.id}
-												onError={showError}
-												onInspect={inspect}
-												onOpen={openInApp}
-												onRefresh={async (target: Repository) =>
-													refreshMetadata(refreshGroups, [target.id])}
-												{outputLines}
-												{repository}
-												{runs}
-												shortcuts={preferences.repositoryShortcuts}
-											/>{/if}
-									</td>{#if cell.column.id === fillerAfterColumnId}<td
+								>{#each virtualColumns.slots as slot (slot.id)}{#if slot.kind === 'spacer'}<td
+											class="column-spacer"
+											aria-hidden="true"
+											colspan={slot.span}
+										></td>{:else if slot.kind === 'filler'}<td
 											class="table-filler"
 											aria-hidden="true"
-										></td>{/if}{/each}</tr
+										></td>{:else}{@const cell =
+											cells[slot.id]}{#if cell !== undefined}{@const repository =
+												row.original}{@const run = runs.find(
+												(item) => item.id === cell.column.id,
+											)}{@const display = getColumnDisplay(cell.column.id)}{@const dock =
+												dockPositions[cell.column.id]}<td
+												style:left={dock?.side === 'start' ? `${dock.offset}px` : undefined}
+												style:right={dock?.side === 'end' ? `${dock.offset}px` : undefined}
+												class:column-dragged={draggingColumnId === cell.column.id}
+												class:dock-edge={dock?.edge}
+												class:docked-end={dock?.side === 'end'}
+												class:docked-start={dock?.side === 'start'}
+												class:numeric-cell={display === 'number'}
+												class:output-cell={run !== undefined}
+												class:repository-cell={cell.column.id === 'relativePath'}
+												class:selection-cell={cell.column.id === 'select'}
+												data-column-id={cell.column.id}
+												data-run-status={run === undefined
+													? undefined
+													: runCellStatus(run, repository.id)}
+											>
+												{#if cell.column.id === 'select'}<label
+														class="selection-hit-area"
+														{@attach selection.checkbox(row.id)}
+														><input
+															aria-label="Select {repository.name}"
+															checked={row.getIsSelected()}
+															type="checkbox"
+														/></label
+													>
+												{:else}<CellContent
+														columnId={cell.column.id}
+														onError={showError}
+														onInspect={inspect}
+														onOpen={openInApp}
+														onRefresh={async (target: Repository) =>
+															refreshMetadata(refreshGroups, [target.id])}
+														{outputLines}
+														{repository}
+														{runs}
+														shortcuts={preferences.repositoryShortcuts}
+													/>{/if}
+											</td>{/if}{/if}{/each}</tr
 							>{/each}{#if virtualRows.after > 0}<tr class="row-spacer" aria-hidden="true"
 								><td style:height="{virtualRows.after}px" colspan={tableColumnCount}></td></tr
 							>{/if}</tbody

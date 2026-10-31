@@ -1174,6 +1174,11 @@ th.docked-end {
 	background: none;
 }
 
+/* Spacers hold the place of scrolling columns far outside the viewport, which render as they near it */
+.table-scroll .column-spacer {
+	padding: 0;
+}
+
 /* Shift-clicking checkboxes extends the row selection, never a text selection */
 .selection-cell {
 	user-select: none;
