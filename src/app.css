@@ -1300,10 +1300,10 @@ tbody tr {
 	background: var(--column-slot-shadow), linear-gradient(to top, #e6e8eb 1px, #f4f5f7 1px);
 }
 
-/* The header row sticks along with its cells, so its painted slot stays under them while scrolled */
+/* The header row sticks along with its cells, so its painted slot stays under them while scrolled, above every body cell, a dragged docked one included */
 thead {
 	position: sticky;
-	z-index: 3;
+	z-index: 4;
 	top: 0;
 }
 
