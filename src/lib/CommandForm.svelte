@@ -2,6 +2,7 @@
 	import { tick } from 'svelte'
 	import { commandPresets } from './command-presets.js'
 	import CommandAutocomplete from './CommandAutocomplete.svelte'
+	import { focusFromKeyboard } from './focus-source.js'
 	import NumberField from './NumberField.svelte'
 
 	/* eslint-disable ts/no-useless-default-assignment -- $bindable() marks a prop bindable, it is not a default */
@@ -32,8 +33,7 @@
 
 	/** Move focus to the command field and select its contents. */
 	export function focus() {
-		input?.focus()
-		input?.select()
+		focusFromKeyboard(input)
 	}
 
 	/** Forget the recall position, for example after the history changes. */

@@ -83,6 +83,11 @@ summary:focus-visible {
 	outline-offset: 1px;
 }
 
+/* AppKit rings only what the keyboard focused; Chromium also rings text fields and popups a click focused */
+[data-pointer-focus]:focus-visible {
+	outline: none;
+}
+
 input[type='checkbox'] {
 	position: relative;
 	overflow: hidden;
@@ -842,19 +847,14 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 /* The field's frame wears the ring for its text input; the pickers and steppers inside it never light the frame */
-.command-input:has(> input:focus-visible),
-.number-field:has(> input:focus-visible),
-.search-field:has(> input:focus-visible) {
+.command-input:has(> input:focus-visible:not([data-pointer-focus])),
+.number-field:has(> input:focus-visible:not([data-pointer-focus])),
+.search-field:has(> input:focus-visible:not([data-pointer-focus])) {
 	outline: 3px solid var(--focus-ring);
 	outline-offset: 1px;
 }
 
 :is(.command-input, .number-field, .search-field) > input:focus-visible {
-	outline: none;
-}
-
-/* Chromium rings a popup button even when a click focused it; AppKit rings it only under keyboard navigation */
-:where(:root[data-pointer-focus] select):focus-visible {
 	outline: none;
 }
 

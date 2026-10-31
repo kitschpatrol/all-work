@@ -47,6 +47,7 @@
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterMenu from '#lib/FilterMenu.svelte'
+	import { focusFromKeyboard } from '#lib/focus-source.js'
 	import { titleOnHover } from '#lib/hover-titles.js'
 	import { refreshGroups } from '#lib/metadata-columns.js'
 	import { planMetadataRequests, sendMetadataRequests } from '#lib/metadata-requests.js'
@@ -1062,8 +1063,7 @@
 			fitColumns()
 		},
 		'view.focusSearch'() {
-			searchInput?.focus()
-			searchInput?.select()
+			focusFromKeyboard(searchInput)
 		},
 		'view.reset'() {
 			void resetView()
