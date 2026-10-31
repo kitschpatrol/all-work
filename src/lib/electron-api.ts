@@ -14,6 +14,7 @@ export type MenuCommand =
 	| 'column.clearFinishedLeft'
 	| 'column.clearFinishedRight'
 	| 'column.copy'
+	| 'column.copyCommand'
 	| 'column.copySelected'
 	| 'column.copyVariable'
 	| 'column.dockEnd'

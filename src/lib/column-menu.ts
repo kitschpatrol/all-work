@@ -50,9 +50,9 @@ type ColumnMenuOptions = {
 
 /**
  * Connect a column's native menu to sorting, visibility, docking, filter rules,
- * copying its plain text or shell variable, and, for a run column, sorting by
- * exit code and clearing finished runs beside it, and the empty header space's
- * menu to showing hidden columns.
+ * copying its plain text or shell variable, and, for a run column, copying its
+ * command, sorting by exit code, and clearing finished runs beside it, and the
+ * empty header space's menu to showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
 	function getColumn(id: string | undefined) {
@@ -111,6 +111,15 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		options.onSort()
 	}
 
+	async function writeClipboard(text: string) {
+		try {
+			// eslint-disable-next-line node/no-unsupported-features/node-builtins -- The clipboard is written in the browser.
+			await navigator.clipboard.writeText(text)
+		} catch (error) {
+			options.onError(error)
+		}
+	}
+
 	async function copy(id: string | undefined, selected: boolean) {
 		const column = getColumn(id)
 		const rows = options.getRows(selected)
@@ -118,12 +127,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			return
 		}
 
-		try {
-			// eslint-disable-next-line node/no-unsupported-features/node-builtins -- The clipboard is written in the browser.
-			await navigator.clipboard.writeText(getColumnCopyLines(rows, column.id, options.getRuns()))
-		} catch (error) {
-			options.onError(error)
-		}
+		await writeClipboard(getColumnCopyLines(rows, column.id, options.getRuns()))
 	}
 
 	async function copyVariable(id: string | undefined) {
@@ -132,11 +136,13 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			return
 		}
 
-		try {
-			// eslint-disable-next-line node/no-unsupported-features/node-builtins -- The clipboard is written in the browser.
-			await navigator.clipboard.writeText(`$${name}`)
-		} catch (error) {
-			options.onError(error)
+		await writeClipboard(`$${name}`)
+	}
+
+	async function copyCommand(id: string | undefined) {
+		const run = options.getRuns().find((entry) => entry.id === id)
+		if (run !== undefined) {
+			await writeClipboard(run.command)
 		}
 	}
 
@@ -157,6 +163,9 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 		},
 		'column.copy'(payload) {
 			void copy(payload, false)
+		},
+		'column.copyCommand'(payload) {
+			void copyCommand(payload)
 		},
 		'column.copySelected'(payload) {
 			void copy(payload, true)

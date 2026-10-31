@@ -104,6 +104,27 @@ describe('copying a column variable', () => {
 	})
 })
 
+describe('copying a run column’s command', () => {
+	it('copies the command a run column ran', async () => {
+		menu().actions['column.copyCommand']('run-id')
+		await vi.waitFor(() => expect(writeText).toHaveBeenCalledExactlyOnceWith('git status'))
+	})
+
+	it('copies nothing for a column that is not a run', async () => {
+		menu().actions['column.copyCommand']('branch')
+		menu().actions['column.copyCommand']()
+		await Promise.resolve()
+		expect(writeText).not.toHaveBeenCalled()
+	})
+
+	it('reports a clipboard failure', async () => {
+		const onError = vi.fn<(error: unknown) => void>()
+		writeText.mockRejectedValueOnce(new Error('Clipboard denied'))
+		menu(onError).actions['column.copyCommand']('run-id')
+		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Clipboard denied')))
+	})
+})
+
 describe('clearing finished runs beside a run column', () => {
 	function run(id: string, finished: boolean): CommandRun {
 		return { command: id, concurrency: 1, createdAt: '', finished, id, number: 1, results: {} }

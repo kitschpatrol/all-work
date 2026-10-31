@@ -304,6 +304,9 @@ async function main(): Promise<void> {
 				['Copy', 'column.copy', true],
 				['Copy Selected', 'column.copySelected', request.hasSelection],
 				['Copy Variable', 'column.copyVariable', request.hasVariable],
+				...(request.isRun
+					? [['Copy Command', 'column.copyCommand', true] satisfies ColumnMenuItem]
+					: []),
 				...(request.isRun ? runItems : []),
 			]
 			Menu.buildFromTemplate(
