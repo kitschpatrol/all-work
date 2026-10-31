@@ -1077,8 +1077,15 @@ tr.selected td {
  * a line below each row, and the blank space shows its floor.
  */
 tbody tr.row-spacer {
-	background: linear-gradient(to bottom, #f4f5f7 calc(var(--row-height) - 1px), #e6e8eb 0) 0
-		calc(var(--row-stripes-y) + var(--row-stripes-shift)) / 100% var(--row-height) repeat-y;
+	background: linear-gradient(
+			to bottom,
+			#f2f3f5 calc(var(--row-height) - 1px),
+			#e6e8eb 0 var(--row-height),
+			#eff0f2 0 calc(var(--row-height) * 2 - 1px),
+			#e6e8eb 0
+		)
+		0 calc(var(--row-stripes-y) + var(--row-stripes-shift)) / 100% calc(var(--row-height) * 2)
+		repeat-y;
 }
 
 tbody tr.row-spacer td {
@@ -1474,12 +1481,17 @@ thead::after {
 }
 
 /*
- * Each row paints the space beyond its last cell. The same paint shows through
- * the slot a dragged column leaves behind, during the drag and while it settles
- * after the drop.
+ * Each row paints the space beyond its last cell, a shade lighter in rows whose
+ * cells are white, so the blank space continues the rows' stripes. The same
+ * paint shows through the slot a dragged column leaves behind, during the drag
+ * and while it settles after the drop.
  */
 tbody tr {
-	background: var(--column-slot-shadow), linear-gradient(to top, #e6e8eb 1px, #f4f5f7 1px);
+	background: var(--column-slot-shadow), linear-gradient(to top, #e6e8eb 1px, #f2f3f5 1px);
+}
+
+tbody tr.even {
+	background: var(--column-slot-shadow), linear-gradient(to top, #e6e8eb 1px, #eff0f2 1px);
 }
 
 /* The header row sticks along with its cells, so its painted slot stays under them while scrolled, above every body cell, a dragged docked one included */
