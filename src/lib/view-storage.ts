@@ -34,7 +34,6 @@ export type SavedView = {
 	runIds: string[]
 	/** Run columns that sort by exit code rather than output. */
 	runsSortedByExitCode: string[]
-	scroll: { left: number; top: number }
 	search: string
 	selectedOnly: boolean
 	sorting: Array<{ desc: boolean; id: string }>
@@ -48,8 +47,9 @@ function strings(value: unknown): string[] {
 		: []
 }
 
-function integer(value: unknown, fallback: number, min: number, max = Number.MAX_SAFE_INTEGER) {
-	return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max
+// Every saved count starts at 1
+function count(value: unknown, fallback: number, max = Number.MAX_SAFE_INTEGER) {
+	return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= max
 		? value
 		: fallback
 }
@@ -80,7 +80,6 @@ function booleanRecord(value: unknown): Record<string, boolean> {
 /** Restore all durable toolbar and table state from a versioned snapshot. */
 export function parseSavedView(value: unknown, defaultDirectory: string): SavedView {
 	const record = asRecord(value) ?? {}
-	const scroll = asRecord(record.scroll)
 	return {
 		autoClear: record.autoClear === true,
 		autoClearPredecessors: Object.fromEntries(
@@ -109,18 +108,17 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		columnVisibility: booleanRecord(record.columnVisibility),
 		command: typeof record.command === 'string' ? record.command : '',
 		commandHistory: strings(record.commandHistory).slice(-100),
-		concurrency: integer(record.concurrency, 6, 1, 32),
+		concurrency: count(record.concurrency, 6, 32),
 		directory: typeof record.directory === 'string' ? record.directory : defaultDirectory,
 		filter: parseFilter(record.filter),
 		filterPreset: isFilterPresetId(record.filterPreset) ? record.filterPreset : undefined,
-		nextRunNumber: integer(record.nextRunNumber, 1, 1),
-		outputLines: integer(record.outputLines, 3, 1),
+		nextRunNumber: count(record.nextRunNumber, 1),
+		outputLines: count(record.outputLines, 3),
 		recursive: record.recursive === true,
 		resizedColumns: strings(record.resizedColumns),
 		rowSelection: booleanRecord(record.rowSelection),
 		runIds: strings(record.runIds).slice(-1000),
 		runsSortedByExitCode: strings(record.runsSortedByExitCode),
-		scroll: { left: integer(scroll?.left, 0, 0), top: integer(scroll?.top, 0, 0) },
 		search: typeof record.search === 'string' ? record.search : '',
 		selectedOnly: record.selectedOnly === true,
 		sorting: Array.isArray(record.sorting)

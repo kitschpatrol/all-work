@@ -106,8 +106,6 @@
 	let persistence: { reset: () => Promise<void> }
 	let preferences = $state(defaultPreferences())
 	let savedView = $state<SavedView>()
-	let pendingScroll = $state<SavedView['scroll']>()
-	let scrollPosition = $state({ left: 0, top: 0 })
 	let commandForm: {
 		choose: (value: string) => Promise<void>
 		focus: () => void
@@ -309,7 +307,6 @@
 		rowSelection,
 		runIds: workspace === undefined ? (savedView?.runIds ?? []) : runs.map((run) => run.id),
 		runsSortedByExitCode: runSorting.runIds,
-		scroll: pendingScroll ?? scrollPosition,
 		search,
 		selectedOnly,
 		sorting: table.atoms.sorting.get(),
@@ -368,7 +365,6 @@
 		table.setSorting(view.sorting.filter((sort) => columns.some((column) => column.id === sort.id)))
 		runSorting.restore(view.runsSortedByExitCode)
 		table.setGlobalFilter(search)
-		pendingScroll = view.scroll
 	}
 
 	async function restoreView(view: SavedView, nextPreferences: Preferences) {
@@ -389,26 +385,6 @@
 		}
 	}
 
-	function restoreScrollPosition() {
-		if (pendingScroll === undefined) {
-			return
-		}
-
-		tableScroll.scrollLeft = pendingScroll.left
-		tableScroll.scrollTop = pendingScroll.top
-		scrollPosition = pendingScroll
-		if (
-			workspace?.repositories.every((repository) =>
-				['local', 'git', 'code', 'files'].every((group) => {
-					const state = repository.metadata?.groups[group as MetadataGroup]?.status
-					return state !== undefined && state !== 'queued' && state !== 'loading'
-				}),
-			)
-		) {
-			pendingScroll = undefined
-		}
-	}
-
 	async function applyPreferences(next: Preferences, persist = false) {
 		try {
 			await updatePreferences(preferences, next, workspace, persist)
@@ -422,7 +398,6 @@
 	async function resetView() {
 		await persistence.reset()
 		savedView = undefined
-		pendingScroll = undefined
 		directory = workspace?.directory ?? data.defaultDirectory
 		recursive = false
 		autoClear = false
@@ -448,7 +423,6 @@
 		fitColumns()
 		tableScroll.scrollLeft = 0
 		tableScroll.scrollTop = 0
-		scrollPosition = { left: 0, top: 0 }
 	}
 
 	function disposeStreams() {
@@ -549,8 +523,6 @@
 						.map((column) => column.id),
 				)
 			}
-
-			restoreScrollPosition()
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		} finally {
@@ -578,7 +550,6 @@
 				}
 
 				scheduleMetadata()
-				void tick().then(restoreScrollPosition)
 				sizingTimer ??= setTimeout(() => {
 					sizingTimer = undefined
 					void tick().then(() =>
@@ -1274,19 +1245,7 @@
 				{@attach virtualRows.scroller}
 				{@attach virtualColumns.scroller}
 				aria-label="Repository table"
-				onpointerdown={() => {
-					pendingScroll = undefined
-				}}
-				onscroll={() => {
-					scheduleMetadata()
-					scrollPosition = {
-						left: Math.round(tableScroll.scrollLeft),
-						top: Math.round(tableScroll.scrollTop),
-					}
-				}}
-				onwheel={() => {
-					pendingScroll = undefined
-				}}
+				onscroll={scheduleMetadata}
 				role="region"
 			>
 				<table

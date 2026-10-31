@@ -66,7 +66,6 @@ describe('shared JSON view persistence', () => {
 			{
 				columnSizing: { name: 123 },
 				rowSelection: { fixture: true },
-				scroll: { left: 40, top: 80 },
 				sorting: [{ desc: true, id: 'name' }],
 			},
 			'/projects',
@@ -107,7 +106,6 @@ describe('shared JSON view persistence', () => {
 					outputLines: 0,
 					rowSelection: { invalid: 1, valid: true },
 					runsSortedByExitCode: ['run-1', 2],
-					scroll: { left: -5, top: 20 },
 					sorting: [42, { desc: true, id: 'name' }],
 				},
 				'/default',
@@ -119,7 +117,6 @@ describe('shared JSON view persistence', () => {
 			outputLines: 3,
 			rowSelection: { valid: true },
 			runsSortedByExitCode: ['run-1'],
-			scroll: { left: 0, top: 20 },
 			sorting: [{ desc: true, id: 'name' }],
 		})
 	})
