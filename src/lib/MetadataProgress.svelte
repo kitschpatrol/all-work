@@ -24,7 +24,7 @@
 
 {#if progress.groups > 0}<span class="metadata-status"
 		><span id={labelId}
-			>Loading metadata for {progress.repositories}
+			>Loading {progress.repositories}
 			{progress.repositories === 1 ? 'repository' : 'repositories'}…</span
 		><progress
 			class="metadata-progress"
