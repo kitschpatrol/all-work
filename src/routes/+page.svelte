@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ColumnDef, RowSelectionState } from '@tanstack/svelte-table'
+	import type { RowSelectionState } from '@tanstack/svelte-table'
 	import type { AppWindow } from '#lib/app-windows.js'
 	import type { MenuActions } from '#lib/electron-api.js'
 	import type { RequestedMetadata } from '#lib/metadata-requests.js'
@@ -13,24 +13,7 @@
 		StreamEvent,
 		Workspace,
 	} from '#lib/workspace.js'
-	import {
-		columnFilteringFeature,
-		columnOrderingFeature,
-		columnResizingFeature,
-		columnSizingFeature,
-		columnVisibilityFeature,
-		createFilteredRowModel,
-		createSortedRowModel,
-		createTable,
-		filterFn_includesString,
-		globalFilteringFeature,
-		rowSelectionFeature,
-		rowSortingFeature,
-		sortFn_alphanumeric,
-		sortFn_basic,
-		sortFn_text,
-		tableFeatures,
-	} from '@tanstack/svelte-table'
+	import { createTable } from '@tanstack/svelte-table'
 	import AppTitle from '#lib/AppTitle.svelte'
 	import AppWindows from '#lib/AppWindows.svelte'
 	import CellContent from '#lib/CellContent.svelte'
@@ -72,6 +55,7 @@
 	import { createRunHistory } from '#lib/run-history.svelte.js'
 	import { createRunSorting } from '#lib/run-sorting.js'
 	import RunHeader from '#lib/RunHeader.svelte'
+	import { createColumnDefs, features } from '#lib/table-columns.js'
 	import { getColumnSizingValue, runCellStatus } from '#lib/table-formatting.js'
 	import { createTableRows } from '#lib/table-rows.svelte.js'
 	import { measureColumns } from '#lib/table-sizing.js'
@@ -129,55 +113,9 @@
 	// Metadata groups that load for shown columns, rows in view first; codebase scans and dependency checks run only when requested
 	const lazyGroups: ReadonlySet<MetadataGroup> = new Set(['ci', 'git', 'github', 'registry'])
 
-	const features = tableFeatures({
-		columnFilteringFeature,
-		columnOrderingFeature,
-		columnResizingFeature,
-		columnSizingFeature,
-		columnVisibilityFeature,
-		filteredRowModel: createFilteredRowModel(),
-		filterFns: { includesString: filterFn_includesString },
-		globalFilteringFeature,
-		rowSelectionFeature,
-		rowSortingFeature,
-		sortedRowModel: createSortedRowModel(),
-		sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, text: sortFn_text },
-	})
 	const defaultColumnIds = new Set(['relativePath', ...defaultColumnPreset.columns])
 
-	const columns = $derived<Array<ColumnDef<typeof features, Repository>>>([
-		{
-			enableHiding: false,
-			enableResizing: false,
-			enableSorting: false,
-			header: '',
-			id: 'select',
-			maxSize: 32,
-			minSize: 32,
-			size: 32,
-		},
-		...repositoryColumns.map((column): ColumnDef<typeof features, Repository> => ({
-			accessorFn: column.value,
-			enableHiding: column.id !== 'relativePath',
-			header: column.header,
-			id: column.id,
-			minSize: column.id === 'relativePath' ? 160 : 24,
-			sortFn: column.sort,
-			sortUndefined: 'last',
-		})),
-		...runs.map((run): ColumnDef<typeof features, Repository> => ({
-			accessorFn: (repository: Repository) => runSorting.value(run, repository.id),
-			enableGlobalFilter: false,
-			header: run.command,
-			id: run.id,
-			minSize: 240,
-			size: 240,
-			sortFn: (rowA, rowB, columnId) =>
-				(runSorting.sortsByExitCode(run.id) ? sortFn_basic : sortFn_text)(rowA, rowB, columnId),
-			// Rows without an exit code stay last in either direction
-			sortUndefined: 'last',
-		})),
-	])
+	const columns = $derived(createColumnDefs(runs, runSorting))
 	const pinnedColumns = $derived({
 		start: ['select', 'relativePath'],
 		end: runs.slice(-1).map((run) => run.id),
