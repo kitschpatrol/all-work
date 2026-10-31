@@ -1273,20 +1273,15 @@ th.column-dragged:is(.docked-start, .docked-end) {
 	}
 }
 
-/* Cells draw only their right border, so the dragged column carries away its neighbor's left edge */
-td.column-dragged + td:not(.dock-edge) {
+/* Cells draw only their right border, so the dragged column carries away the left edge of the column right of its slot */
+td[data-slot-edge]:not(.dock-edge) {
 	box-shadow: inset 1px 0 #eceef1;
 }
 
-th.column-dragged + th:not(.dock-edge) {
+th[data-slot-edge]:not(.dock-edge) {
 	box-shadow:
 		inset 1px 0 #d3d3d3,
 		inset 2px 0 #fff;
-}
-
-/* Hover states and tooltips would flicker beneath the pointer while a column moves */
-.column-dragging {
-	user-select: none;
 }
 
 /*
@@ -1357,10 +1352,6 @@ thead::after {
 	inset: 0;
 	border-bottom: 1px solid #b9b9b9;
 	background: var(--column-slot-shadow), linear-gradient(#f8f8f8, #ebebeb);
-}
-
-.column-dragging table {
-	pointer-events: none;
 }
 
 .sort-button {

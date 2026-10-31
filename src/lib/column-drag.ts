@@ -70,7 +70,8 @@ function slide(scroller: HTMLElement, id: string, from: number) {
 	const animations = columnElements(scroller, id).map((element) =>
 		element.animate(
 			[{ transform: `translateX(${from}px)` }, { transform: 'translateX(0)' }],
-			slideOptions,
+			// Added to any transform the element already has, such as a neighbor's shift
+			{ ...slideOptions, composite: 'add' },
 		),
 	)
 	slides.set(id, animations)
@@ -153,9 +154,11 @@ function regionLeft(scroller: HTMLElement, layout: Layout) {
  * Track a press on a column header and reorder the column as in the macOS
  * Finder. Past a small threshold the column follows the pointer within its
  * region, neighbors slide aside once it covers half their width, and the table
- * scrolls while a scrolling column nears either dock. Releasing settles the
- * column into its slot and swallows the click, so a drag never sorts. A press
- * that never crosses the threshold stays a click.
+ * scrolls while a scrolling column nears either dock. Until the drop, columns
+ * only move by transforms, so a drag never lays out the table again; releasing
+ * commits the new order once and settles every column into place. The click
+ * that ends a drag is swallowed, so a drag never sorts. A press that never
+ * crosses the threshold stays a click.
  */
 export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions): void {
 	const { id, scroller } = options
@@ -166,19 +169,52 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 	const layout = () => measure(options.columns(), options.docked(), options.fixed, id)
 	const originX = event.clientX
 	const originScroll = scroller.scrollLeft
+	let originIndex = 0
 	let originPosition = 0
 	let pointerX = originX
 	let offset = 0
+	let slot = 0
+	let slotEdge: string | undefined
 	let slotLeft: number | undefined
 	let drag: number | undefined
 	let frame: number | undefined
 	// Measured once as the drag begins, so each frame avoids a forced layout
 	let bounds = new DOMRect()
+	// Columns slid aside to open the slot, by how far
+	const shifts = new Map<string, number>()
+	// Rows that render mid-drag, as the table scrolls, take on the columns' transforms
+	const rows = new MutationObserver(() => {
+		setTransform(id, offset)
+		for (const [columnId, shift] of shifts) {
+			setTransform(columnId, shift)
+		}
 
-	function setOffset(next: number) {
-		offset = next
-		for (const element of columnElements(scroller, id)) {
-			element.style.transform = next === 0 ? '' : `translateX(${next}px)`
+		markSlotEdge(slotEdge)
+	})
+
+	// Writes only cells that differ, so a column already in place restyles nothing
+	function setTransform(columnId: string, shift: number) {
+		const transform = shift === 0 ? '' : `translateX(${shift}px)`
+		for (const element of columnElements(scroller, columnId)) {
+			if (element.style.transform !== transform) {
+				element.style.transform = transform
+			}
+		}
+	}
+
+	// The column right of the open slot draws the edge the dragged column carried away
+	function markSlotEdge(columnId: string | undefined) {
+		if (slotEdge !== columnId) {
+			for (const element of scroller.querySelectorAll<HTMLElement>('[data-slot-edge]')) {
+				delete element.dataset.slotEdge
+			}
+		}
+
+		slotEdge = columnId
+		if (columnId !== undefined) {
+			for (const element of columnElements(scroller, columnId)) {
+				element.dataset.slotEdge = ''
+			}
 		}
 	}
 
@@ -207,31 +243,34 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		}
 	}
 
-	function reorder(current: Layout, slot: number) {
-		const index = current.columns.findIndex((column) => column.id === id)
+	// Slide the columns between the dragged column's own place and `next` aside by its width
+	function openSlot(current: Layout, next: number) {
+		const width = current.columns[originIndex]?.width ?? 0
 		const others = current.columns.filter((column) => column.id !== id)
-		const displaced = others.slice(Math.min(index, slot), Math.max(index, slot))
-		const before = new Map(displaced.map((column) => [column.id, headerLeft(scroller, column.id)]))
-		options.onReorder(
-			current.region,
-			moveColumn(regionOrder(current), id, slot, new Set(others.map((column) => column.id))),
-		)
-		void tick().then(() => {
-			for (const [columnId, left] of before) {
-				cancelSlide(columnId)
-				const after = headerLeft(scroller, columnId)
-				if (left !== undefined && after !== undefined && Math.abs(left - after) >= 1) {
-					slide(scroller, columnId, left - after)
-				}
+		for (const [index, column] of others.entries()) {
+			const shift =
+				index >= next && index < originIndex
+					? width
+					: index >= originIndex && index < next
+						? -width
+						: 0
+			const previous = shifts.get(column.id) ?? 0
+			if (shift === previous) {
+				continue
 			}
-		})
+
+			shifts.set(column.id, shift)
+			setTransform(column.id, shift)
+			slide(scroller, column.id, previous - shift)
+		}
+
+		markSlotEdge(others[next]?.id)
 	}
 
 	function update() {
 		frame = undefined
 		const current = layout()
-		const index = current.columns.findIndex((column) => column.id === id)
-		if (index === -1) {
+		if (current.columns[originIndex]?.id !== id) {
 			finish()
 			return
 		}
@@ -247,23 +286,24 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			Math.max(originPosition + pointerX - originX + scrolled, 0),
 			totalWidth(others),
 		)
-		const slot = nearestSlot(
+		const next = nearestSlot(
 			others.map((column) => column.width),
 			position,
 		)
-		if (slot !== index) {
-			reorder(current, slot)
+		if (next !== slot) {
+			slot = next
+			openSlot(current, next)
 		}
 
-		const resting = totalWidth(others.slice(0, slot))
-		const left = regionLeft(scroller, current) + resting
+		const left = regionLeft(scroller, current) + totalWidth(others.slice(0, slot))
 		if (left !== slotLeft) {
 			slotLeft = left
 			scroller.style.setProperty('--column-drag-slot-left', `${left}px`)
 		}
 
-		if (slot !== index || position - resting !== offset) {
-			setOffset(position - resting)
+		if (position - originPosition !== offset) {
+			offset = position - originPosition
+			setTransform(id, offset)
 		}
 
 		frame = requestAnimationFrame(update)
@@ -285,13 +325,78 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		latestDrag += 1
 		drag = latestDrag
 		bounds = scroller.getBoundingClientRect()
+		originIndex = index
+		slot = index
 		originPosition = totalWidth(current.columns.slice(0, index))
 		slotLeft = regionLeft(scroller, current) + originPosition
 		scroller.style.setProperty('--column-drag-slot-left', `${slotLeft}px`)
 		scroller.style.setProperty('--column-drag-slot-width', `${column.width}px`)
+		// Hover states and tooltips would flicker beneath the pointer while the column moves, so the header keeps the pointer
+		scroller
+			.querySelector(`th[data-column-id="${CSS.escape(id)}"]`)
+			?.setPointerCapture(moveEvent.pointerId)
 		document.documentElement.classList.add('column-dragging')
 		options.onDragging(id)
+		markSlotEdge(current.columns[index + 1]?.id)
+		const body = scroller.querySelector('tbody')
+		if (body !== null) {
+			rows.observe(body, { childList: true })
+		}
+
 		frame = requestAnimationFrame(update)
+	}
+
+	// Commit the order, then slide every column from where it shows to its new place
+	async function settle(settled: number) {
+		const current = layout()
+		const ids = current.columns.map((column) => column.id)
+		const before = new Map(ids.map((columnId) => [columnId, headerLeft(scroller, columnId)]))
+		if (slot !== originIndex && current.columns[originIndex]?.id === id) {
+			const others = current.columns.filter((column) => column.id !== id)
+			options.onReorder(
+				current.region,
+				moveColumn(regionOrder(current), id, slot, new Set(others.map((column) => column.id))),
+			)
+		}
+
+		await tick()
+		markSlotEdge(undefined)
+		for (const columnId of ids) {
+			cancelSlide(columnId)
+			setTransform(columnId, 0)
+		}
+
+		shifts.clear()
+		offset = 0
+		// Ending the drag only now lets the shadows fade from cells the new order moved
+		document.documentElement.classList.remove('column-dragging')
+		const animations = ids.flatMap((columnId) => {
+			const from = before.get(columnId)
+			const to = headerLeft(scroller, columnId)
+			return from === undefined || to === undefined || Math.abs(from - to) < 1
+				? []
+				: slide(scroller, columnId, from - to)
+		})
+		// The header's shadow transition represents every cell, including a drop with no slide.
+		const shadows =
+			columnElements(scroller, id)[0]
+				?.getAnimations()
+				.filter(
+					(animation) =>
+						animation instanceof CSSTransition &&
+						animation.transitionProperty === '--column-drag-shadow-opacity',
+				) ?? []
+		await Promise.allSettled(
+			[...animations, ...shadows].map(async (animation) => animation.finished),
+		)
+		// A newer drag owns the dragging state now
+		if (settled !== latestDrag) {
+			return
+		}
+
+		scroller.style.removeProperty('--column-drag-slot-left')
+		scroller.style.removeProperty('--column-drag-slot-width')
+		options.onDragging(undefined)
 	}
 
 	function finish() {
@@ -299,6 +404,7 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 		removeEventListener('pointerup', finish)
 		removeEventListener('pointercancel', finish)
 		removeEventListener('blur', finish)
+		rows.disconnect()
 		if (frame !== undefined) {
 			cancelAnimationFrame(frame)
 			frame = undefined
@@ -310,32 +416,8 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 
 		const settled = drag
 		drag = undefined
-		document.documentElement.classList.remove('column-dragging')
 		suppressNextClick()
-		const settling = offset
-		setOffset(0)
-		const animations = settling === 0 ? [] : slide(scroller, id, settling)
-		// The header's shadow transition represents every cell, including a drop with no slide.
-		const shadows =
-			columnElements(scroller, id)[0]
-				?.getAnimations()
-				.filter(
-					(animation) =>
-						animation instanceof CSSTransition &&
-						animation.transitionProperty === '--column-drag-shadow-opacity',
-				) ?? []
-		void Promise.allSettled(
-			[...animations, ...shadows].map(async (animation) => animation.finished),
-		).then(() => {
-			// A newer drag owns the dragging state now
-			if (settled !== latestDrag) {
-				return
-			}
-
-			scroller.style.removeProperty('--column-drag-slot-left')
-			scroller.style.removeProperty('--column-drag-slot-width')
-			options.onDragging(undefined)
-		})
+		void settle(settled)
 	}
 
 	addEventListener('pointermove', move)
