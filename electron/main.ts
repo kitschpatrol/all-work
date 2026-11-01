@@ -59,6 +59,32 @@ function guardNavigation(window: BrowserWindow): void {
 	})
 }
 
+/** Give text fields native editing menus in every app window. */
+function installTextContextMenu(window: BrowserWindow): void {
+	window.webContents.on('context-menu', (_event, params) => {
+		if (!params.isEditable) {
+			return
+		}
+
+		const { editFlags } = params
+		Menu.buildFromTemplate([
+			{ enabled: editFlags.canUndo, role: 'undo' },
+			{ enabled: editFlags.canRedo, role: 'redo' },
+			{ type: 'separator' },
+			{ enabled: editFlags.canCut, role: 'cut' },
+			{ enabled: editFlags.canCopy, role: 'copy' },
+			{ enabled: editFlags.canPaste, role: 'paste' },
+			{ enabled: editFlags.canPaste, role: 'pasteAndMatchStyle' },
+			{ type: 'separator' },
+			{ enabled: editFlags.canSelectAll, role: 'selectAll' },
+		]).popup({
+			// Associating the frame enables macOS Services, Writing Tools, and AutoFill.
+			frame: params.frame ?? undefined,
+			window,
+		})
+	})
+}
+
 function getAppUrl(): URL {
 	if (app.isPackaged) {
 		return new URL(`http://${packagedServer.host}:${packagedServer.port}`)
@@ -88,6 +114,7 @@ function createWindow(appUrl: URL): void {
 
 	mainWindow.menuBarVisible = false // Windows: hides the menu bar
 	guardNavigation(mainWindow)
+	installTextContextMenu(mainWindow)
 	void mainWindow.loadURL(appUrl.href)
 
 	mainWindow.on('closed', () => {
@@ -136,6 +163,7 @@ function openSecondaryWindow(appUrl: URL, request: AppWindowRequest): void {
 	})
 	window.menuBarVisible = false
 	guardNavigation(window)
+	installTextContextMenu(window)
 	secondaryWindows.add(window)
 	window.on('closed', () => {
 		secondaryWindows.delete(window)
