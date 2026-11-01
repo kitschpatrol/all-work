@@ -129,7 +129,7 @@ Earlier unreleased versions of All Work were written by hand in 2024 and focused
 
 Technically, All Work can run in a browser, but it's distributed only in application form since it's nice to have native menus and multiple windows.
 
-Only macOS is officially support, but tests are passing on Linux runners. Many tests pass on Windows as well, and some path-related accommodations have already been made, but a bit more work would be needed for a functional build.
+Only macOS is officially supported, but tests are passing on Linux runners. Many tests pass on Windows as well, and some path-related accommodations have already been made, but a bit more work would be needed for a functional build.
 
 See [Development and packaging](./docs/help.md#development-and-packaging) for commands and release instructions.
 
