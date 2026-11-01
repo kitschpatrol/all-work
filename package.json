@@ -12,7 +12,7 @@
 		"repository",
 		"software-analytics",
 		"task-runner",
-		"homebrew-formula"
+		"homebrew-cask"
 	],
 	"homepage": "https://github.com/kitschpatrol/all-work",
 	"bugs": "https://github.com/kitschpatrol/all-work/issues",
@@ -65,7 +65,7 @@
 		"@types/node": "~24.13.6",
 		"autoprefixer": "^10.6.2",
 		"bumpp": "^12.3.0",
-		"electron": "^45.1.0",
+		"electron": "^45.2.1",
 		"electron-builder": "^26.18.1",
 		"poptab": "^1.2.2",
 		"shx": "^0.4.0",
