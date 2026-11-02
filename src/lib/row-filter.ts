@@ -232,6 +232,7 @@ const dayPattern = /^(\d{4})-(\d{2})-(\d{2})$/v
 const columnsById = new Map(repositoryColumns.map((column) => [column.id, column]))
 // Columns naming GitHub accounts or people, which rules can compare with your own
 const identityColumns = new Map<string, FilterKind>([
+	['metadata:Account', 'account'],
 	['metadata:Author', 'people'],
 	['metadata:Contributor', 'people'],
 	['metadata:Maintainer', 'people'],
@@ -287,6 +288,16 @@ export function getOperatorLabel(
 	operator: FilterOperator,
 	selected: boolean,
 ): string {
+	if (kind === 'account') {
+		if (operator === 'isMe') {
+			return 'is mine'
+		}
+
+		if (operator === 'isNotMe') {
+			return 'is not mine'
+		}
+	}
+
 	const label = operatorLabels[operator]
 	const worded = kind === 'output' && outputOperators.has(operator) ? `output ${label}` : label
 	return selected || getOperandShape(kind, operator) === 'none' ? worded : `${worded}…`

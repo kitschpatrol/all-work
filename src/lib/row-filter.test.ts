@@ -152,12 +152,36 @@ describe('compiling filters', () => {
 		expect(isRuleActive(rule('repoOwner', 'isMe'), [])).toBe(true)
 	})
 
+	it('matches Account metadata against your GitHub accounts independently of the repo owner', () => {
+		const rows = [
+			repository('mine', { repoOwner: 'someone' }, { Account: 'kitschpatrol' }),
+			repository('studio', {}, { Account: 'SlopForest' }),
+			repository('theirs', { repoOwner: 'kitschpatrol' }, { Account: 'someone' }),
+			repository('local'),
+		]
+		const results = (filter: FilterGroup) => rows.map((row) => evaluate(filter, row))
+		expect(results(all(rule('metadata:Account', 'isMe')))).toEqual([true, true, false, false])
+		expect(results(all(rule('metadata:Account', 'isNotMe')))).toEqual([false, false, true, true])
+		expect(results(all(rule('metadata:Account', 'is', 'SOMEONE')))).toEqual([
+			false,
+			false,
+			true,
+			false,
+		])
+	})
+
 	it('matches no owner or author as you when no identity is set', () => {
 		const nobody = { authorNames: [], githubAccounts: [] }
-		const mine = repository('mine', { repoOwner: 'kitschpatrol' }, { Author: ['Eric Mika'] })
+		const mine = repository(
+			'mine',
+			{ repoOwner: 'kitschpatrol' },
+			{ Account: 'kitschpatrol', Author: ['Eric Mika'] },
+		)
 		const owner = compileFilter(all(rule('repoOwner', 'isMe')), [], nobody, now)
+		const account = compileFilter(all(rule('metadata:Account', 'isMe')), [], nobody, now)
 		const author = compileFilter(all(rule('metadata:Author', 'includesMe')), [], nobody, now)
 		expect(owner?.(mine)).toBe(false)
+		expect(account?.(mine)).toBe(false)
 		expect(author?.(mine)).toBe(false)
 	})
 
@@ -215,6 +239,13 @@ describe('compiling filters', () => {
 		const loading = repository('loading', {}, {}, { local: { status: 'loading' } })
 		expect(evaluate(all(rule('repoOwner', 'isNotMe')), loading)).toBeUndefined()
 		expect(evaluate(all(rule('metadata:Author', 'doesNotIncludeMe')), loading)).toBeUndefined()
+	})
+
+	it('leaves Account identity rules undecided until GitHub metadata loads', () => {
+		const loading = repository('loading', {}, {}, { github: { status: 'loading' } })
+		expect(evaluate(all(rule('metadata:Account', 'isMe')), loading)).toBeUndefined()
+		expect(evaluate(all(rule('metadata:Account', 'isNotMe')), loading)).toBeUndefined()
+		expect(getFilterMetadataGroups(all(rule('metadata:Account', 'isMe')), [])).toEqual(['github'])
 	})
 
 	it('compares text without regard to case', () => {
@@ -419,11 +450,15 @@ describe('editing rules', () => {
 		expect(createRule(column('metadata:Fork')).operator).toBe('isYes')
 	})
 
-	it('offers identity comparisons only on owner and people columns', () => {
-		expect(column('repoOwner').kind).toBe('account')
-		expect(createRule(column('repoOwner')).operator).toBe('isMe')
+	it('offers identity comparisons only on account, owner, and people columns', () => {
+		for (const id of ['metadata:Account', 'repoOwner']) {
+			expect(column(id).kind).toBe('account')
+			expect(createRule(column(id)).operator).toBe('isMe')
+		}
+
 		expect(getOperators('text')).not.toContain('isMe')
-		expect(getOperatorLabel('account', 'isNotMe', false)).toBe('is not me')
+		expect(getOperatorLabel('account', 'isMe', false)).toBe('is mine')
+		expect(getOperatorLabel('account', 'isNotMe', false)).toBe('is not mine')
 		for (const id of ['metadata:Author', 'metadata:Contributor', 'metadata:Maintainer']) {
 			expect(column(id).kind).toBe('people')
 		}

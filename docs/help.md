@@ -140,7 +140,7 @@ Rules can reference hidden columns. The value field suggests values already load
 | Column kind                     | Comparisons and behavior                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Text                            | Contains, exact equality, begins/ends with, their available negative forms, pattern matching, and empty/not empty. Text comparisons are case-insensitive. |
-| Repo owner                      | Text comparisons plus **is me** and **is not me**, using your GitHub accounts in Preferences.                                                             |
+| Account, Repo owner             | Text comparisons plus **is mine** and **is not mine**, using your GitHub accounts in Preferences.                                                         |
 | Numbers                         | Equality, inequality, greater/less than, inclusive bounds, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                   |
 | Dates                           | Within/not within the last N days, weeks, months, or years; before/after a date; empty/not empty. Before/after excludes the chosen local calendar day.    |
 | Yes/no                          | **is Yes**, **is No**, and empty/not empty. Missing values do not count as No.                                                                            |
@@ -487,7 +487,7 @@ The two identity fields have different roles:
 | Field           | What to enter                                                                                         | Where it is used                                                                                                                         |
 | --------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Author names    | Your names or aliases as they appear in extracted project author, contributor, or maintainer metadata | People-column **is me**, **includes me**, and **does not include me** rules; the author part of **Mine**; project Status classification. |
-| GitHub accounts | GitHub usernames and organization account names that you want treated as yours                        | Repo owner **is me** and **is not me** rules; the ownership part of **Mine**; project Status classification.                             |
+| GitHub accounts | GitHub usernames and organization account names that you want treated as yours                        | Account and Repo owner **is mine** and **is not mine** rules; the ownership part of **Mine**; project Status classification.             |
 
 Use one entry per line or separate entries with commas. Leading/trailing whitespace and empty entries are removed, duplicate entries are collapsed, and a leading `@` is removed from GitHub accounts. Each field accepts up to 100 entries of up to 200 characters. Both lists can be empty.
 
