@@ -774,9 +774,13 @@
 		return repository === undefined ? '' : getCellTooltip(repository, columnId)
 	}
 
-	async function stop(runId: string) {
+	async function stop(runId: string, repositoryId?: string) {
 		try {
-			await request(`/api/runs/${runId}`, {}, 'PATCH')
+			await request(
+				`/api/runs/${runId}`,
+				repositoryId === undefined ? {} : { repositoryId },
+				'PATCH',
+			)
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		}
@@ -1406,6 +1410,8 @@
 														onOpen={openInApp}
 														onRefresh={async (target: Repository) =>
 															refreshMetadata(refreshGroups, [target.id])}
+														onStop={async (target: CommandRun, repositoryToStop: Repository) =>
+															stop(target.id, repositoryToStop.id)}
 														{outputLines}
 														{repository}
 														{runs}

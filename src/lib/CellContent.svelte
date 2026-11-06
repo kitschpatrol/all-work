@@ -19,6 +19,7 @@
 		onInspect,
 		onOpen,
 		onRefresh,
+		onStop,
 		outputLines,
 		repository,
 		runs,
@@ -29,6 +30,7 @@
 		onInspect: (run: CommandRun, repository: Repository) => void
 		onOpen: (repository: Repository, app: NativeOpenTarget) => Promise<void>
 		onRefresh: (repository: Repository) => Promise<void>
+		onStop: (run: CommandRun, repository: Repository) => Promise<void>
 		outputLines: number
 		repository: Repository
 		runs: CommandRun[]
@@ -97,7 +99,9 @@
 			onInspect={() => {
 				onInspect(run, repository)
 			}}
+			onStop={async () => onStop(run, repository)}
 			{result}
+			stopLabel="Stop the command in {repository.name}"
 		/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
 {:else if url !== undefined}<a
 		class="cell-text cell-link"

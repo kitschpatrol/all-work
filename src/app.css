@@ -49,7 +49,7 @@ select {
 	cursor: default;
 }
 
-button:not(.output-preview),
+button,
 label,
 summary,
 th,
@@ -1111,11 +1111,13 @@ td.output-cell {
 	vertical-align: top;
 }
 
-td.output-cell[data-run-status='success'] {
+td.output-cell[data-run-status='success'],
+.window-toolbar[data-run-status='success'] {
 	background: #edf6ef;
 }
 
-td.output-cell[data-run-status='failed'] {
+td.output-cell[data-run-status='failed'],
+.window-toolbar[data-run-status='failed'] {
 	background: #fbeeed;
 }
 
@@ -1127,7 +1129,8 @@ tr.even td.output-cell[data-run-status='failed'] {
 	background: #f7e9e8;
 }
 
-td.output-cell[data-run-status='running'] {
+td.output-cell[data-run-status='running'],
+.window-toolbar[data-run-status='running'] {
 	background:
 		linear-gradient(-45deg, #ffffff99 25%, #fff0 25% 50%, #ffffff99 50% 75%, #fff0 75%) 0 0 / 16px
 			16px,
@@ -1135,12 +1138,13 @@ td.output-cell[data-run-status='running'] {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	td.output-cell[data-run-status='running'] {
-		animation: run-cell-stripes 0.8s linear infinite;
+	td.output-cell[data-run-status='running'],
+	.window-toolbar[data-run-status='running'] {
+		animation: run-stripes 0.8s linear infinite;
 	}
 }
 
-@keyframes run-cell-stripes {
+@keyframes run-stripes {
 	to {
 		background-position:
 			16px 0,
@@ -1841,14 +1845,8 @@ tr[data-text-lines] .cell-text:not(.cell-link) {
 }
 
 .output-preview {
-	display: block;
-	width: 100%;
 	min-height: 44px;
 	padding: 5px 8px;
-	border: 0;
-	color: inherit;
-	text-align: left;
-	background: transparent;
 }
 
 /* Tabular figures only outside measured cells, since table-sizing measures with proportional canvas text */
@@ -1889,6 +1887,12 @@ tr[data-text-lines] .cell-text:not(.cell-link) {
 	margin-left: auto;
 	font-weight: 400;
 	color: var(--text-tertiary);
+}
+
+/* Bleed into the cell padding so the buttons don't make the meta line taller */
+.output-action {
+	flex-shrink: 0;
+	margin-block: -4px;
 }
 
 /* Line height stays 14px: OutputPreview limits the preview to lineLimit * 14px */
@@ -2370,6 +2374,13 @@ tr.selected
 	font-size: 11px;
 	color: var(--text-secondary);
 	background: #f7f7f7;
+}
+
+.window-toolbar-status {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: 8px;
+	align-items: center;
 }
 
 .window-toolbar-actions {

@@ -3,6 +3,8 @@
 	import { on } from 'svelte/events'
 	import type { OutputNeighbors, OutputTarget } from './app-windows.js'
 	import type { CommandRun, StreamEvent } from './workspace.js'
+	import { request } from './client-request.js'
+	import { runCellStatus } from './table-formatting.js'
 
 	/**
 	 * Live output for one repository in one run, shared by the Electron output
@@ -30,7 +32,9 @@
 	} = $props()
 	let run = $state<CommandRun>()
 	let message = $state('')
+	let stopping = $state(false)
 	const result = $derived(run?.results[repositoryId])
+	const stoppable = $derived(result?.status === 'queued' || result?.status === 'running')
 
 	onMount(() => {
 		// eslint-disable-next-line node/no-unsupported-features/node-builtins -- This EventSource runs in the browser.
@@ -71,6 +75,17 @@
 		}
 	}
 
+	async function stop() {
+		stopping = true
+		try {
+			await request(`/api/runs/${runId}`, { repositoryId }, 'PATCH')
+		} catch (error) {
+			message = error instanceof Error ? error.message : 'Could not stop the command.'
+		} finally {
+			stopping = false
+		}
+	}
+
 	async function copyOutput() {
 		try {
 			await navigator.clipboard.writeText(result?.output ?? '')
@@ -98,12 +113,24 @@
 			<p>{path}</p>
 		</div>
 	</div>
-	<div class="window-toolbar">
-		<span
-			>{result?.status ?? 'loading'}{result?.exitCode === undefined
-				? ''
-				: ` · exit ${result.exitCode}`}</span
-		>
+	<div
+		class="window-toolbar"
+		data-run-status={run === undefined ? undefined : runCellStatus(run, repositoryId)}
+	>
+		<div class="window-toolbar-status">
+			<span
+				>{result?.status ?? 'loading'}{result?.exitCode === undefined
+					? ''
+					: ` · exit ${result.exitCode}`}</span
+			>
+			{#if stoppable}<button
+					class="button subtle"
+					disabled={stopping}
+					onclick={stop}
+					title="Stop the command in {name}"
+					type="button">Stop</button
+				>{/if}
+		</div>
 		<div class="window-toolbar-actions">
 			<button
 				class="button subtle"
