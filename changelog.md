@@ -5,16 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-11-06
 
 ### Added
 
 - Filter Account metadata by is mine and is not mine using GitHub accounts configured in Preferences.
 - Give editable text fields native context menus in every app window, including undo/redo, clipboard actions, and Select All.
+- Add “Save As” for modified filter and column presets, creating a new preset without overwriting the original.
+- Stop one repository's command while the rest of its run continues, with controls in running cells and output windows. `PATCH /api/runs/[id]` accepts `repositoryId` to skip queued commands or terminate running ones.
 
 ### Changed
 
 - Label account and repository-owner identity predicates is mine and is not mine.
+- Show running-command counts separately from completed/total progress in run headers, and explicitly mark finished runs complete.
+- Open full command output through a dedicated button, allowing output preview text to be selected.
+- Show animated running stripes and success or failure colors in output-window toolbars.
 
 ### Security
 
@@ -24,11 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Document Account and Repo owner ownership filters and their GitHub account settings.
 - Correct the README's macOS support wording.
+- Add run-header tooltips explaining that Stop affects every repository and deleting an active output column also stops its run.
 
 ### Maintenance
 
 - Remove the obsolete esbuild build approval.
 - Correct the Homebrew package keyword from homebrew-formula to homebrew-cask.
+- Integrate `@kitschpatrol/chagent` 0.4.0 into the release command and upgrade the GitHub release-changelog action to v3.
 
 ## [1.1.0] - 2026-10-31
 
@@ -153,8 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Establish Svelte 5/Tailwind 4 builds, Node.js 22+/pnpm 10+ requirements, lint/type/test checks, and desktop packaging and release tooling for macOS ZIP, Windows NSIS, and Linux tarball targets.
 - Add a script reporting dependency usage frequency across authored projects.
 
-[Unreleased]: https://github.com/kitschpatrol/all-work/compare/v1.1.0...HEAD
 [0.0.5]: https://github.com/kitschpatrol/all-work/releases/tag/v0.0.5
 [0.0.6]: https://github.com/kitschpatrol/all-work/compare/v0.0.5...v0.0.6
 [1.0.0]: https://github.com/kitschpatrol/all-work/compare/v0.0.6...v1.0.0
 [1.1.0]: https://github.com/kitschpatrol/all-work/compare/v1.0.0...v1.1.0
+[1.2.0]: https://github.com/kitschpatrol/all-work/compare/v1.1.0...v1.2.0
