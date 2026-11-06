@@ -6,6 +6,7 @@ import {
 	pendingMetadata,
 	runCellStatus,
 	runOutcomes,
+	runProgress,
 	splitBreakableWords,
 } from './table-formatting.js'
 
@@ -126,6 +127,30 @@ describe('runOutcomes', () => {
 
 	it('counts nothing for a run without results', () => {
 		expect(runOutcomes(run())).toEqual({ failed: 0, succeeded: 0 })
+	})
+})
+
+describe('runProgress', () => {
+	function run(finished: boolean, ...statuses: Array<CommandRun['results'][string]['status']>) {
+		return {
+			finished,
+			results: Object.fromEntries(statuses.map((status, index) => [String(index), { status }])),
+		} as unknown as CommandRun
+	}
+
+	it('counts running and finished results separately while the run is in progress', () => {
+		expect(runProgress(run(false, 'running', 'running', 'queued'))).toBe('2 running · 0/3 done')
+		expect(runProgress(run(false, 'success', 'failed', 'cancelled', 'running'))).toBe(
+			'1 running · 3/4 done',
+		)
+	})
+
+	it('omits the running count when only queued results remain', () => {
+		expect(runProgress(run(false, 'success', 'queued'))).toBe('1/2 done')
+	})
+
+	it('reports a finished run as complete', () => {
+		expect(runProgress(run(true, 'success', 'failed'))).toBe('2/2 complete')
 	})
 })
 

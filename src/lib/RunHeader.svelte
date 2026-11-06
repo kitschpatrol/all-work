@@ -36,8 +36,7 @@
 		<span class="run-header-content">
 			<span class="run-label"
 				>RUN {number}
-				<span>{runProgress(run)}{run.finished ? ' complete' : ' running'}</span
-				>{#if outcomes.succeeded > 0}<span
+				<span>{runProgress(run)}</span>{#if outcomes.succeeded > 0}<span
 						class="run-outcome succeeded"
 						title="{outcomes.succeeded} succeeded">✓ {outcomes.succeeded}</span
 					>{/if}{#if outcomes.failed > 0}<span

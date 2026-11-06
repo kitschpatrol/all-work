@@ -35,10 +35,23 @@ export function vscodeUrl(repositoryPath: string) {
 	return `vscode://file${encoded}/`
 }
 
-/** Format the count of repositories whose command has finished. */
+/**
+ * Format a run's progress: "5 running · 3/10 done" while it is in progress
+ * (omitting the running count when only queued commands remain), and "10/10
+ * complete" once it has finished.
+ */
 export function runProgress(run: CommandRun) {
 	const results = Object.values(run.results)
-	return `${results.filter((result) => result.status !== 'queued' && result.status !== 'running').length}/${results.length}`
+	const running = results.filter((result) => result.status === 'running').length
+	const finished = results.filter(
+		(result) => result.status !== 'queued' && result.status !== 'running',
+	).length
+	const fraction = `${finished}/${results.length}`
+	if (run.finished) {
+		return `${fraction} complete`
+	}
+
+	return running > 0 ? `${running} running · ${fraction} done` : `${fraction} done`
 }
 
 /**
