@@ -11,19 +11,21 @@ import { userShellCommand } from './user-shell.js'
 type Job = {
 	cacheTimer?: ReturnType<typeof setTimeout>
 	cancelled: boolean
-	controller: AbortController
+	// One per command that has started, so each can be stopped alone
+	controllers: Map<string, AbortController>
 	deleted: boolean
 	environments: Map<string, Record<string, string>>
 	listeners: Set<(event: RunEvent) => void>
 	onFinished?: (repository: Repository) => void
 	run: CommandRun
+	stopped: Set<string>
 }
 
 const jobs = new Map<string, Job>()
 const outputLimit = 128_000
 
-function isCancelled(job: Job) {
-	return job.cancelled
+function isCancelled(job: Job, repositoryId: string) {
+	return job.cancelled || job.stopped.has(repositoryId)
 }
 
 function emit(job: Job, event: RunEvent) {
@@ -43,17 +45,19 @@ function emit(job: Job, event: RunEvent) {
 
 async function execute(job: Job, repository: Repository): Promise<void> {
 	const result = job.run.results[repository.id]
-	if (result === undefined || job.cancelled) {
+	if (result === undefined || isCancelled(job, repository.id)) {
 		return
 	}
 
+	const controller = new AbortController()
+	job.controllers.set(repository.id, controller)
 	const started = Date.now()
 	let timer: ReturnType<typeof setTimeout> | undefined
 	result.status = 'running'
 	emit(job, { result, type: 'result' })
 	try {
 		await verifyRepository(repository)
-		if (isCancelled(job)) {
+		if (isCancelled(job, repository.id)) {
 			return
 		}
 
@@ -75,7 +79,7 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 		const child = execa(file, args, {
 			all: true,
 			buffer: false,
-			cancelSignal: job.controller.signal,
+			cancelSignal: controller.signal,
 			cwd: repository.path,
 			env: environment,
 			extendEnv: false,
@@ -101,15 +105,17 @@ async function execute(job: Job, repository: Repository): Promise<void> {
 		})
 		const completion = await child
 		result.exitCode = completion.exitCode
-		result.status = isCancelled(job) ? 'cancelled' : completion.failed ? 'failed' : 'success'
-		if (completion.exitCode === undefined && !isCancelled(job)) {
+		const cancelled = isCancelled(job, repository.id)
+		result.status = cancelled ? 'cancelled' : completion.failed ? 'failed' : 'success'
+		if (!cancelled && completion.exitCode === undefined) {
 			result.output ||= completion.shortMessage ?? 'The shell could not start.'
 		}
 	} catch (error) {
-		result.status = isCancelled(job) ? 'cancelled' : 'failed'
+		result.status = isCancelled(job, repository.id) ? 'cancelled' : 'failed'
 		result.output = error instanceof Error ? error.message : String(error)
 	} finally {
 		clearTimeout(timer)
+		job.controllers.delete(repository.id)
 		job.environments.delete(repository.id)
 		result.duration = Date.now() - started
 		emit(job, { result, type: 'result' })
@@ -158,12 +164,13 @@ export function startRun(
 	}
 	const job: Job = {
 		cancelled: false,
-		controller: new AbortController(),
+		controllers: new Map(),
 		deleted: false,
 		environments,
 		listeners: new Set(),
 		onFinished,
 		run,
+		stopped: new Set(),
 	}
 	jobs.set(run.id, job)
 	void saveRunCache(run)
@@ -214,6 +221,16 @@ export function subscribeRun(id: string, listener: (event: RunEvent) => void): (
 	}
 }
 
+function cancel(job: Job, result: CommandRun['results'][string]) {
+	if (result.status !== 'queued' && result.status !== 'running') {
+		return
+	}
+
+	result.status = 'cancelled'
+	emit(job, { result, type: 'result' })
+	job.controllers.get(result.repositoryId)?.abort()
+}
+
 /** Cancel queued commands and terminate running shell process groups. */
 export function stopRun(id: string): void {
 	const job = jobs.get(id)
@@ -223,15 +240,23 @@ export function stopRun(id: string): void {
 
 	job.cancelled = true
 	for (const result of Object.values(job.run.results)) {
-		if (result.status !== 'queued' && result.status !== 'running') {
-			continue
-		}
+		cancel(job, result)
+	}
+}
 
-		result.status = 'cancelled'
-		emit(job, { result, type: 'result' })
+/**
+ * Cancel one repository's command if it has not started, or terminate its shell
+ * process group if it is running, leaving the rest of the run going.
+ */
+export function stopResult(id: string, repositoryId: string): void {
+	const job = jobs.get(id)
+	const result = job?.run.results[repositoryId]
+	if (job === undefined || result === undefined || job.run.finished) {
+		return
 	}
 
-	job.controller.abort()
+	job.stopped.add(repositoryId)
+	cancel(job, result)
 }
 
 /** Release a run's history after stopping any remaining commands. */
@@ -282,11 +307,12 @@ export async function restoreRuns(ids: string[], repositoryIds: Set<string>) {
 
 			jobs.set(id, {
 				cancelled: true,
-				controller: new AbortController(),
+				controllers: new Map(),
 				deleted: false,
 				environments: new Map(),
 				listeners: new Set(),
 				run,
+				stopped: new Set(),
 			})
 		}
 

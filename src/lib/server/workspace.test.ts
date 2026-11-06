@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CommandRun, Repository, Workspace } from '../workspace.js'
-import { deleteRun, getRun, startRun, stopRun, subscribeRun } from './commands.js'
+import { deleteRun, getRun, startRun, stopResult, stopRun, subscribeRun } from './commands.js'
 import { forgetWorkspace, getWorkspace, scanWorkspace, verifyRepository } from './repositories.js'
 import { readRequest } from './request.js'
 
@@ -675,6 +675,38 @@ describe('parallel command runs', () => {
 		expect(
 			Object.values(run.results).filter((result) => result.output.includes('started')),
 		).toHaveLength(1)
+	})
+
+	it("stops one repository's running command while the others keep running", async () => {
+		const run = startRun(longRunningCommand, repositories, repositories.length, 1)
+		runIds.push(run.id)
+		await vi.waitFor(() =>
+			expect(Object.values(run.results).every((result) => result.output.includes('started'))).toBe(
+				true,
+			),
+		)
+		const [stopped, ...others] = repositories.map((repository) => repository.id)
+		stopResult(run.id, stopped!)
+		await vi.waitFor(() => expect(run.results[stopped!]?.duration).toBeDefined())
+		expect(run.results[stopped!]?.status).toBe('cancelled')
+		expect(others.map((id) => run.results[id]?.status)).toEqual(others.map(() => 'running'))
+		expect(run.finished).toBe(false)
+		stopRun(run.id)
+		await waitForRun(run)
+	})
+
+	it("skips a stopped repository's queued command and runs the rest", async () => {
+		const run = startRun('echo done', repositories, 1, 1)
+		runIds.push(run.id)
+		const skipped = repositories.at(-1)!.id
+		stopResult(run.id, skipped)
+		await waitForRun(run)
+		expect(run.results[skipped]).toMatchObject({ output: '', status: 'cancelled' })
+		expect(
+			repositories
+				.filter((repository) => repository.id !== skipped)
+				.map((repository) => run.results[repository.id]?.status),
+		).toEqual(repositories.slice(1).map(() => 'success'))
 	})
 
 	it.skipIf(isWindows)(
