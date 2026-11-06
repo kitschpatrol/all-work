@@ -56,11 +56,15 @@
 				class="stop-button"
 				aria-label="Stop command"
 				onclick={onStop}
+				title="Stop this run in every repository"
 				type="button">■</button
 			>{/if}<button
 			class="remove-button"
 			aria-label="Delete output column"
 			onclick={onRemove}
+			title={run.finished
+				? 'Delete this output column'
+				: 'Stop this run and delete its output column'}
 			type="button">×</button
 		>
 	</div>
