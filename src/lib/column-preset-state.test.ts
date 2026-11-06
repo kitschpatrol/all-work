@@ -124,6 +124,21 @@ describe('column preset state', () => {
 		expect(state.modified).toBe(false)
 	})
 
+	it('saves edits to a saved preset as a new preset, leaving the original unchanged', async () => {
+		const { savedPresets, state, toggle, visible } = setup()
+		toggle('remote')
+		await state.savePreset('Remotes')
+		const original = savedPresets[0]
+		toggle('version')
+		expect(state.modified).toBe(true)
+		await state.savePreset('Remotes and version')
+		expect(savedPresets).toHaveLength(2)
+		expect(savedPresets[0]).toEqual(original)
+		expect(savedPresets[1]?.columns.toSorted()).toEqual(visible())
+		expect(state.selected?.label).toBe('Remotes and version')
+		expect(state.modified).toBe(false)
+	})
+
 	it('changes only repository columns when applying a preset', () => {
 		const { apply, state, toggle, visibility } = setup()
 		toggle('run-1')

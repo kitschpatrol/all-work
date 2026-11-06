@@ -234,6 +234,20 @@ describe('row filter state', () => {
 		expect(state.filter.rules[0]).toEqual({ column: 'branch', operator: 'is', value: 'main' })
 	})
 
+	it('saves edits to a saved preset as a new preset, leaving the original unchanged', async () => {
+		const { savedPresets, state } = setup()
+		state.applyPreset('clean')
+		await state.savePreset('Spotless')
+		const original = savedPresets[0]
+		state.set({ match: 'all', rules: [{ column: 'branch', operator: 'is', value: 'main' }] })
+		expect(state.modified).toBe(true)
+		await state.savePreset('Main branch')
+		expect(savedPresets).toHaveLength(2)
+		expect(savedPresets.find((preset) => preset.id === original?.id)).toEqual(original)
+		expect(state.selectedPreset?.label).toBe('Main branch')
+		expect(state.modified).toBe(false)
+	})
+
 	it('makes the filter custom when a built-in preset is edited and restores it when applied again', () => {
 		const { state } = setup()
 		state.applyPreset('changed')

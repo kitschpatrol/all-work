@@ -294,6 +294,13 @@
 								<button
 									class="button subtle"
 									disabled={busy}
+									onclick={beginSave}
+									title="Save these rules as a new preset, leaving “{selected.label}” unchanged"
+									type="button">Save As…</button
+								>
+								<button
+									class="button subtle"
+									disabled={busy}
 									onclick={saveChanges}
 									title="Save these rules to “{selected.label}”"
 									type="button">Save</button

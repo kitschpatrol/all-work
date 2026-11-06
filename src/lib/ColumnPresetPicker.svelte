@@ -8,9 +8,9 @@
 
 	/**
 	 * Choose, save, and delete column presets at the top of the Columns popover.
-	 * Save stores edits to the chosen saved preset; otherwise it names a new one.
-	 * The row keeps one height in every state so the checkboxes below never
-	 * move.
+	 * Save stores edits to the chosen saved preset, and Save As names a new one
+	 * from them; with no saved preset chosen, Save names a new one. The row keeps
+	 * one height in every state so the checkboxes below never move.
 	 */
 	const { columnPresets }: { columnPresets: ReturnType<typeof createColumnPresets> } = $props()
 	const selected = $derived(columnPresets.selected)
@@ -169,6 +169,13 @@
 				type="button">Save…</button
 			>
 		{:else if saved && columnPresets.modified}
+			<button
+				class="button subtle"
+				disabled={busy}
+				onclick={beginSave}
+				title="Save these columns as a new preset, leaving “{selected.label}” unchanged"
+				type="button">Save As…</button
+			>
 			<button
 				class="button subtle"
 				disabled={busy}
