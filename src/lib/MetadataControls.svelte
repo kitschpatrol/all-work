@@ -3,6 +3,7 @@
 	import { isColumnPresetId } from './column-presets.js'
 	import ColumnPresetOptions from './ColumnPresetOptions.svelte'
 	import ColumnPresetPicker from './ColumnPresetPicker.svelte'
+	import { clearSearchOnEscape, closeOnEscape } from './escape-key.js'
 
 	type MenuColumn = {
 		category: string
@@ -34,14 +35,8 @@
 	const menuId = $props.id()
 </script>
 
+<svelte:document onkeydown={(event: KeyboardEvent) => closeOnEscape(event, columnMenu)} />
 <svelte:window
-	onkeydown={(event: KeyboardEvent) => {
-		if (event.key !== 'Escape') {
-			return
-		}
-
-		columnMenu.open = false
-	}}
 	onpointerdown={(event: PointerEvent) => {
 		// Before click, so choosing New column set… in the select is not undone by its own click
 		if (columnMenu.open && !event.composedPath().includes(columnMenu)) {
@@ -92,6 +87,7 @@
 					<div class="column-search-field">
 						<input
 							aria-label="Find a column"
+							onkeydown={clearSearchOnEscape}
 							placeholder="Find a column…"
 							type="search"
 							bind:value={search}

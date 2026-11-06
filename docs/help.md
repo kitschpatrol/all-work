@@ -585,12 +585,13 @@ These shortcuts refer to the macOS desktop app:
 | ⌘A                                 | Select all matching repositories, or text when a text field has focus |
 | ⌥⌘A                                | Deselect every repository                                             |
 | ⇧⌘R                                | Refresh metadata for selected matching repositories                   |
+| Esc                                | Clear search text, close a popover, or leave the focused control      |
 | Shift-click a column heading       | Add or change a secondary sort                                        |
 | Option-click **+** in filter rules | Add a nested rule group                                               |
 
 Browser mode provides Preferences through the gear button or its shortcut (⌘, on macOS or Ctrl+, elsewhere), and repository selection through ⌘A/Ctrl+A and ⌥⌘A/Alt+Ctrl+A outside text fields. Other application menu shortcuts are not installed there and may retain their browser meanings. Preferences and output use dialogs, **Browse…** is absent, and native repository/header context menus are absent. Enter workspace paths manually. Dependency checking is currently exposed through the desktop Repositories menu.
 
-Focus rings appear when navigating with the keyboard or using field-focus shortcuts such as ⌘L and ⌘F. Clicking a control, or typing in a field focused by a click, does not add a focus ring. The **Jobs** and **Output lines** stepper arrows leave keyboard focus where it was.
+Focus rings appear when navigating with the keyboard or using field-focus shortcuts such as ⌘L and ⌘F. Clicking a control, or typing in a field focused by a click, does not add a focus ring. The **Jobs** and **Output lines** stepper arrows leave keyboard focus where it was. Escape does one thing per press, innermost first: it dismisses a suggestion list, clears the focused search field, closes an open Columns or Filter popover, and finally leaves the focused control so ⌘A and other shortcuts apply to the table again.
 
 ## Example workflows
 

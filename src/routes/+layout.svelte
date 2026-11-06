@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isUnhandledEscape } from '#lib/escape-key.js'
 	import { focusSource } from '#lib/focus-source.js'
 	import type { LayoutProps } from './$types'
 	import '../app.css'
@@ -20,10 +21,18 @@
 			focusSource.focus(event.target)
 		}
 	}
+
+	// The last Escape stage, on the window so the popovers' document handlers run first
+	function blurOnEscape(event: KeyboardEvent) {
+		if (isUnhandledEscape(event) && event.target instanceof HTMLElement) {
+			event.target.blur()
+		}
+	}
 </script>
 
 <svelte:window
 	onfocusincapture={focusin}
+	onkeydown={blurOnEscape}
 	onkeydowncapture={keydown}
 	onpointerdowncapture={() => {
 		focusSource.pointerdown()

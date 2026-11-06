@@ -45,6 +45,7 @@
 	import CommandForm from '#lib/CommandForm.svelte'
 	import { isOpenTarget } from '#lib/electron-api.js'
 	import ElectronMenu from '#lib/ElectronMenu.svelte'
+	import { clearSearchOnEscape } from '#lib/escape-key.js'
 	import { isFilterPresetId } from '#lib/filter-presets.js'
 	import FilterMenu from '#lib/FilterMenu.svelte'
 	import { focusFromKeyboard } from '#lib/focus-source.js'
@@ -1195,6 +1196,7 @@
 								table.setGlobalFilter(search)
 								scheduleMetadata()
 							}}
+							onkeydown={clearSearchOnEscape}
 							placeholder="Search repositories…"
 							type="search"
 							bind:value={search}

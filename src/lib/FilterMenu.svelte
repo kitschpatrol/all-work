@@ -4,6 +4,7 @@
 	import type { createRowFilter } from './row-filter-state.svelte.js'
 	import type { FilterMatch } from './row-filter.js'
 	import type { CommandRun, Repository } from './workspace.js'
+	import { closeOnEscape } from './escape-key.js'
 	import { focusLastFilterRule } from './filter-focus.js'
 	import { isFilterPresetId } from './filter-presets.js'
 	import FilterGroupEditor from './FilterGroupEditor.svelte'
@@ -156,18 +157,18 @@
 	}
 </script>
 
-<svelte:window
-	onblur={() => {
-		altHeld = false
-	}}
+<svelte:document
 	onkeydown={(event: KeyboardEvent) => {
 		altHeld = event.altKey
-		if (event.key === 'Escape') {
-			rowFilter.open = false
-		}
+		closeOnEscape(event, rowFilter)
 	}}
 	onkeyup={(event: KeyboardEvent) => {
 		altHeld = event.altKey
+	}}
+/>
+<svelte:window
+	onblur={() => {
+		altHeld = false
 	}}
 	onpointerdown={(event: PointerEvent) => {
 		// Before click, so a menu command that opens the popover is not undone by its own click
