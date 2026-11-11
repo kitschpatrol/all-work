@@ -125,6 +125,7 @@ export type ColumnMenuRequest = {
 	hasFinishedRunsRight: boolean
 	hasSelection: boolean
 	hasVariable: boolean
+	hiddenColumns: HiddenColumnsMenuRequest
 	isRun: boolean
 }
 
@@ -139,7 +140,11 @@ export type AllWorkApi = {
 	onMenuCommand: (callback: (command: MenuCommand, payload?: string) => void) => () => void
 	openExternalUrl: (url: string) => Promise<void>
 	openWindow: (request: AppWindowRequest) => Promise<void>
-	showColumnMenu: (request: ColumnMenuRequest) => Promise<void>
+	/**
+	 * Returns a hidden column chosen from Add Column, or undefined for other
+	 * actions.
+	 */
+	showColumnMenu: (request: ColumnMenuRequest) => Promise<string | undefined>
 	showHiddenColumnsMenu: (request: HiddenColumnsMenuRequest) => Promise<void>
 	showRepositoryMenu: (request: RepositoryMenuRequest) => Promise<RepositoryMenuChoice | undefined>
 	updateMenuState: (state: MenuState) => void
@@ -191,6 +196,7 @@ export function isColumnMenuRequest(value: unknown): value is ColumnMenuRequest 
 		typeof request.hasFinishedRunsRight === 'boolean' &&
 		typeof request.hasSelection === 'boolean' &&
 		typeof request.hasVariable === 'boolean' &&
+		isHiddenColumnsMenuRequest(request.hiddenColumns) &&
 		typeof request.isRun === 'boolean'
 	)
 }

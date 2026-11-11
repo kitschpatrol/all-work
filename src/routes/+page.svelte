@@ -25,6 +25,7 @@
 		dockNewestRun,
 		getDockPositions,
 		getDockSide,
+		moveColumnAfter,
 		moveColumnToEnd,
 		resolveColumnOrder,
 		toggleDock,
@@ -234,9 +235,23 @@
 				void removeRun(id)
 			}
 		},
-		async onShow(id) {
-			columnOrder = moveColumnToEnd(resolvedColumnOrder, id, dockedColumns)
+		async onShow(id, afterId) {
+			if (afterId === undefined) {
+				columnOrder = moveColumnToEnd(resolvedColumnOrder, id, dockedColumns)
+			} else {
+				const next = moveColumnAfter(resolvedColumnOrder, id, afterId, dockedColumns)
+				columnOrder = next.order
+				columnDocking = {
+					start: next.docked.start.filter((entry) => !fixedColumnIds.includes(entry)),
+					end: next.docked.end,
+				}
+			}
+
 			await setColumnsVisible([id], true)
+			if (afterId !== undefined) {
+				return
+			}
+
 			await tick()
 			tableScroll.scrollLeft = tableScroll.scrollWidth
 		},

@@ -15,6 +15,7 @@ import {
 	isMenuState,
 	isRepositoryMenuRequest,
 } from '../src/lib/electron-api.js'
+import { hiddenColumnsMenuItems } from './hidden-columns-menu.js'
 import { initialMenuState, syncMenu } from './menu.js'
 import { openExternalUrl } from './open-url.js'
 
@@ -289,7 +290,7 @@ async function main(): Promise<void> {
 			openSecondaryWindow(appUrl, request)
 		})
 
-		ipcMain.handle('all-work:column-menu', (event, request: unknown) => {
+		ipcMain.handle('all-work:column-menu', async (event, request: unknown) => {
 			if (!isTrustedSender(event, appUrl)) {
 				throw new Error('Column menus are only available inside All Work.')
 			}
@@ -337,8 +338,8 @@ async function main(): Promise<void> {
 					: []),
 				...(request.isRun ? runItems : []),
 			]
-			Menu.buildFromTemplate(
-				items.map((item) => {
+			return new Promise<string | undefined>((resolve) => {
+				const template: MenuItemConstructorOptions[] = items.map((item) => {
 					if (item === 'separator') {
 						return { type: 'separator' } as const
 					}
@@ -352,8 +353,18 @@ async function main(): Promise<void> {
 						label,
 						...(checked !== undefined && { checked, type: 'checkbox' as const }),
 					}
-				}),
-			).popup({ window })
+				})
+				template.splice(sortItems.length, 0, {
+					label: 'Add Column',
+					submenu: hiddenColumnsMenuItems(request.hiddenColumns, resolve),
+				})
+				Menu.buildFromTemplate(template).popup({
+					callback() {
+						resolve(undefined)
+					},
+					window,
+				})
+			})
 		})
 
 		ipcMain.handle('all-work:hidden-columns-menu', (event, request: unknown) => {
@@ -370,21 +381,10 @@ async function main(): Promise<void> {
 				return
 			}
 
-			// Section headers need macOS 14; elsewhere a disabled item labels each category
-			const items = request.groups.flatMap(({ category, columns }, index) => [
-				...(index > 0 ? [{ type: 'separator' } as const] : []),
-				process.platform === 'darwin'
-					? ({ label: category, type: 'header' } as const)
-					: { enabled: false, label: category },
-				...columns.map(({ id, label }): MenuItemConstructorOptions => ({
-					click() {
-						event.sender.send('all-work:menu-command', 'column.show' satisfies MenuCommand, id)
-					},
-					label,
-				})),
-			])
 			Menu.buildFromTemplate(
-				items.length > 0 ? items : [{ enabled: false, label: 'All Columns Shown' }],
+				hiddenColumnsMenuItems(request, (id) => {
+					event.sender.send('all-work:menu-command', 'column.show' satisfies MenuCommand, id)
+				}),
 			).popup({ window })
 		})
 

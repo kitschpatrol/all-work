@@ -38,8 +38,9 @@ const api: AllWorkApi = {
 	async openWindow(request: AppWindowRequest): Promise<void> {
 		await ipcRenderer.invoke('all-work:open-window', request)
 	},
-	async showColumnMenu(request: ColumnMenuRequest): Promise<void> {
-		await ipcRenderer.invoke('all-work:column-menu', request)
+	async showColumnMenu(request: ColumnMenuRequest): Promise<string | undefined> {
+		const result: unknown = await ipcRenderer.invoke('all-work:column-menu', request)
+		return typeof result === 'string' ? result : undefined
 	},
 	async showHiddenColumnsMenu(request: HiddenColumnsMenuRequest): Promise<void> {
 		await ipcRenderer.invoke('all-work:hidden-columns-menu', request)

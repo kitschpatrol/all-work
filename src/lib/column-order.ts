@@ -112,6 +112,36 @@ export function moveColumnToEnd(order: string[], id: string, docked: DockedColum
 }
 
 /**
+ * Move a column immediately after another, joining its dock or scrolling
+ * region.
+ */
+export function moveColumnAfter(
+	order: string[],
+	id: string,
+	afterId: string,
+	docked: DockedColumns,
+): { docked: DockedColumns; order: string[] } {
+	if (id === afterId || !order.includes(id) || !order.includes(afterId)) {
+		return { docked, order }
+	}
+
+	const rest = order.filter((entry) => entry !== id)
+	const nextOrder = rest.toSpliced(rest.indexOf(afterId) + 1, 0, id)
+	const without = undockColumn(docked, id)
+	const side = getDockSide(docked, afterId)
+	return {
+		docked:
+			side === undefined
+				? without
+				: {
+						...without,
+						[side]: without[side].toSpliced(without[side].indexOf(afterId) + 1, 0, id),
+					},
+		order: nextOrder,
+	}
+}
+
+/**
  * Choose the slot for a dragged column whose left edge sits `offset` pixels
  * into its region. `widths` are the other visible columns of the region in
  * order, so slot `n` rests after the first `n` of them. The closest resting

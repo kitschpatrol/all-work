@@ -1,5 +1,5 @@
 import type { DockedColumns, DockSide } from './column-order.js'
-import type { MenuActions } from './electron-api.js'
+import type { HiddenColumnsMenuRequest, MenuActions } from './electron-api.js'
 import type { CommandRun, Repository } from './workspace.js'
 import { getDockSide } from './column-order.js'
 import { getColumnVariableName } from './column-variables.js'
@@ -41,8 +41,11 @@ type ColumnMenuOptions = {
 	onFilter: (id: string) => void
 	onHide: (id: string) => Promise<void>
 	onRemoveRuns: (ids: readonly string[]) => void
-	/** Show a hidden column at the end of the table, where its menu opened. */
-	onShow: (id: string) => Promise<void>
+	/**
+	 * Show a hidden column after a header, or at the end for the empty header
+	 * menu.
+	 */
+	onShow: (id: string, afterId?: string) => Promise<void>
 	onSort: () => void
 	/** Sort a run column by its commands' exit codes, or by their output. */
 	sortByExitCode: (runId: string, byExitCode: boolean) => void
@@ -55,6 +58,20 @@ type ColumnMenuOptions = {
  * empty header space's menu to showing hidden columns.
  */
 export function createColumnMenu(options: ColumnMenuOptions) {
+	function getHiddenColumns(): HiddenColumnsMenuRequest {
+		const hidden = options.getOptionalColumns().filter((column) => !column.visible)
+		const groups = Map.groupBy(hidden, (column) => column.category)
+		return {
+			groups: Array.from(groups, ([category, columns]) => ({
+				category,
+				columns: columns.map(({ header, id, onDemand }) => ({
+					id,
+					label: onDemand ? `${header} · on demand` : header,
+				})),
+			})),
+		}
+	}
+
 	function getColumn(id: string | undefined) {
 		return id === undefined ? undefined : options.getColumn(id)
 	}
@@ -225,7 +242,7 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 
 			event.preventDefault()
 			try {
-				await globalThis._allWork.showColumnMenu({
+				const addedId = await globalThis._allWork.showColumnMenu({
 					canDock: canDock(columnId),
 					canFilter: column.getCanFilter(),
 					canHide: column.getCanHide(),
@@ -236,8 +253,16 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 					hasFinishedRunsRight: getFinishedRunsBeside(columnId, 'right').length > 0,
 					hasSelection: options.getRows(true).length > 0,
 					hasVariable: getColumnVariableName(columnId, options.getRuns()) !== undefined,
+					hiddenColumns: getHiddenColumns(),
 					isRun: isRun(columnId),
 				})
+				if (
+					addedId !== undefined &&
+					options.getColumnOrder().includes(columnId) &&
+					options.getOptionalColumns().some((entry) => entry.id === addedId && !entry.visible)
+				) {
+					await options.onShow(addedId, columnId)
+				}
 			} catch (error) {
 				options.onError(error)
 			}
@@ -248,18 +273,8 @@ export function createColumnMenu(options: ColumnMenuOptions) {
 			}
 
 			event.preventDefault()
-			const hidden = options.getOptionalColumns().filter((column) => !column.visible)
-			const groups = Map.groupBy(hidden, (column) => column.category)
 			try {
-				await globalThis._allWork.showHiddenColumnsMenu({
-					groups: Array.from(groups, ([category, columns]) => ({
-						category,
-						columns: columns.map(({ header, id, onDemand }) => ({
-							id,
-							label: onDemand ? `${header} · on demand` : header,
-						})),
-					})),
-				})
+				await globalThis._allWork.showHiddenColumnsMenu(getHiddenColumns())
 			} catch (error) {
 				options.onError(error)
 			}

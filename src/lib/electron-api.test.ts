@@ -52,6 +52,7 @@ describe('menu requests arriving over IPC', () => {
 			hasFinishedRunsRight: true,
 			hasSelection: false,
 			hasVariable: true,
+			hiddenColumns: { groups: [] },
 			isRun: true,
 		}
 		expect(isColumnMenuRequest(request)).toBe(true)
@@ -62,6 +63,13 @@ describe('menu requests arriving over IPC', () => {
 		expect(isColumnMenuRequest({ ...request, dock: 'start' })).toBe(true)
 		expect(isColumnMenuRequest({ ...request, dock: 'left' })).toBe(false)
 		expect(isColumnMenuRequest({ ...request, canDock: undefined })).toBe(false)
+		expect(isColumnMenuRequest({ ...request, hiddenColumns: undefined })).toBe(false)
+		expect(
+			isColumnMenuRequest({
+				...request,
+				hiddenColumns: { groups: [{ category: 'Git', columns: [{ id: 'sync' }] }] },
+			}),
+		).toBe(false)
 	})
 
 	it('accepts hidden columns grouped under a category, and an empty list', () => {

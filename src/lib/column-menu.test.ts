@@ -4,9 +4,9 @@ import type { CommandRun } from './workspace.js'
 import { createColumnMenu } from './column-menu.js'
 
 const writeText = vi.fn<(text: string) => Promise<void>>()
-const showColumnMenu = vi.fn<(request: ColumnMenuRequest) => Promise<void>>()
+const showColumnMenu = vi.fn<(request: ColumnMenuRequest) => Promise<string | undefined>>()
 const showHiddenColumnsMenu = vi.fn<(request: HiddenColumnsMenuRequest) => Promise<void>>()
-const onShow = vi.fn<(id: string) => Promise<void>>()
+const onShow = vi.fn<(id: string, afterId?: string) => Promise<void>>()
 const optionalColumns = [
 	{ category: 'Identity', header: 'Repo owner', id: 'repoOwner', onDemand: false, visible: false },
 	{ category: 'Identity', header: 'Name', id: 'name', onDemand: false, visible: true },
@@ -61,7 +61,7 @@ function menu(
 
 beforeEach(() => {
 	writeText.mockResolvedValue()
-	showColumnMenu.mockResolvedValue()
+	showColumnMenu.mockResolvedValue(undefined)
 	showHiddenColumnsMenu.mockResolvedValue()
 	onShow.mockResolvedValue()
 	vi.stubGlobal('navigator', { clipboard: { writeText } })
@@ -217,6 +217,54 @@ describe('showing hidden columns from the empty header space', () => {
 		onShow.mockRejectedValueOnce(new Error('Could not show column'))
 		menu(onError).actions['column.show']('sync')
 		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Could not show column')))
+	})
+})
+
+describe('adding hidden columns beside a header', () => {
+	const rightClick = { preventDefault: vi.fn<() => void>() } as unknown as MouseEvent
+
+	it('offers exactly the same grouped columns as the empty header menu', async () => {
+		const columnMenu = menu()
+		await columnMenu.showHidden(rightClick)
+		await columnMenu.show(rightClick, 'branch')
+		expect(showColumnMenu).toHaveBeenCalledWith(
+			expect.objectContaining({ hiddenColumns: showHiddenColumnsMenu.mock.calls[0]![0] }),
+		)
+	})
+
+	it.each(['branch', 'run-id', 'select'])(
+		'inserts the chosen hidden column beside the clicked %s header',
+		async (id) => {
+			showColumnMenu.mockResolvedValueOnce('sync')
+			await menu().show(rightClick, id)
+			expect(onShow).toHaveBeenCalledExactlyOnceWith('sync', id)
+		},
+	)
+
+	it.each([undefined, 'unknown', 'name', 'select'])(
+		'adds nothing for a dismissed menu or unavailable choice: %s',
+		async (choice) => {
+			showColumnMenu.mockResolvedValueOnce(choice)
+			await menu().show(rightClick, 'branch')
+			expect(onShow).not.toHaveBeenCalled()
+		},
+	)
+
+	it('adds nothing if the clicked header disappears while the menu is open', async () => {
+		let order = ['branch']
+		showColumnMenu.mockResolvedValueOnce('sync')
+		const showing = menu(undefined, { getColumnOrder: () => order }).show(rightClick, 'branch')
+		order = []
+		await showing
+		expect(onShow).not.toHaveBeenCalled()
+	})
+
+	it('reports a failure to insert the chosen column', async () => {
+		const onError = vi.fn<(error: unknown) => void>()
+		showColumnMenu.mockResolvedValueOnce('sync')
+		onShow.mockRejectedValueOnce(new Error('Could not show column'))
+		await menu(onError).show(rightClick, 'branch')
+		expect(onError).toHaveBeenCalledWith(new Error('Could not show column'))
 	})
 })
 

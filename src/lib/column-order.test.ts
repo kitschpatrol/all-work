@@ -4,6 +4,7 @@ import {
 	getDockPositions,
 	getDockSide,
 	moveColumn,
+	moveColumnAfter,
 	moveColumnToEnd,
 	nearestSlot,
 	resolveColumnOrder,
@@ -67,6 +68,88 @@ describe('moveColumnToEnd', () => {
 
 	it('leaves a docked column at its edge', () => {
 		expect(moveColumnToEnd(ids, 'run2', docked)).toEqual(['name', 'branch', 'version', 'run1'])
+	})
+})
+
+describe('moveColumnAfter', () => {
+	it('inserts a hidden column immediately after the clicked scrolling header', () => {
+		const next = moveColumnAfter(ids, 'version', 'name', docked)
+		expect(resolveColumnOrder(ids, next.order, next.docked)).toEqual([
+			'select',
+			'path',
+			'name',
+			'version',
+			'branch',
+			'run1',
+			'run2',
+		])
+		expect(next.docked).toEqual(docked)
+	})
+
+	it('overrides a hidden column’s saved dock to insert it in the scrolling area', () => {
+		const next = moveColumnAfter(ids, 'run2', 'branch', docked)
+		expect(resolveColumnOrder(ids, next.order, next.docked)).toEqual([
+			'select',
+			'path',
+			'name',
+			'branch',
+			'run2',
+			'version',
+			'run1',
+		])
+		expect(next.docked).toEqual({ start: ['select', 'path'], end: [] })
+	})
+
+	it('joins the left dock immediately after the fixed selection column', () => {
+		const next = moveColumnAfter(ids, 'version', 'select', docked)
+		expect(resolveColumnOrder(ids, next.order, next.docked)).toEqual([
+			'select',
+			'version',
+			'path',
+			'name',
+			'branch',
+			'run1',
+			'run2',
+		])
+		expect(next.docked.start).toEqual(['select', 'version', 'path'])
+	})
+
+	it('joins the right dock immediately after its clicked header', () => {
+		const next = moveColumnAfter(ids, 'name', 'run2', docked)
+		expect(resolveColumnOrder(ids, next.order, next.docked)).toEqual([
+			'select',
+			'path',
+			'branch',
+			'version',
+			'run1',
+			'run2',
+			'name',
+		])
+		expect(next.docked.end).toEqual(['run2', 'name'])
+	})
+
+	it('moves a hidden column between docks without changing the existing layout', () => {
+		const next = moveColumnAfter(ids, 'run2', 'path', docked)
+		expect(resolveColumnOrder(ids, next.order, next.docked)).toEqual([
+			'select',
+			'path',
+			'run2',
+			'name',
+			'branch',
+			'version',
+			'run1',
+		])
+		expect(next.docked).toEqual({ start: ['select', 'path', 'run2'], end: [] })
+		expect(docked).toEqual({ start: ['select', 'path'], end: ['run2'] })
+		expect(ids).toEqual(['select', 'path', 'name', 'branch', 'version', 'run1', 'run2'])
+	})
+
+	it.each([
+		['missing', 'branch'],
+		['version', 'missing'],
+		['version', 'version'],
+	])('leaves the layout alone for an unavailable insertion: %s after %s', (id, afterId) => {
+		expect(moveColumnAfter(ids, id, afterId, docked)).toEqual({ docked, order: ids })
 	})
 })
 
