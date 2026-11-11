@@ -107,7 +107,7 @@ export function parseSavedView(value: unknown, defaultDirectory: string): SavedV
 		),
 		columnVisibility: booleanRecord(record.columnVisibility),
 		command: typeof record.command === 'string' ? record.command : '',
-		commandHistory: strings(record.commandHistory).slice(-100),
+		commandHistory: strings(record.commandHistory).slice(-50),
 		concurrency: count(record.concurrency, 6, 32),
 		directory: typeof record.directory === 'string' ? record.directory : defaultDirectory,
 		filter: parseFilter(record.filter),

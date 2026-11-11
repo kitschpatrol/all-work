@@ -11,6 +11,7 @@
 		concurrency = $bindable(),
 		history,
 		loading,
+		onClearHistory,
 		onRun,
 		starting,
 		targetCount,
@@ -20,6 +21,7 @@
 		concurrency: number
 		history: string[]
 		loading: boolean
+		onClearHistory: () => void
 		onRun: () => Promise<void>
 		starting: boolean
 		targetCount: number
@@ -27,6 +29,7 @@
 	} = $props()
 	/* eslint-enable ts/no-useless-default-assignment */
 	const categories = $derived([...new Set(variables.map((variable) => variable.category))])
+	const recentHistory = $derived(history.slice(-50).toReversed())
 	let input = $state<HTMLInputElement>()
 	let historyIndex = $state(-1)
 	let draft = $state('')
@@ -128,6 +131,36 @@
 			/>
 			<CommandAutocomplete {input} onComplete={choose} {variables} />
 
+			<select
+				class="command-picker command-history"
+				aria-label="Command history"
+				disabled={recentHistory.length === 0}
+				onchange={async (event) => {
+					const { value } = event.currentTarget
+					event.currentTarget.value = ''
+					if (value === 'clear') {
+						onClearHistory()
+						resetRecall()
+						input?.focus()
+					} else {
+						const entry = recentHistory[Number(value)]
+						if (entry !== undefined) {
+							await choose(entry)
+						}
+					}
+				}}
+				title="Choose a recent command"
+				value=""
+			>
+				<option disabled value="">History</option>
+				{#each recentHistory as entry, index (index)}
+					<option title={entry} value={String(index)}
+						>{entry.length > 80 ? `${entry.slice(0, 77)}...` : entry}</option
+					>
+				{/each}
+				<hr />
+				<option value="clear">Clear history</option>
+			</select>
 			<select
 				class="command-picker command-variables"
 				aria-label="Column variables"

@@ -759,7 +759,7 @@
 			runs = [...runs, run]
 			runHistory.counted(run)
 			if (commandHistory.at(-1) !== run.command) {
-				commandHistory = [...commandHistory, run.command].slice(-100)
+				commandHistory = [...commandHistory, run.command].slice(-50)
 			}
 
 			commandForm.resetRecall()
@@ -1184,6 +1184,9 @@
 			bind:this={commandForm}
 			history={commandHistory}
 			{loading}
+			onClearHistory={() => {
+				commandHistory = []
+			}}
 			onRun={runCommand}
 			{starting}
 			targetCount={targets.length}

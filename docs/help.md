@@ -256,7 +256,7 @@ Each submission creates a run with its own concurrency limit. Multiple runs can 
 
 Choose **Presets → Fetch remote updates** to insert `git fetch --all --prune`, or use **Command → Presets → Fetch remote updates** in the desktop menu. Click **Run in N** to execute it in the selected matching repositories. Git metadata refreshes as each repository's command finishes.
 
-Use Up and Down in the command field to browse submitted commands. Down past the latest history entry restores your draft. The last 100 entries are remembered; consecutive identical submissions share one history entry. Clearing output does not clear history.
+**History**, between the command field and **Variables**, lists the last 50 submitted commands from newest to oldest. Choosing an entry restores its full command to the field without running it. Labels longer than 80 characters end in `...`; the full command remains intact. The dropdown is disabled until there is history. **Clear history**, below the divider, clears saved history while keeping the current command draft. Use Up and Down in the command field to browse submitted commands; Down past the latest entry restores your draft. Consecutive identical submissions share one history entry. Clearing output does not clear history.
 
 ### Shell behavior
 

@@ -449,6 +449,14 @@ select {
 	border-radius: 0 4px 4px 0;
 }
 
+.command-history {
+	width: 70px;
+}
+
+.command-picker:disabled {
+	opacity: 0.45;
+}
+
 .primary {
 	border-color: #1f5fcc;
 	border-bottom-color: #174ba8;
