@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-11-11
+
+### Added
+
+- Add a History dropdown to recall submitted commands newest first, with Clear history to erase saved history while keeping the current command draft.
+- Add “Add Column” to every desktop column header’s context menu, inserting hidden columns immediately to the right in the same dock or scrolling area.
+- Add “VS Code Workspace” to “Open Selected In” to open selected repositories together in a new multi-root workspace. `POST /api/repositories/vscode` supports opening selections in one workspace or separate windows.
+
+### Changed
+
+- Handle Escape one step per press, clearing the focused search before closing a Columns or Filter popover and finally leaving the focused control to restore table shortcuts.
+- Reduce saved command history from 100 entries to 50.
+- Move Columns beside the filters and keep Clear finished runs visible on the right, disabled when there are no finished runs.
+- Hide exit codes 0 and 1 in table previews and soften the ellipsis indicating additional output. Full output views still show all available exit codes.
+- Omit the redundant ready status from metadata tooltips.
+- Remove the sample `git status --short` placeholder from the command field.
+
+### Fixed
+
+- Fix “Open Selected In → VS Code” failing to open every selected repository by launching each in its own window. The action now requires `code` on PATH and reports launcher errors.
+
+### Documentation
+
+- Update the help guide for command history controls, column insertion, VS Code opening modes and launcher requirements, Escape handling, and exit-code display.
+- Clarify that the maintained macOS build requires Apple silicon and macOS 13 (Ventura) or later.
+- Correct `pnpm release` documentation to include Chagent changelog generation before the release commit.
+
+### Maintenance
+
+- Update Electron to `^45.2.3`, Metascope to `^0.13.9`, and Lognow to `^0.8.8`.
+- Refresh development and release tooling, including SvelteKit 3.2, Chagent 0.5, pnpm 12.18, shared lint configuration, and GitHub Actions.
+- Pin Knip to 6.44.2 to avoid false dependency reports for SvelteKit’s generated `$app` configuration.
+- Exclude generated distribution and coverage output from TypeScript project checks.
+
 ## [1.2.0] - 2026-11-06
 
 ### Added
@@ -165,3 +199,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.0]: https://github.com/kitschpatrol/all-work/compare/v0.0.6...v1.0.0
 [1.1.0]: https://github.com/kitschpatrol/all-work/compare/v1.0.0...v1.1.0
 [1.2.0]: https://github.com/kitschpatrol/all-work/compare/v1.1.0...v1.2.0
+[1.3.0]: https://github.com/kitschpatrol/all-work/compare/v1.2.0...v1.3.0
