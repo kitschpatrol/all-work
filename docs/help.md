@@ -129,7 +129,7 @@ The GitHub shortcut requires a recognized `github.com` origin remote; other host
 
 The readme shortcut checks the repository root, preferring Markdown files such as `readme.md` over other readme formats. Symlinked readmes and names such as `readme.ja.md` are not selected. Readme and terminal app choices live in Preferences. **System default** for a terminal means the app macOS associates with shell scripts; choose a specific terminal if that opens an unexpected application.
 
-**Repositories → Open Selected In** and **Reveal Selected in Finder** apply to all selected matching repositories. Missing readmes and unsupported GitHub remotes are skipped for their respective actions. Finder, Tower, terminal, and readme launching currently require macOS; VS Code uses its registered URL handler.
+**Repositories → Open Selected In** and **Reveal Selected in Finder** apply to all selected matching repositories. **VS Code** opens each selected repository in its own window. **VS Code Workspace** opens the selection together in a new window, with each repository as a folder in a multi-root workspace. Both menu actions require the `code` command on PATH and show an error if it is missing. Individual VS Code shortcuts use its registered URL handler. Missing readmes and unsupported GitHub remotes are skipped for their respective actions. Finder, Tower, terminal, and readme launching currently require macOS.
 
 ## Filters
 

@@ -2,7 +2,7 @@ import type { OpenTarget } from './electron-api.js'
 import type { Repository } from './workspace.js'
 import { vscodeUrl } from './table-formatting.js'
 /** Targets the server opens with native macOS applications. */
-export type NativeOpenTarget = Exclude<OpenTarget, 'github' | 'vscode'>
+export type NativeOpenTarget = Exclude<OpenTarget, 'github' | 'vscode' | 'vscode-workspace'>
 
 const githubScpRemote = /^(?:[^\/@:\s]+@)?github\.com:(.+)$/iv
 const trailingSlashes = /\/+$/v
@@ -86,9 +86,19 @@ export async function openRepositories(
 	repositories: readonly Repository[],
 	target: OpenTarget,
 	openInApp: (repository: Repository, app: NativeOpenTarget) => Promise<void>,
+	openInVsCode: (repositories: readonly Repository[], asWorkspace: boolean) => Promise<void>,
 ): Promise<void> {
+	if (repositories.length === 0) {
+		return
+	}
+
+	if (target === 'vscode' || target === 'vscode-workspace') {
+		await openInVsCode(repositories, target === 'vscode-workspace')
+		return
+	}
+
 	for (const repository of repositories) {
-		if (target === 'github' || target === 'vscode') {
+		if (target === 'github') {
 			openRepositoryLink(repository, target)
 		} else if (target !== 'readme' || repository.readme !== '') {
 			await openInApp(repository, target)

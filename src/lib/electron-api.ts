@@ -56,12 +56,21 @@ export type MenuCommand =
 /** Renderer-side handlers for each menu command. */
 export type MenuActions = Record<MenuCommand, (payload?: string) => void>
 
-const openTargets = ['finder', 'github', 'readme', 'terminal', 'tower', 'vscode'] as const
+const openTargets = [
+	'finder',
+	'github',
+	'readme',
+	'terminal',
+	'tower',
+	'vscode',
+	'vscode-workspace',
+] as const
 /** Applications the Repositories menu can open selected repositories in. */
 export type OpenTarget = (typeof openTargets)[number]
 
 /** An item chosen from a repository's context menu. */
-export type RepositoryMenuChoice = 'copyPath' | 'refresh' | 'website' | OpenTarget
+export type RepositoryMenuChoice =
+	'copyPath' | 'refresh' | 'website' | Exclude<OpenTarget, 'vscode-workspace'>
 
 /** Which of a repository's context menu items can be used. */
 export type RepositoryMenuRequest = {
@@ -217,7 +226,10 @@ export function isOpenTarget(value: unknown): value is OpenTarget {
 
 /** Narrow the item returned by a repository's context menu. */
 export function isRepositoryMenuChoice(value: unknown): value is RepositoryMenuChoice {
-	return value === 'copyPath' || value === 'refresh' || value === 'website' || isOpenTarget(value)
+	return (
+		value !== 'vscode-workspace' &&
+		(value === 'copyPath' || value === 'refresh' || value === 'website' || isOpenTarget(value))
+	)
 }
 
 /** Validate a repository context menu request arriving over IPC. */

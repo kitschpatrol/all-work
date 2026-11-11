@@ -5,6 +5,7 @@ import {
 	isColumnMenuRequest,
 	isHiddenColumnsMenuRequest,
 	isMenuState,
+	isOpenTarget,
 	isRepositoryMenuChoice,
 	isRepositoryMenuRequest,
 } from './electron-api.js'
@@ -117,5 +118,10 @@ describe('menu requests arriving over IPC', () => {
 		for (const choice of ['Readme', 'copy', '', undefined]) {
 			expect(isRepositoryMenuChoice(choice)).toBe(false)
 		}
+	})
+
+	it('offers VS Code Workspace for the selection rather than a single repository', () => {
+		expect(isOpenTarget('vscode-workspace')).toBe(true)
+		expect(isRepositoryMenuChoice('vscode-workspace')).toBe(false)
 	})
 })

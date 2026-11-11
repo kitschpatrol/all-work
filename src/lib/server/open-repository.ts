@@ -162,6 +162,65 @@ export async function openRepository(
 	}
 }
 
+/**
+ * Open selected repositories in separate VS Code windows or one multi-root
+ * workspace.
+ */
+export async function openRepositoriesInVsCode(request: Request, url: URL): Promise<Response> {
+	const body = await readRequest(request, url)
+	const workspace =
+		typeof body.workspaceId === 'string' ? getWorkspace(body.workspaceId) : undefined
+	if (workspace === undefined) {
+		error(404, 'Reload the folder to start a new workspace.')
+	}
+
+	if (
+		!Array.isArray(body.repositoryIds) ||
+		body.repositoryIds.length === 0 ||
+		typeof body.asWorkspace !== 'boolean'
+	) {
+		error(400, 'Choose repositories from the loaded folder and a VS Code opening mode.')
+	}
+
+	const scannedRepositories = new Map(
+		workspace.repositories.map((repository) => [repository.id, repository]),
+	)
+	const repositories = Array.from(new Set<unknown>(body.repositoryIds), (id) => {
+		const repository = typeof id === 'string' ? scannedRepositories.get(id) : undefined
+		if (repository === undefined) {
+			error(400, 'Choose repositories from the loaded folder.')
+		}
+
+		return repository
+	})
+
+	try {
+		await Promise.all(repositories.map(async (repository) => verifyRepository(repository)))
+		if (body.asWorkspace) {
+			await execute('code', ['--new-window', '--', ...repositories.map((entry) => entry.path)])
+		} else {
+			for (const repository of repositories) {
+				await execute('code', ['--new-window', '--', repository.path])
+			}
+		}
+
+		return Response.json({ opened: true })
+	} catch (error_) {
+		error(
+			400,
+			error_ instanceof Error &&
+				'code' in error_ &&
+				error_.code === 'ENOENT' &&
+				'path' in error_ &&
+				error_.path === 'code'
+				? 'The code command was not found on PATH. Install the VS Code command-line launcher and try again.'
+				: error_ instanceof Error
+					? error_.message
+					: 'Could not open the selected repositories in VS Code.',
+		)
+	}
+}
+
 function readApp(value: unknown): InstalledApp | undefined {
 	const app = asRecord(value)
 	return isBundleId(app?.id) && typeof app.path === 'string' && app.path !== ''

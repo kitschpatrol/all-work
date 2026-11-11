@@ -913,6 +913,22 @@
 		}
 	}
 
+	async function openInVsCode(repositories: readonly Repository[], asWorkspace: boolean) {
+		if (workspace === undefined) {
+			return
+		}
+
+		try {
+			await request('/api/repositories/vscode', {
+				asWorkspace,
+				repositoryIds: repositories.map((repository) => repository.id),
+				workspaceId: workspace.id,
+			})
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : String(error)
+		}
+	}
+
 	const menuActions: MenuActions = {
 		...columnMenu.actions,
 		'command.focus'() {
@@ -948,6 +964,7 @@
 					targets.map((row) => row.original),
 					payload,
 					openInApp,
+					openInVsCode,
 				)
 			}
 		},

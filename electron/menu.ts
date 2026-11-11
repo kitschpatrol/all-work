@@ -175,6 +175,7 @@ function buildTemplate(
 					item('Readme', 'repositories.open', { payload: 'readme' }),
 					item('Tower', 'repositories.open', { payload: 'tower' }),
 					item('VS Code', 'repositories.open', { payload: 'vscode' }),
+					item('VS Code Workspace', 'repositories.open', { payload: 'vscode-workspace' }),
 					item('GitHub', 'repositories.open', { payload: 'github' }),
 					item('Terminal', 'repositories.open', { payload: 'terminal' }),
 				],

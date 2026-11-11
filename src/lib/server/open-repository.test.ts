@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import {
 	listReadmeApps,
 	listTerminalApps,
+	openRepositoriesInVsCode,
 	openRepository as openRepositoryInApp,
 } from './open-repository.js'
 import { readSettings } from './settings.js'
@@ -121,6 +122,122 @@ async function openRepository(
 	})
 	return openRepositoryInApp(request, url, app)
 }
+
+describe('opening selected repositories in VS Code', () => {
+	const selected = [repository, workspace.repositories[0]!]
+
+	async function openSelection(body: Record<string, unknown> = {}) {
+		const { request, url } = localRequest('repositories/vscode', {
+			asWorkspace: false,
+			repositoryIds: selected.map(({ id }) => id),
+			workspaceId: workspace.id,
+			...body,
+		})
+		return openRepositoriesInVsCode(request, url)
+	}
+
+	it('opens each selected repository in its own new window, preserving exact paths and order', async () => {
+		const response = await openSelection()
+		await expect(response.json()).resolves.toEqual({ opened: true })
+		expect(launch.mock.calls).toEqual(
+			selected.map((entry) => ['code', ['--new-window', '--', entry.path], { timeout: 15_000 }]),
+		)
+		for (const entry of selected) {
+			expect(verifyRepository).toHaveBeenCalledWith(entry)
+		}
+	})
+
+	it('opens all selected folders in one new multi-root workspace with one CLI call', async () => {
+		await openSelection({ asWorkspace: true })
+		expect(launch).toHaveBeenCalledExactlyOnceWith(
+			'code',
+			['--new-window', '--', ...selected.map((entry) => entry.path)],
+			{ timeout: 15_000 },
+		)
+	})
+
+	it('does not open duplicate windows for repeated repository IDs', async () => {
+		await openSelection({ repositoryIds: [repository.id, repository.id] })
+		expect(launch).toHaveBeenCalledExactlyOnceWith(
+			'code',
+			['--new-window', '--', repository.path],
+			{ timeout: 15_000 },
+		)
+	})
+
+	it.each([
+		{ repositoryIds: [] },
+		{ repositoryIds: 'chosen-repository' },
+		{ repositoryIds: [repository.id, 'unknown-repository'] },
+		{ repositoryIds: [42] },
+		{ asWorkspace: 'true' },
+	])('rejects an invalid selection or opening mode: %j', async (body) => {
+		await expect(openSelection(body)).rejects.toMatchObject({ status: 400 })
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('rejects a workspace that is no longer loaded', async () => {
+		vi.mocked(getWorkspace).mockReturnValue(undefined)
+		await expect(openSelection()).rejects.toMatchObject({ status: 404 })
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('verifies every selected path before launching any windows', async () => {
+		vi.mocked(verifyRepository)
+			.mockResolvedValueOnce()
+			.mockRejectedValueOnce(new Error('Repository path changed.'))
+		await expect(openSelection()).rejects.toMatchObject({
+			body: { message: 'Repository path changed.' },
+			status: 400,
+		})
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('reports a missing code command as an actionable error for the notification', async () => {
+		launch.mockImplementation(() => {
+			throw Object.assign(new Error('spawn code ENOENT'), { code: 'ENOENT', path: 'code' })
+		})
+		await expect(openSelection()).rejects.toMatchObject({
+			body: {
+				message:
+					'The code command was not found on PATH. Install the VS Code command-line launcher and try again.',
+			},
+			status: 400,
+		})
+		expect(launch).toHaveBeenCalledTimes(1)
+	})
+
+	it('reports a missing repository path without blaming the code command', async () => {
+		vi.mocked(verifyRepository).mockRejectedValue(
+			Object.assign(new Error('Repository folder no longer exists.'), {
+				code: 'ENOENT',
+				path: repository.path,
+			}),
+		)
+		await expect(openSelection()).rejects.toMatchObject({
+			body: { message: 'Repository folder no longer exists.' },
+			status: 400,
+		})
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('reports other CLI launch failures', async () => {
+		launch.mockImplementation(() => {
+			throw new Error('VS Code could not start.')
+		})
+		await expect(openSelection({ asWorkspace: true })).rejects.toMatchObject({
+			body: { message: 'VS Code could not start.' },
+			status: 400,
+		})
+	})
+
+	it('requires an intentional same-origin app request', async () => {
+		const { request, url } = localRequest('repositories/vscode', {})
+		request.headers.set('origin', 'https://example.com')
+		await expect(openRepositoriesInVsCode(request, url)).rejects.toMatchObject({ status: 403 })
+		expect(launch).not.toHaveBeenCalled()
+	})
+})
 
 describe.skipIf(process.platform !== 'darwin').each(['Finder', 'Terminal', 'Tower'] as const)(
 	'opening a local repository in %s',

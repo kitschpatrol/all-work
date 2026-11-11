@@ -87,15 +87,42 @@ describe('opening selected repositories', () => {
 	it('opens readmes in order and skips repositories without one', async () => {
 		const openInApp = vi.fn<(repository: Repository, app: NativeOpenTarget) => Promise<void>>()
 		openInApp.mockResolvedValue()
+		const openInVsCode = vi.fn<Parameters<typeof openRepositories>[3]>().mockResolvedValue()
 		const repositories = [
 			{ ...base, id: 'a', readme: 'readme.md' },
 			{ ...base, id: 'b' },
 			{ ...base, id: 'c', readme: 'README' },
 		]
-		await openRepositories(repositories, 'readme', openInApp)
+		await openRepositories(repositories, 'readme', openInApp, openInVsCode)
 		expect(openInApp.mock.calls.map(([repository]) => repository.id)).toEqual(['a', 'c'])
 		openInApp.mockClear()
-		await openRepositories(repositories, 'finder', openInApp)
+		await openRepositories(repositories, 'finder', openInApp, openInVsCode)
 		expect(openInApp).toHaveBeenCalledTimes(3)
+		expect(openInVsCode).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		['vscode', false],
+		['vscode-workspace', true],
+	] as const)(
+		'sends the entire selection to the CLI action for %s',
+		async (target, asWorkspace) => {
+			const openInApp = vi.fn<Parameters<typeof openRepositories>[2]>().mockResolvedValue()
+			const openInVsCode = vi.fn<Parameters<typeof openRepositories>[3]>().mockResolvedValue()
+			const repositories = [
+				{ ...base, id: 'a', path: '/Code/first repo' },
+				{ ...base, id: 'b', path: '/Code/second repo' },
+			]
+			await openRepositories(repositories, target, openInApp, openInVsCode)
+			expect(openInVsCode).toHaveBeenCalledExactlyOnceWith(repositories, asWorkspace)
+			expect(openInApp).not.toHaveBeenCalled()
+		},
+	)
+
+	it('does not open an empty VS Code window when nothing is selected', async () => {
+		const openInApp = vi.fn<Parameters<typeof openRepositories>[2]>().mockResolvedValue()
+		const openInVsCode = vi.fn<Parameters<typeof openRepositories>[3]>().mockResolvedValue()
+		await openRepositories([], 'vscode-workspace', openInApp, openInVsCode)
+		expect(openInVsCode).not.toHaveBeenCalled()
 	})
 })
