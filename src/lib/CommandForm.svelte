@@ -5,7 +5,6 @@
 	import { focusFromKeyboard } from './focus-source.js'
 	import NumberField from './NumberField.svelte'
 
-	/* eslint-disable ts/no-useless-default-assignment -- $bindable() marks a prop bindable, it is not a default */
 	let {
 		command = $bindable(),
 		concurrency = $bindable(),
@@ -27,7 +26,7 @@
 		targetCount: number
 		variables: Array<{ category: string; id: string; label: string; name: string; preview: string }>
 	} = $props()
-	/* eslint-enable ts/no-useless-default-assignment */
+
 	const categories = $derived([...new Set(variables.map((variable) => variable.category))])
 	const recentHistory = $derived(history.slice(-50).toReversed())
 	let input = $state<HTMLInputElement>()

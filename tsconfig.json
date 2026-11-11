@@ -1,4 +1,5 @@
 {
 	"extends": ["@kitschpatrol/typescript-config/svelte", "$app/tsconfig"],
-	"exclude": ["**/build/", "**/out/"]
+	// Keep generated application, package, and test output out of project checks.
+	"exclude": ["./dist", "**/build/", "**/coverage/", "**/out/"]
 }

@@ -1,8 +1,10 @@
 allowBuilds:
   electron-winstaller: true
   unrs-resolver: true
-minimumReleaseAgeExclude:
-  - '@kitschpatrol/chagent@0.4.0'
+overrides:
+  # Remove when Knip no longer reports SvelteKit's generated $app config as an npm dependency.
+  # https://github.com/webpro-nl/knip/commit/8c5d329f5a139b94623776a4c061de9dc0ac1bcb
+  '@kitschpatrol/knip-config@8.14.1>knip': 6.44.2
 peerDependencyRules:
   allowedVersions:
     # Remove once the installed version declares ESLint 10 support.

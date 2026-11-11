@@ -687,7 +687,7 @@ For implementation details, see the [metadata loader](../src/lib/server/reposito
 
 ### Maintainer release scripts
 
-`pnpm release` uses Bumpp to bump the version and create a `Release: <version>` commit, builds the app, then packages and publishes artifacts to GitHub. It uses the maintainer's 1Password CLI token lookup and sets `APPLE_KEYCHAIN_PROFILE=notarytool`. This script requires the corresponding maintainer credentials and macOS signing setup and is not needed for ordinary development.
+`pnpm release` uses Bumpp to bump the version, generates the changelog with Chagent, and creates a `Release: <version>` commit. It then builds the app, packages it, and publishes artifacts to GitHub. It uses the maintainer's 1Password CLI token lookup and sets `APPLE_KEYCHAIN_PROFILE=notarytool`. This script requires the corresponding maintainer credentials and macOS signing setup and is not needed for ordinary development.
 
 To save notarization credentials in that Keychain profile:
 

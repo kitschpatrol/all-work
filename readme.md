@@ -46,6 +46,8 @@ _If you're just interested in access to the project metadata extraction and norm
 brew install --cask kitschpatrol/tap/all-work
 ```
 
+The maintained build requires Apple silicon and macOS 13 (Ventura) or later.
+
 ### First run
 
 Find and launch **All Work.app** in your `/Applications` folder.
