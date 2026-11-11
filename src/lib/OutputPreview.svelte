@@ -60,7 +60,9 @@
 		class:failed={result.status === 'failed'}
 		class:success={result.status === 'success'}
 	>
-		<span class="status-dot"></span>{result.status}{result.exitCode === undefined
+		<span class="status-dot"></span>{result.status}{result.exitCode === undefined ||
+		result.exitCode === 0 ||
+		result.exitCode === 1
 			? ''
 			: ` · exit ${result.exitCode}`}<span class="result-duration"
 			>{result.duration === undefined ? '' : `${(result.duration / 1000).toFixed(1)}s`}</span

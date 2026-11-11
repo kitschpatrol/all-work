@@ -272,11 +272,11 @@ The Windows runner uses `ComSpec` or `cmd.exe` with `/d /s /c`, rather than UNIX
 
 ### Inspecting output
 
-Every run adds an output column with its run number, command, progress, and success/failure counts. Each repository's result shows its status, exit code when available, duration, and captured text. **Output lines** controls how many lines appear in the table preview. When command output makes a row taller, ordinary metadata text wraps at whitespace to use the available height; links remain on one line. Text beyond the available space is still truncated. This does not change the captured output.
+Every run adds an output column with its run number, command, progress, and success/failure counts. Each repository's result shows its status, duration, and captured text. Exit codes other than 0 and 1 also appear in the table preview. **Output lines** controls how many lines appear in the table preview. When command output makes a row taller, ordinary metadata text wraps at whitespace to use the available height; links remain on one line. Text beyond the available space is still truncated. This does not change the captured output.
 
 Output combines stdout and stderr and strips terminal control sequences. All Work retains up to 128,000 characters per repository per run. Reaching the capture limit does not stop the command. A preview shortened by **Output lines** can still have more captured text; the capture-limit message identifies actual truncation.
 
-Click a result to open a separate output window in the desktop app, or a dialog in browser mode. **Copy output** copies its captured text. **Previous result** and **Next result** follow the current filtered table order and skip repositories omitted from the run.
+Click a result to open a separate output window in the desktop app, or a dialog in browser mode. This view always shows the exit code when available, including 0 and 1. **Copy output** copies its captured text. **Previous result** and **Next result** follow the current filtered table order and skip repositories omitted from the run.
 
 The displayed command substitutes simple column-variable references with their captured values. It leaves other shell variables and more complex shell expansions as typed; this display is not a complete shell execution trace. To copy the original command before substitution, use **Copy Command** in the run header's desktop context menu.
 
