@@ -809,6 +809,10 @@ h2 {
 	font-size: 11px;
 }
 
+.filters > .menu-control {
+	margin-left: 8px;
+}
+
 .search-field {
 	display: flex;
 	flex-wrap: nowrap;

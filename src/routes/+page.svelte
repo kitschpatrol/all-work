@@ -1224,6 +1224,14 @@
 						><input onchange={scheduleMetadata} type="checkbox" bind:checked={selectedOnly} /> Selected
 						only</label
 					>
+					<MetadataControls
+						{columnPresets}
+						columns={optionalColumns}
+						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
+						onVisibilityAll={async (visible: boolean) =>
+							setColumnsVisible(optionalColumnIds, visible)}
+						onVisibilityMany={setColumnsVisible}
+					/>
 				</div>
 				<div class="table-title-actions">
 					{#if activeRuns.length > 0}<span class="running-indicator"
@@ -1233,14 +1241,6 @@
 							onclick={clearFinishedRuns}
 							type="button">Clear finished runs</button
 						>{/if}
-					<MetadataControls
-						{columnPresets}
-						columns={optionalColumns}
-						onVisibility={async (id: string, visible: boolean) => setColumnsVisible([id], visible)}
-						onVisibilityAll={async (visible: boolean) =>
-							setColumnsVisible(optionalColumnIds, visible)}
-						onVisibilityMany={setColumnsVisible}
-					/>
 					<div class="number-option">
 						<label for="output-lines">Output lines</label>
 						<NumberField
