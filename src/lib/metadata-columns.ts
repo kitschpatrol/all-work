@@ -328,7 +328,7 @@ export function metadataHint(repository: Repository, group: MetadataGroup): stri
 
 	return [
 		metadataGroups[group],
-		state.status,
+		state.status === 'ready' ? '' : state.status,
 		state.cached === true ? 'cached' : '',
 		state.updatedAt === undefined ? '' : `Updated ${formatUpdatedAt(state.updatedAt)}`,
 		state.error ?? '',
