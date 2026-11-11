@@ -1236,10 +1236,6 @@
 				<div class="table-title-actions">
 					{#if activeRuns.length > 0}<span class="running-indicator"
 							><span class="connection-dot"></span>{activeRuns.length} running</span
-						>{/if}{#if runs.some((run) => run.finished)}<button
-							class="button subtle"
-							onclick={clearFinishedRuns}
-							type="button">Clear finished runs</button
 						>{/if}
 					<div class="number-option">
 						<label for="output-lines">Output lines</label>
@@ -1259,6 +1255,12 @@
 						<input aria-label="Auto clear" type="checkbox" bind:checked={autoClear} />
 						Auto clear
 					</label>
+					<button
+						class="button subtle"
+						disabled={runs.every((run) => !run.finished)}
+						onclick={clearFinishedRuns}
+						type="button">Clear finished runs</button
+					>
 				</div>
 			</div>
 			<div

@@ -548,6 +548,7 @@ h2 {
 	flex-wrap: nowrap;
 	gap: 10px;
 	align-items: center;
+	margin-left: auto;
 }
 
 .table-title-actions .number-field {
@@ -2482,10 +2483,6 @@ tr.selected
 @media (width <= 1000px) {
 	.app-identity h1 {
 		display: none;
-	}
-
-	.table-title-actions {
-		margin-left: auto;
 	}
 }
 
