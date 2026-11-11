@@ -123,7 +123,6 @@
 					historyIndex = -1
 				}}
 				onkeydown={recall}
-				placeholder="git status --short"
 				spellcheck="false"
 				bind:value={command}
 			/>
