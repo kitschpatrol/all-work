@@ -248,7 +248,7 @@ Local ahead/behind statistics never fetch. Run `git fetch --all --prune` to upda
 
 ## Running commands
 
-Enter a shell command, set **Jobs** between 1 and 32 (default 6), and click **Run in N**. Pressing Enter in the command field also submits the form when a variable-completion menu is not consuming the key. Commands can contain up to 16,000 characters.
+Enter a shell command, set **Jobs** between 1 and 32 (default 6), and click **Run in N**. Pressing Enter in the command field also submits the form when a variable-completion menu is not consuming the key. Once the run starts, the command moves to history and the field clears, so pressing Enter again does not repeat it; press Up to recall it. Turn off **Preferences → Commands → Clear the command field after running** to keep the command in the field instead. A failed submission always keeps the command in the field. Commands can contain up to 16,000 characters.
 
 Each submission creates a run with its own concurrency limit. Multiple runs can overlap, so their combined running-job count can exceed the **Jobs** setting. A failure in one repository does not stop the others. The repository targets and column-variable values are captured at submission; later selection, sort, or filter changes do not alter queued jobs.
 
@@ -527,19 +527,20 @@ Application lists load when Preferences opens. Reopen Preferences after installi
 
 ### Defaults
 
-| Preference                           | Initial value and Reset All Settings value |
-| ------------------------------------ | ------------------------------------------ |
-| Author names                         | Developer author aliases.                  |
-| GitHub accounts                      | Developer account names.                   |
-| Repo shortcut buttons                | GitHub, Finder, Terminal, and Refresh.     |
-| Readmes → Open with                  | System default.                            |
-| Terminal → Open with                 | System default.                            |
-| Restore the last workspace on launch | Enabled.                                   |
-| User filter and column presets       | None; built-in presets remain available.   |
+| Preference                            | Initial value and Reset All Settings value |
+| ------------------------------------- | ------------------------------------------ |
+| Author names                          | Developer author aliases.                  |
+| GitHub accounts                       | Developer account names.                   |
+| Repo shortcut buttons                 | GitHub, Finder, Terminal, and Refresh.     |
+| Readmes → Open with                   | System default.                            |
+| Terminal → Open with                  | System default.                            |
+| Clear the command field after running | Enabled.                                   |
+| Restore the last workspace on launch  | Enabled.                                   |
+| User filter and column presets        | None; built-in presets remain available.   |
 
 ### Saved view and workspace restoration
 
-Named filter and column presets, identity, shortcut choices, preferred apps, and the workspace-restoration setting are saved in preferences. The current view separately remembers the workspace path, recursive setting, command draft and history, Jobs, Output lines, Auto clear, search and filter rules, selections, column visibility/order/widths, docking, sorting (including which runs sort by exit code), and run references. Table scroll position is not saved or restored.
+Named filter and column presets, identity, shortcut choices, preferred apps, the command-clearing setting, and the workspace-restoration setting are saved in preferences. The current view separately remembers the workspace path, recursive setting, command draft and history, Jobs, Output lines, Auto clear, search and filter rules, selections, column visibility/order/widths, docking, sorting (including which runs sort by exit code), and run references. Table scroll position is not saved or restored.
 
 **Storage → Restore the last workspace on launch** is enabled by default. On startup, it loads the last workspace, restores its current view and available run output, and starts normal metadata refreshes. It never reruns saved commands; interrupted runs restore as cancelled snapshots after a server restart.
 

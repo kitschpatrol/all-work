@@ -27,6 +27,7 @@ export const repositoryShortcutOptions = [
 export type RepositoryShortcuts = Record<(typeof repositoryShortcutOptions)[number]['id'], boolean>
 
 export type Preferences = {
+	clearCommandOnRun: boolean
 	columnPresets: ColumnPreset[]
 	filterPresets: FilterPreset[]
 	identity: ProjectIdentity
@@ -68,11 +69,12 @@ export function isBundleId(value: unknown): value is string {
 }
 
 /**
- * Provide the initial identity, appearance, and workspace restoration
+ * Provide the initial identity, appearance, command, and workspace restoration
  * preferences.
  */
 export function defaultPreferences(): Preferences {
 	return {
+		clearCommandOnRun: true,
 		columnPresets: [],
 		filterPresets: [],
 		identity: {
@@ -144,6 +146,7 @@ export function parsePreferences(value: unknown): Preferences {
 	}
 
 	return {
+		clearCommandOnRun: record?.clearCommandOnRun !== false,
 		columnPresets: parseColumnPresets(record?.columnPresets),
 		filterPresets: parseFilterPresets(record?.filterPresets),
 		identity: parseIdentity(record?.identity) ?? defaults.identity,

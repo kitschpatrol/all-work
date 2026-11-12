@@ -745,6 +745,7 @@
 
 		starting = true
 		errorMessage = ''
+		const submittedCommand = command
 		const previousRunId = autoClear ? runs.at(-1)?.id : undefined
 		try {
 			const run = await request<CommandRun>('/api/runs', {
@@ -760,6 +761,10 @@
 			runHistory.counted(run)
 			if (commandHistory.at(-1) !== run.command) {
 				commandHistory = [...commandHistory, run.command].slice(-50)
+			}
+
+			if (command === submittedCommand && preferences.clearCommandOnRun) {
+				command = ''
 			}
 
 			commandForm.resetRecall()

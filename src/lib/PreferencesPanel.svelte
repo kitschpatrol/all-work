@@ -27,6 +27,7 @@
 		onSaved: (preferences: Preferences) => void
 	} = $props()
 	let preferences = $state(defaultPreferences())
+	let clearCommandOnRun = $state(true)
 	let authorNames = $state('')
 	let githubAccounts = $state('')
 	let readmeApp = $state('')
@@ -51,6 +52,7 @@
 
 	function readDraft() {
 		authorNames = preferences.identity.authorNames.join('\n')
+		clearCommandOnRun = preferences.clearCommandOnRun
 		githubAccounts = preferences.identity.githubAccounts.join('\n')
 		readmeApp = preferences.readmeApp
 		restoreWorkspace = preferences.restoreWorkspace
@@ -124,6 +126,7 @@
 
 		await persist({
 			...preferences,
+			clearCommandOnRun,
 			identity,
 			readmeApp,
 			repositoryShortcuts,
@@ -216,6 +219,16 @@
 			<p class="preference-help">
 				Used by the terminal shortcut button and Open Selected In › Terminal. The system default is
 				the app macOS uses for shell scripts.
+			</p>
+		</fieldset>
+		<fieldset disabled={busy}>
+			<legend>Commands</legend>
+			<label class="preference-checkbox"
+				><input type="checkbox" bind:checked={clearCommandOnRun} /> Clear the command field after running</label
+			>
+			<p class="preference-help">
+				When off, the command stays in the field after it starts. Either way, press Up in the
+				command field to recall earlier commands.
 			</p>
 		</fieldset>
 		<fieldset disabled={busy}>

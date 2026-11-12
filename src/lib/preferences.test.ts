@@ -74,6 +74,14 @@ describe('saved project identity', () => {
 		}
 	})
 
+	it('clears the command field after running unless turned off', () => {
+		expect(defaultPreferences().clearCommandOnRun).toBe(true)
+		expect(parsePreferences({ clearCommandOnRun: false }).clearCommandOnRun).toBe(false)
+		for (const clearCommandOnRun of [undefined, 'false', 0]) {
+			expect(parsePreferences({ clearCommandOnRun }).clearCommandOnRun).toBe(true)
+		}
+	})
+
 	it('normalizes aliases without changing author casing', () => {
 		expect(
 			parseIdentity({
