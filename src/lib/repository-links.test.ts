@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeOpenTarget } from './repository-links.js'
 import type { Repository } from './workspace.js'
-import { getGithubUrl, getWebsiteUrl, openRepositories } from './repository-links.js'
+import {
+	getGithubActionsUrl,
+	getGithubUrl,
+	getWebsiteUrl,
+	openRepositories,
+} from './repository-links.js'
 
 describe('GitHub repository links', () => {
 	it.each([
@@ -21,6 +26,13 @@ describe('GitHub repository links', () => {
 		'https://github.com/team',
 	])('does not offer a GitHub link for %s', (remote) => {
 		expect(getGithubUrl(remote)).toBeUndefined()
+	})
+
+	it.each(['success', 'failure'] as const)('links to %s Actions history', (conclusion) => {
+		expect(getGithubActionsUrl('git@github.com:team/project.git', conclusion)).toBe(
+			`https://github.com/team/project/actions?query=is%3A${conclusion}`,
+		)
+		expect(getGithubActionsUrl('https://gitlab.com/team/project.git', conclusion)).toBeUndefined()
 	})
 })
 

@@ -10,6 +10,7 @@ import type {
 import type { MetadataContext, SourceName } from 'metascope'
 import { metadataColumns, metadataGroups } from '#lib/metadata-columns.js'
 import { defaultPreferences } from '#lib/preferences.js'
+import { asRecord } from '#lib/record.js'
 import { sourceNames } from 'metascope'
 import { createHash } from 'node:crypto'
 import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
@@ -99,12 +100,18 @@ const releaseFields = new Set(['Latest Release Date', 'Latest Release Version', 
 function cachePath(repository: Repository, group: MetadataGroup, identity?: ProjectIdentity) {
 	// Include the credential identity without persisting credentials themselves.
 	const credentialsIdentity = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? 'default-user'
+	// CI now separates outcome counts from workflow names and their run links.
+	const version = group === 'ci' ? 4 : 3
 	const key = createHash('sha256')
 		.update(
-			`3\0${repository.path}\0${credentialsIdentity}\0${JSON.stringify(identity ?? defaultPreferences().identity)}\0${group}`,
+			`${version}\0${repository.path}\0${credentialsIdentity}\0${JSON.stringify(identity ?? defaultPreferences().identity)}\0${group}`,
 		)
 		.digest('hex')
 	return path.join(cacheDirectory('metadata'), `${key}.json`)
+}
+
+function isStringArray(value: unknown): value is string[] {
+	return Array.isArray(value) && value.every((item: unknown) => typeof item === 'string')
 }
 
 function isValue(value: unknown): value is MetadataValue {
@@ -112,7 +119,7 @@ function isValue(value: unknown): value is MetadataValue {
 		typeof value === 'string' ||
 		typeof value === 'boolean' ||
 		(typeof value === 'number' && Number.isFinite(value)) ||
-		(Array.isArray(value) && value.every((item: unknown) => typeof item === 'string'))
+		isStringArray(value)
 	)
 }
 
@@ -124,6 +131,19 @@ function restoreFields(repository: Repository, group: MetadataGroup, fields: unk
 		if (typeof value === typeof repository[key]) {
 			Object.assign(repository, { [key]: value })
 		}
+	}
+}
+
+function restoreLinks(metadata: NonNullable<Repository['metadata']>, links: unknown) {
+	const entries = Object.entries(asRecord(links) ?? {})
+	for (const [field, urls] of entries) {
+		const values = metadata.values[field]
+		if (!Array.isArray(values) || !isStringArray(urls) || urls.length !== values.length) {
+			continue
+		}
+
+		metadata.links ??= {}
+		metadata.links[field] = urls
 	}
 }
 
@@ -158,6 +178,7 @@ async function restoreCache(repository: Repository, identity?: ProjectIdentity) 
 			}
 
 			restoreFields(repository, group, 'fields' in cached ? cached.fields : undefined)
+			restoreLinks(metadata, 'links' in cached ? cached.links : undefined)
 
 			metadata.groups[group] = { cached: true, status: 'ready', updatedAt: cached.updatedAt }
 		} catch {
@@ -196,6 +217,12 @@ async function saveCache(repository: Repository, group: MetadataGroup, identity?
 			JSON.stringify({
 				fields: Object.fromEntries(
 					(persistedFields[group] ?? []).map((key) => [key, repository[key]]),
+				),
+				links: Object.fromEntries(
+					fields.flatMap((field) => {
+						const links = metadata.links?.[field]
+						return links === undefined ? [] : [[field, links]]
+					}),
 				),
 				updatedAt: metadata.groups[group]?.updatedAt,
 				values,
@@ -308,12 +335,22 @@ function applyContext(
 		if (!isValue(value)) {
 			if (column.group === refreshed) {
 				Reflect.deleteProperty(metadata.values, column.field)
+				if (metadata.links !== undefined) {
+					Reflect.deleteProperty(metadata.links, column.field)
+				}
 			}
 
 			continue
 		}
 
 		metadata.values[column.field] = value
+		const links = project.links[column.field]
+		if (links === undefined) {
+			continue
+		}
+
+		metadata.links ??= {}
+		metadata.links[column.field] = links
 	}
 
 	const dependencies = [

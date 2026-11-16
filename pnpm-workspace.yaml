@@ -1,6 +1,9 @@
 allowBuilds:
   electron-winstaller: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  # Use the freshly published workflow-run fix from our Metascope release.
+  - metascope@0.13.10
 overrides:
   # Remove when Knip no longer reports SvelteKit's generated $app config as an npm dependency.
   # https://github.com/webpro-nl/knip/commit/8c5d329f5a139b94623776a4c061de9dc0ac1bcb

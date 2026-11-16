@@ -1,3 +1,4 @@
+import type { MetadataContext } from 'metascope'
 import { getWebsiteUrl } from '#lib/repository-links.js'
 import { defineTemplate, helpers, templates } from 'metascope'
 import { getRemoteRepository } from './repository-remote.js'
@@ -17,10 +18,43 @@ function getUpstream(gitStats: undefined | UpstreamStats) {
 	}
 }
 
+/** Group known outcomes with each workflow's latest completed run link. */
+function getActionMetadata(actions: MetadataContext['githubActions']) {
+	const reported = helpers
+		.ensureArray(actions)
+		.map(({ data }) => data)
+		.filter((action) => action.lastRunConclusion !== undefined)
+	const failed =
+		reported.length === 0
+			? undefined
+			: reported.filter((action) => action.lastRunConclusion === 'failure')
+	const passed =
+		reported.length === 0
+			? undefined
+			: reported.filter((action) => action.lastRunConclusion === 'success')
+	const links: Record<string, string[] | undefined> = {
+		'Actions Failed': failed?.map((action) => action.lastRunUrl ?? ''),
+		'Actions Passed': passed?.map((action) => action.lastRunUrl ?? ''),
+	}
+	return {
+		frontmatter: {
+			'Actions Failed': failed?.map((action) => action.name),
+			'Actions Failed Count': failed?.length,
+			'Actions Passed': passed?.map((action) => action.name),
+			'Actions Passed Count': passed?.length,
+		},
+		links,
+	}
+}
+
 /** Derive All Work's project and repository fields from local Metascope sources. */
 export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const project = templates.project(context, templateData)
-	const frontmatter = templates.frontmatter(context, templateData)
+	const actions = getActionMetadata(context.githubActions)
+	const frontmatter = {
+		...templates.frontmatter(context, templateData),
+		...actions.frontmatter,
+	}
 	const gitStats = helpers.firstOf(context.gitStats)?.data
 	const github = helpers.firstOf(context.github)?.data
 	const remote =
@@ -46,6 +80,7 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 		changedFiles: gitStats?.uncommittedFileCount,
 		frontmatter,
 		gitStatusAvailable: gitStats?.uncommittedFileCount !== undefined,
+		links: actions.links,
 		packageManager: helpers.firstOf(context.nodePackageJson)?.data.packageManager,
 		remote,
 		repoName: identity?.name,

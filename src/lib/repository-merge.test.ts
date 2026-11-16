@@ -1,6 +1,7 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import { describe, expect, it } from 'vitest'
 import type { Repository } from './workspace.js'
+import { getColumnLinkedItems } from './column-variables.js'
 import { applyMetadataEvent, mergeGroups, mergeRepository } from './repository-merge.js'
 
 function repository(overrides: Partial<Repository> = {}): Repository {
@@ -100,6 +101,40 @@ describe('repository merge', () => {
 		mergeRepository(next, repository())
 		expect(next.metadata?.values.Version).toBe('1.0.0')
 	})
+
+	it('preserves unchanged run links and updates or removes links when names stay the same', () => {
+		const target = repository()
+		const first = 'https://github.com/team/project/actions/runs/1'
+		const next = 'https://github.com/team/project/actions/runs/2'
+		const metadata = {
+			groups: {},
+			links: { 'Actions Passed': [first] },
+			values: { 'Actions Passed': ['CI'] },
+		}
+		mergeRepository(target, repository({ metadata }))
+		const links = target.metadata?.links?.['Actions Passed']
+		mergeRepository(target, repository({ metadata: structuredClone(metadata) }))
+		expect(target.metadata?.links?.['Actions Passed']).toBe(links)
+		expect(getColumnLinkedItems(target, 'metadata:Actions Passed')).toEqual([
+			{ label: 'CI', url: new URL(first) },
+		])
+
+		mergeRepository(
+			target,
+			repository({ metadata: { ...metadata, links: { 'Actions Passed': [next] } } }),
+		)
+		expect(getColumnLinkedItems(target, 'metadata:Actions Passed')).toEqual([
+			{ label: 'CI', url: new URL(next) },
+		])
+		mergeGroups(target, { ci: { status: 'loading' } })
+		expect(target.metadata?.links?.['Actions Passed']).toEqual([next])
+
+		mergeRepository(target, repository({ metadata: { ...metadata, links: {} } }))
+		expect(getColumnLinkedItems(target, 'metadata:Actions Passed')).toBeUndefined()
+		mergeRepository(target, repository({ metadata }))
+		mergeRepository(target, repository({ metadata: { groups: {}, values: metadata.values } }))
+		expect(target.metadata?.links).toBeUndefined()
+	})
 })
 
 describe('metadata events', () => {
@@ -125,6 +160,30 @@ describe('metadata events', () => {
 		expect(first?.branch).toBe('next')
 		expect(second?.metadata?.groups).toEqual({ local: { status: 'loading' } })
 	})
+
+	it.each([true, false])(
+		'keeps Actions run URLs from streamed updates with existing metadata: %s',
+		(existing) => {
+			const target = existing ? repository() : repository({ metadata: undefined })
+			const rows = [target]
+			const passed = 'https://github.com/team/project/actions/runs/1'
+			const failed = 'https://github.com/team/project/actions/runs/2'
+			const update = repository({
+				metadata: {
+					groups: { ci: { status: 'ready' } },
+					links: { 'Actions Failed': [failed], 'Actions Passed': [passed] },
+					values: { 'Actions Failed': ['Release'], 'Actions Passed': ['CI'] },
+				},
+			})
+			expect(applyMetadataEvent(rows, { ...event, repositories: [update] })).toBe(rows)
+			expect(getColumnLinkedItems(target, 'metadata:Actions Passed')).toEqual([
+				{ label: 'CI', url: new URL(passed) },
+			])
+			expect(getColumnLinkedItems(target, 'metadata:Actions Failed')).toEqual([
+				{ label: 'Release', url: new URL(failed) },
+			])
+		},
+	)
 
 	it('drops removed rows and ignores changes to them', () => {
 		const rows = [repository(), repository({ id: 'b' })]

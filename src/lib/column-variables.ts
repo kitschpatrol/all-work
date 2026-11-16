@@ -1,6 +1,7 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import type { ColumnDisplay, ColumnKind } from './metadata-columns.js'
 import type { CommandRun, MetadataGroup, Repository } from './workspace.js'
+import { parseExternalUrl } from './external-links.js'
 import { metadataColumns, metadataHint, metadataText } from './metadata-columns.js'
 
 type RepositoryColumn = {
@@ -220,6 +221,20 @@ export function getColumnValue(
 	return column === undefined
 		? runs.find((run) => run.id === columnId)?.results[repository.id]?.output
 		: column.value(repository)
+}
+
+/** Pair list items with their own links. Raw column values remain names. */
+export function getColumnLinkedItems(repository: Repository, columnId: string) {
+	const field = columnsById.get(columnId)?.field
+	if (field === undefined) {
+		return
+	}
+
+	const values = repository.metadata?.values[field]
+	const links = repository.metadata?.links?.[field]
+	return links === undefined || !Array.isArray(values)
+		? undefined
+		: values.map((label, index) => ({ label, url: parseExternalUrl(links[index]) }))
 }
 
 /** Snapshot one row's raw column values as environment variables. */

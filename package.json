@@ -52,7 +52,7 @@
 		"execa": "^10.2.1",
 		"git-url-parse": "^16.1.0",
 		"lognow": "^0.8.8",
-		"metascope": "^0.13.9"
+		"metascope": "^0.13.10"
 	},
 	"devDependencies": {
 		"@kitschpatrol/chagent": "^0.5.0",

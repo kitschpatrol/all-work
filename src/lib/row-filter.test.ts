@@ -295,6 +295,27 @@ describe('compiling filters', () => {
 		expect(evaluate(all(rule('metadata:Dependencies', 'isEmpty')), bare)).toBe(true)
 	})
 
+	it('filters Actions names as list items and their counts as numbers', () => {
+		const row = repository(
+			'project',
+			{},
+			{
+				'Actions Failed': [],
+				'Actions Failed Count': 0,
+				'Actions Passed': ['CI', 'Build, Windows'],
+				'Actions Passed Count': 2,
+			},
+			{ ci: ready },
+		)
+		expect(evaluate(all(rule('metadata:Actions Passed', 'includes', 'Build, Windows')), row)).toBe(
+			true,
+		)
+		expect(evaluate(all(rule('metadata:Actions Passed', 'includes', 'Build')), row)).toBe(false)
+		expect(evaluate(all(rule('metadata:Actions Passed Count', 'greaterThan', '1')), row)).toBe(true)
+		expect(evaluate(all(rule('metadata:Actions Failed Count', 'is', '0')), row)).toBe(true)
+		expect(evaluate(all(rule('metadata:Actions Failed', 'isEmpty')), row)).toBe(true)
+	})
+
 	it('compares dates by local calendar day and relative to now', () => {
 		const row = repository('alpha', { lastCommitDate: new Date(2026, 9, 1, 9).toISOString() })
 		expect(evaluate(all(rule('lastCommitDate', 'before', '2026-10-01')), row)).toBe(false)

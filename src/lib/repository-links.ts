@@ -31,6 +31,18 @@ export function getGithubUrl(remote: string): string | undefined {
 	}
 }
 
+/** Link to successful or failed Actions history across branches and commits. */
+export function getGithubActionsUrl(remote: string, conclusion: 'failure' | 'success') {
+	const repositoryUrl = getGithubUrl(remote)
+	if (repositoryUrl === undefined) {
+		return
+	}
+
+	const url = new URL(`${repositoryUrl}/actions`)
+	url.searchParams.set('query', `is:${conclusion}`)
+	return url.href
+}
+
 /** Return a website link unless it points back to the repository's GitHub page. */
 export function getWebsiteUrl(website = '', repositoryUrl = ''): string | undefined {
 	const text = website.trim()

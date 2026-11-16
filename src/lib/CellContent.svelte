@@ -5,11 +5,13 @@
 	import {
 		formatColumnCellValue,
 		getColumnDisplay,
+		getColumnLinkedItems,
 		getColumnValue,
 		getMetadataPlaceholder,
 	} from './column-variables.js'
 	import { parseExternalUrl } from './external-links.js'
 	import OutputPreview from './OutputPreview.svelte'
+	import { getGithubActionsUrl } from './repository-links.js'
 	import RepositoryCell from './RepositoryCell.svelte'
 	import { formatDate, splitBreakableWords } from './table-formatting.js'
 
@@ -42,12 +44,28 @@
 	const value = $derived(formatColumnCellValue(repository, columnId, runs))
 	const raw = $derived(getColumnValue(repository, columnId, runs))
 	const missing = $derived(raw === undefined || raw === '')
-	const url = $derived(parseExternalUrl(value))
+	const actionConclusion = $derived(
+		columnId === 'metadata:Actions Passed Count'
+			? 'success'
+			: columnId === 'metadata:Actions Failed Count'
+				? 'failure'
+				: undefined,
+	)
+	const url = $derived(
+		parseExternalUrl(
+			typeof raw === 'number' && actionConclusion !== undefined
+				? getGithubActionsUrl(repository.remote, actionConclusion)
+				: value,
+		),
+	)
+	const linkedItems = $derived(getColumnLinkedItems(repository, columnId))
 	const words = $derived(splitBreakableWords(value))
+	// Preserve the space that Svelte trims from literal text at block boundaries.
+	const listSeparator = ', '
 
-	async function openLink(event: MouseEvent) {
+	async function openLink(event: MouseEvent, target = url) {
 		if (
-			url === undefined ||
+			target === undefined ||
 			globalThis._allWork === undefined ||
 			(event.button !== 0 && event.button !== 1)
 		) {
@@ -56,7 +74,7 @@
 
 		event.preventDefault()
 		try {
-			await globalThis._allWork.openExternalUrl(url.href)
+			await globalThis._allWork.openExternalUrl(target.href)
 		} catch (error) {
 			onError(error)
 		}
@@ -103,8 +121,19 @@
 			{result}
 			stopLabel="Stop the command in {repository.name}"
 		/>{:else}<span class="not-targeted">Not included in this run</span>{/if}
+{:else if linkedItems !== undefined && linkedItems.length > 0}<span class="cell-text"
+		>{#each linkedItems as item, index (index)}{#if index > 0}{listSeparator}{/if}{#if item.url !== undefined}<a
+					class="cell-link cell-word"
+					href={item.url.href}
+					onauxclick={async (event) => openLink(event, item.url)}
+					onclick={async (event) => openLink(event, item.url)}
+					rel="external noopener noreferrer"
+					target="_blank">{item.label}</a
+				>{:else}<span class="cell-word">{item.label}</span>{/if}{/each}</span
+	>
 {:else if url !== undefined}<a
 		class="cell-text cell-link"
+		class:monospace={display === 'number'}
 		href={url.href}
 		onauxclick={openLink}
 		onclick={openLink}

@@ -21,6 +21,8 @@ export type Repository = {
 	lastCommitDate: string
 	metadata?: {
 		groups: MetadataGroups
+		/** URLs for list items; an empty string leaves an item unlinked. */
+		links?: Record<string, string[]>
 		values: Record<string, MetadataValue>
 	}
 	name: string

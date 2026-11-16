@@ -92,7 +92,7 @@ async function ready(workspace: Workspace) {
 	)
 }
 
-type CacheRecord = Partial<Record<'fields' | 'values', Record<string, unknown>>>
+type CacheRecord = Partial<Record<'fields' | 'links' | 'values', Record<string, unknown>>>
 
 // One key's value in each cache record, which are named by hashes
 async function cached(kind: keyof CacheRecord, key: string): Promise<unknown[]> {
@@ -123,9 +123,9 @@ afterEach(async () => {
 })
 
 describe('progressive Metascope metadata', () => {
-	it('covers all 78 Obsidian fields without duplicates', () => {
-		expect(metadataColumns).toHaveLength(78)
-		expect(new Set(metadataColumns.map((column) => column.field)).size).toBe(78)
+	it('covers all 82 metadata fields without duplicates', () => {
+		expect(metadataColumns).toHaveLength(82)
+		expect(new Set(metadataColumns.map((column) => column.field)).size).toBe(82)
 		expect(metadataColumns.filter((column) => column.group === 'updates')).toHaveLength(5)
 	})
 
@@ -160,8 +160,137 @@ describe('progressive Metascope metadata', () => {
 		expect(values?.Fork).toBeUndefined()
 		expect(values?.Published).toBeUndefined()
 		expect(values?.['Total Updates']).toBeUndefined()
+		expect(values?.['Actions Passed']).toBeUndefined()
+		expect(values?.['Actions Failed']).toBeUndefined()
+		expect(values?.['Actions Passed Count']).toBeUndefined()
+		expect(values?.['Actions Failed Count']).toBeUndefined()
 		expect(values?.['Git Current Branch']).toBe('main')
 		expect(values?.['Git Dirty Files']).toBe(0)
+	})
+
+	it('counts and caches known workflow outcomes alongside the existing CI status', async () => {
+		const conclusions = [
+			'success',
+			'success',
+			'failure',
+			'cancelled',
+			'skipped',
+			'timed_out',
+			undefined,
+		] as const
+		vi.mocked(extractMetadata).mockImplementation(async (options) => {
+			await Promise.resolve()
+			return context(
+				options.sources?.includes('githubActions') === true
+					? {
+							githubActions: conclusions.map((lastRunConclusion, index) => ({
+								data: {
+									file: `.github/workflows/${index}.yml`,
+									lastRunConclusion,
+									lastRunUrl: `https://github.com/team/project/actions/runs/${index}`,
+									name: index === 0 ? 'CI' : `Workflow ${index}`,
+								},
+								source: 'fixture',
+							})),
+						}
+					: {},
+			)
+		})
+		const workspace = await fixture()
+		const controller = begin(workspace)
+		await ready(workspace)
+		controller.request(['fixture'], ['ci'], true)
+		await vi.waitFor(() =>
+			expect(workspace.repositories[0]?.metadata?.groups.ci?.status).toBe('ready'),
+		)
+		const values = workspace.repositories[0]?.metadata?.values
+		expect(values?.['Actions Passed Count']).toBe(2)
+		expect(values?.['Actions Failed Count']).toBe(1)
+		expect(values?.['Actions Passed']).toEqual(['CI', 'Workflow 1'])
+		expect(values?.['Actions Failed']).toEqual(['Workflow 2'])
+		expect(values?.CI).toBe('Success')
+		const links = {
+			'Actions Failed': ['https://github.com/team/project/actions/runs/2'],
+			'Actions Passed': [
+				'https://github.com/team/project/actions/runs/0',
+				'https://github.com/team/project/actions/runs/1',
+			],
+		}
+		expect(workspace.repositories[0]?.metadata?.links).toEqual(links)
+		await vi.waitFor(async () => {
+			expect(await cached('values', 'Actions Passed Count')).toContain(2)
+			expect(await cached('values', 'Actions Failed Count')).toContain(1)
+			expect(await cached('values', 'Actions Passed')).toContainEqual(['CI', 'Workflow 1'])
+			expect(await cached('links', 'Actions Passed')).toContainEqual(links['Actions Passed'])
+		})
+
+		const reloaded = await fixture()
+		begin(reloaded)
+		await ready(reloaded)
+		expect(reloaded.repositories[0]?.metadata?.values['Actions Passed']).toEqual([
+			'CI',
+			'Workflow 1',
+		])
+		expect(reloaded.repositories[0]?.metadata?.links).toEqual(links)
+	})
+
+	it('distinguishes zero failures from unavailable workflow outcomes after a refresh', async () => {
+		let lastRunConclusion: 'failure' | 'success' | undefined = 'success'
+		let lastRunUrl = ''
+		vi.mocked(extractMetadata).mockImplementation(async (options) => {
+			await Promise.resolve()
+			return context(
+				options.sources?.includes('githubActions') === true
+					? {
+							githubActions: {
+								data: {
+									file: '.github/workflows/ci.yml',
+									lastRunConclusion,
+									lastRunUrl,
+									name: 'CI',
+								},
+								source: 'fixture',
+							},
+						}
+					: {},
+			)
+		})
+		const workspace = await fixture()
+		const controller = begin(workspace)
+		await ready(workspace)
+		controller.request(['fixture'], ['ci'], true)
+		await vi.waitFor(() =>
+			expect(workspace.repositories[0]?.metadata?.groups.ci?.status).toBe('ready'),
+		)
+		const metadata = workspace.repositories[0]?.metadata
+		if (metadata === undefined) {
+			throw new Error('Missing fixture metadata')
+		}
+
+		expect(metadata.values['Actions Passed Count']).toBe(1)
+		expect(metadata.values['Actions Failed Count']).toBe(0)
+		expect(metadata.values['Actions Passed']).toEqual(['CI'])
+		expect(metadata.values['Actions Failed']).toEqual([])
+		expect(metadata.links?.['Actions Passed']).toEqual([''])
+
+		lastRunConclusion = 'failure'
+		lastRunUrl = 'https://github.com/team/project/actions/runs/2'
+		controller.request(['fixture'], ['ci'], true)
+		await vi.waitFor(() => expect(metadata.groups.ci?.status).toBe('ready'))
+		expect(metadata.values['Actions Passed']).toEqual([])
+		expect(metadata.values['Actions Failed']).toEqual(['CI'])
+		expect(metadata.links?.['Actions Passed']).toEqual([])
+		expect(metadata.links?.['Actions Failed']).toEqual([lastRunUrl])
+
+		lastRunConclusion = undefined
+		controller.request(['fixture'], ['ci'], true)
+		await vi.waitFor(() => expect(metadata.groups.ci?.status).toBe('ready'))
+		expect(metadata.values['Actions Passed']).toBeUndefined()
+		expect(metadata.values['Actions Failed']).toBeUndefined()
+		expect(metadata.values['Actions Passed Count']).toBeUndefined()
+		expect(metadata.values['Actions Failed Count']).toBeUndefined()
+		expect(metadata.links?.['Actions Passed']).toBeUndefined()
+		expect(metadata.links?.['Actions Failed']).toBeUndefined()
 	})
 
 	it('restores cached scans, automatically refreshes them on reload, and retains them after a failure', async () => {

@@ -7,6 +7,7 @@ import {
 	getCellTooltip,
 	getColumnDisplay,
 	getColumnEnvironment,
+	getColumnLinkedItems,
 	getColumnTooltip,
 	getColumnVariableName,
 	getColumnVariables,
@@ -58,6 +59,10 @@ describe('column variables', () => {
 			ahead: 'number',
 			behind: 'number',
 			description: 'text',
+			'metadata:Actions Failed': 'text',
+			'metadata:Actions Failed Count': 'number',
+			'metadata:Actions Passed': 'text',
+			'metadata:Actions Passed Count': 'number',
 			'metadata:Author': 'text',
 			'metadata:Created': 'code',
 			'metadata:Fork': 'text',
@@ -99,15 +104,54 @@ describe('column variables', () => {
 	it('formats expanded metadata and keeps unknown values distinct from zero and false', () => {
 		const expanded = {
 			...repository,
-			metadata: { groups: {}, values: { Public: false, Stars: 0, Tags: ['one', 'two'] } },
+			metadata: {
+				groups: {},
+				values: {
+					'Actions Failed': [],
+					'Actions Failed Count': 0,
+					'Actions Passed': ['CI', 'Release'],
+					'Actions Passed Count': 2,
+					Public: false,
+					Stars: 0,
+					Tags: ['one', 'two'],
+				},
+			},
 		}
 		const environment = getColumnEnvironment(expanded)
+		expect(environment.ALL_WORK_COLUMN_ACTIONS_PASSED_COUNT).toBe('2')
+		expect(environment.ALL_WORK_COLUMN_ACTIONS_FAILED_COUNT).toBe('0')
+		expect(environment.ALL_WORK_COLUMN_ACTIONS_PASSED).toBe('CI, Release')
+		expect(environment.ALL_WORK_COLUMN_ACTIONS_FAILED).toBe('')
+		expect(formatColumnCellValue(expanded, 'metadata:Actions Failed Count')).toBe('0')
+		expect(formatColumnCellValue(repository, 'metadata:Actions Failed Count')).toBe('—')
+		expect(formatColumnCellValue(expanded, 'metadata:Actions Passed')).toBe('CI, Release')
+		expect(formatColumnCellValue(expanded, 'metadata:Actions Failed')).toBe('—')
 		expect(environment.ALL_WORK_COLUMN_PUBLIC).toBe('false')
 		expect(environment.ALL_WORK_COLUMN_STARS).toBe('0')
 		expect(environment.ALL_WORK_COLUMN_TAGS).toBe('one, two')
 		expect(environment.ALL_WORK_COLUMN_TOTAL_UPDATES).toBe('')
 		const variables = getColumnVariables()
 		expect(new Set(variables.map((variable) => variable.name)).size).toBe(variables.length)
+	})
+
+	it('pairs workflow names with their own run URLs, including duplicate names and missing links', () => {
+		const first = 'https://github.com/team/project/actions/runs/1'
+		const second = 'https://github.com/team/project/actions/runs/2'
+		const expanded: Repository = {
+			...repository,
+			metadata: {
+				groups: {},
+				links: { 'Actions Passed': [first, second, ''] },
+				values: { 'Actions Passed': ['CI', 'CI', 'Release'] },
+			},
+		}
+		expect(getColumnLinkedItems(expanded, 'metadata:Actions Passed')).toEqual([
+			{ label: 'CI', url: new URL(first) },
+			{ label: 'CI', url: new URL(second) },
+			{ label: 'Release', url: undefined },
+		])
+		expect(getColumnLinkedItems(repository, 'metadata:Actions Passed')).toBeUndefined()
+		expect(getColumnEnvironment(expanded).ALL_WORK_COLUMN_ACTIONS_PASSED).toBe('CI, CI, Release')
 	})
 
 	it('blocks only referenced values that are still waiting for metadata', () => {

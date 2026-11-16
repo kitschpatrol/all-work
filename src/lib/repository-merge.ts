@@ -74,8 +74,16 @@ export function mergeRepository(target: Repository, update: Repository): void {
 	}
 
 	mergeGroups(target, metadata.groups)
-	if (target.metadata !== undefined && target.metadata !== metadata) {
-		mergeRecord<MetadataValue>(target.metadata.values, metadata.values, sameValue)
+	if (target.metadata === undefined || target.metadata === metadata) {
+		return
+	}
+
+	mergeRecord<MetadataValue>(target.metadata.values, metadata.values, sameValue)
+	if (metadata.links === undefined) {
+		Reflect.deleteProperty(target.metadata, 'links')
+	} else {
+		target.metadata.links ??= {}
+		mergeRecord<string[]>(target.metadata.links, metadata.links, sameValue)
 	}
 }
 

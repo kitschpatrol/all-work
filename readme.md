@@ -27,7 +27,7 @@ All Work is a desktop application that simplifies managing and maintaining large
 
 It has two core competencies:
 
-1. Aggregation and display of Git project metadata in a flexible, filterable data table, across <!-- column-count -->86<!-- /column-count --> extracted fields.
+1. Aggregation and display of Git project metadata in a flexible, filterable data table, across <!-- column-count -->90<!-- /column-count --> extracted fields.
 2. Quick execution of shell commands in parallel across all your projects, or on selected subsets matching specific criteria.
 
 I developed All Work to help manage my 200+ local repositories, and am sharing it here in case anyone else might find it useful.

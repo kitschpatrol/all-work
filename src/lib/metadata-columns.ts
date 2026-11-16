@@ -138,6 +138,8 @@ const defaultFields = new Set([
 	'Status',
 ])
 const basicFields = new Set([
+	'Actions Failed Count',
+	'Actions Passed Count',
 	'Contributors',
 	'Downloads Monthly',
 	'Downloads Total',
@@ -199,6 +201,8 @@ const dateFields = new Set([
 ])
 // Metascope reports these as string arrays; cells join them with commas
 const listFields = new Set([
+	'Actions Failed',
+	'Actions Passed',
 	'Author',
 	'Contributor',
 	'Dependencies',
@@ -230,6 +234,14 @@ const codeFields = new Set([
 	'VS Code Path',
 ])
 const notes: Record<string, string> = {
+	'Actions Failed':
+		'Workflows whose latest completed default-branch run failed. Each name links to that run. Unknown outcomes and other conclusions are excluded.',
+	'Actions Failed Count':
+		'Workflows whose latest completed default-branch run failed. Unknown outcomes and other conclusions are excluded. Opens failed run history across branches and commits.',
+	'Actions Passed':
+		'Workflows whose latest completed default-branch run succeeded. Each name links to that run. Unknown outcomes are excluded.',
+	'Actions Passed Count':
+		'Workflows whose latest completed default-branch run succeeded. Unknown outcomes are excluded. Opens successful run history across branches and commits.',
 	CI: 'Latest completed default-branch run of a workflow named CI.',
 	Contributors: 'Unique Git author emails; distinct from the Contributor names column.',
 	Created: 'First Git commit date, with GitHub creation date or manifest date as fallback.',
@@ -279,7 +291,18 @@ export const metadataColumns: MetadataColumn[] = [
 	...fields(git, 'git', 'Git'),
 	...fields(github, 'github', 'GitHub and releases'),
 	...fields(registry, 'registry', 'Packages'),
-	...fields(['CI', 'CI URL'], 'ci', 'CI'),
+	...fields(
+		[
+			'CI',
+			'CI URL',
+			'Actions Passed Count',
+			'Actions Failed Count',
+			'Actions Passed',
+			'Actions Failed',
+		],
+		'ci',
+		'CI',
+	),
 	...fields(['Secondary Language', 'Lines of Code'], 'code', 'Codebase scans'),
 	...fields(['Total Files', 'Total Size MB'], 'files', 'Codebase scans'),
 	...fields(
