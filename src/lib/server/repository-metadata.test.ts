@@ -123,6 +123,70 @@ afterEach(async () => {
 })
 
 describe('progressive Metascope metadata', () => {
+	it('persists scalar and topic links across reloads and clears them when their sources change', async () => {
+		let version = '1.0.0'
+		let topics = ['topic']
+		vi.mocked(extractMetadata).mockImplementation(async (options) => {
+			await Promise.resolve()
+			if (options.sources?.includes('github') === true) {
+				return context({ github: { data: { topics }, source: 'github' } })
+			}
+
+			if (options.sources?.includes('nodeNpmRegistry') === true) {
+				return context({
+					nodeNpmRegistry: {
+						data: { url: 'https://www.npmjs.com/package/fixture', versionLatest: '1.0.0' },
+						source: 'npm',
+					},
+				})
+			}
+
+			return options.sources?.includes('codemetaJson') === true
+				? context({
+						codemetaJson: {
+							data: { identifier: 'fixture', keywords: ['topic'], version },
+							source: 'codemeta.json',
+						},
+					})
+				: context()
+		})
+		const workspace = await fixture()
+		const controller = begin(workspace)
+		await ready(workspace)
+		controller.request(['fixture'], ['github', 'registry'], true)
+		await vi.waitFor(() =>
+			expect(workspace.repositories[0]?.metadata?.links?.Version).toEqual([
+				'https://www.npmjs.com/package/fixture/v/1.0.0',
+			]),
+		)
+		await vi.waitFor(async () => {
+			expect(await cached('links', 'Version')).toContainEqual([
+				'https://www.npmjs.com/package/fixture/v/1.0.0',
+			])
+			expect(await cached('links', 'Tags')).toContainEqual(['https://github.com/topics/topic'])
+		})
+		controller.dispose()
+		const reloaded = await fixture()
+		const next = begin(reloaded)
+		await ready(reloaded)
+		expect(reloaded.repositories[0]?.metadata?.links?.Version).toEqual([
+			'https://www.npmjs.com/package/fixture/v/1.0.0',
+		])
+		expect(reloaded.repositories[0]?.metadata?.links?.Tags).toEqual([
+			'https://github.com/topics/topic',
+		])
+		version = '2.0.0'
+		next.request(['fixture'], ['local'], true)
+		await vi.waitFor(() => expect(reloaded.repositories[0]?.version).toBe(version))
+		expect(reloaded.repositories[0]?.metadata?.links?.Version).toBeUndefined()
+		topics = []
+		next.request(['fixture'], ['github'], true)
+		await vi.waitFor(() =>
+			expect(reloaded.repositories[0]?.metadata?.groups.github?.status).toBe('ready'),
+		)
+		expect(reloaded.repositories[0]?.metadata?.links?.Tags).toEqual([''])
+	})
+
 	it('covers all 82 metadata fields without duplicates', () => {
 		expect(metadataColumns).toHaveLength(82)
 		expect(new Set(metadataColumns.map((column) => column.field)).size).toBe(82)

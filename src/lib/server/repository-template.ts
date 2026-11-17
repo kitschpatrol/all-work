@@ -1,6 +1,7 @@
-import type { MetadataContext } from 'metascope'
+import type { MetadataContext, TemplateData } from 'metascope'
 import { getWebsiteUrl } from '#lib/repository-links.js'
 import { defineTemplate, helpers, templates } from 'metascope'
+import { getMetadataLinks } from './metadata-links.js'
 import { getRemoteRepository } from './repository-remote.js'
 
 type UpstreamStats = { upstreamAhead?: number; upstreamBehind?: number; upstreamBranch?: string }
@@ -47,6 +48,29 @@ function getActionMetadata(actions: MetadataContext['githubActions']) {
 	}
 }
 
+/** Identify which source groups are available in this extraction. */
+export function getAvailableSources(context: MetadataContext) {
+	return {
+		ci: helpers.firstOf(context.githubActions) !== undefined,
+		code: helpers.firstOf(context.codeStats) !== undefined,
+		files: helpers.firstOf(context.fileStats) !== undefined,
+		git: helpers.firstOf(context.gitStats) !== undefined,
+		github: helpers.firstOf(context.github) !== undefined,
+		registry:
+			helpers.firstOf(context.nodeNpmRegistry) !== undefined ||
+			helpers.firstOf(context.pythonPypiRegistry) !== undefined ||
+			helpers.firstOf(context.obsidianPluginRegistry) !== undefined,
+		updates: helpers.firstOf(context.dependencyUpdates) !== undefined,
+	}
+}
+
+function originRemote(context: MetadataContext, templateData: TemplateData) {
+	return (
+		helpers.firstOf(context.gitConfig)?.data.remote?.origin?.url ??
+		(typeof templateData.originRemote === 'string' ? templateData.originRemote : undefined)
+	)
+}
+
 /** Derive All Work's project and repository fields from local Metascope sources. */
 export const repositoryTemplate = defineTemplate((context, templateData) => {
 	const project = templates.project(context, templateData)
@@ -57,30 +81,20 @@ export const repositoryTemplate = defineTemplate((context, templateData) => {
 	}
 	const gitStats = helpers.firstOf(context.gitStats)?.data
 	const github = helpers.firstOf(context.github)?.data
-	const remote =
-		helpers.firstOf(context.gitConfig)?.data.remote?.origin?.url ??
-		(typeof templateData.originRemote === 'string' ? templateData.originRemote : undefined)
+	const remote = originRemote(context, templateData)
 	const identity = getRemoteRepository(remote ?? '')
 	return {
 		...project,
 		...getUpstream(gitStats),
-		available: {
-			ci: helpers.firstOf(context.githubActions) !== undefined,
-			code: helpers.firstOf(context.codeStats) !== undefined,
-			files: helpers.firstOf(context.fileStats) !== undefined,
-			git: gitStats !== undefined,
-			github: helpers.firstOf(context.github) !== undefined,
-			registry:
-				helpers.firstOf(context.nodeNpmRegistry) !== undefined ||
-				helpers.firstOf(context.pythonPypiRegistry) !== undefined ||
-				helpers.firstOf(context.obsidianPluginRegistry) !== undefined,
-			updates: helpers.firstOf(context.dependencyUpdates) !== undefined,
-		},
+		available: getAvailableSources(context),
 		branch: gitStats?.branchCurrent,
 		changedFiles: gitStats?.uncommittedFileCount,
 		frontmatter,
 		gitStatusAvailable: gitStats?.uncommittedFileCount !== undefined,
-		links: actions.links,
+		links: {
+			...getMetadataLinks(context, templateData, frontmatter, remote ?? github?.url ?? ''),
+			...actions.links,
+		},
 		packageManager: helpers.firstOf(context.nodePackageJson)?.data.packageManager,
 		remote,
 		repoName: identity?.name,

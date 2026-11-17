@@ -16,10 +16,11 @@ import { createHash } from 'node:crypto'
 import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { cacheDirectory } from './cache.js'
+import { getForkComparisonLinks } from './fork-links.js'
 import { resolveGithubToken } from './github-token.js'
 import { extractMetadata } from './metascope-process.js'
 import { findReadme } from './readme.js'
-import { repositoryTemplate } from './repository-template.js'
+import { getAvailableSources, repositoryTemplate } from './repository-template.js'
 
 const remoteSources = new Set<SourceName>([
 	'codeStats',
@@ -100,8 +101,8 @@ const releaseFields = new Set(['Latest Release Date', 'Latest Release Version', 
 function cachePath(repository: Repository, group: MetadataGroup, identity?: ProjectIdentity) {
 	// Include the credential identity without persisting credentials themselves.
 	const credentialsIdentity = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? 'default-user'
-	// CI now separates outcome counts from workflow names and their run links.
-	const version = group === 'ci' ? 4 : 3
+	// Scalar and list destinations now retain their metadata source.
+	const version = 5
 	const key = createHash('sha256')
 		.update(
 			`${version}\0${repository.path}\0${credentialsIdentity}\0${JSON.stringify(identity ?? defaultPreferences().identity)}\0${group}`,
@@ -134,11 +135,22 @@ function restoreFields(repository: Repository, group: MetadataGroup, fields: unk
 	}
 }
 
-function restoreLinks(metadata: NonNullable<Repository['metadata']>, links: unknown) {
+function restoreLinks(repository: Repository, links: unknown) {
+	const { metadata } = repository
+	if (metadata === undefined) {
+		return
+	}
+
 	const entries = Object.entries(asRecord(links) ?? {})
 	for (const [field, urls] of entries) {
-		const values = metadata.values[field]
-		if (!Array.isArray(values) || !isStringArray(urls) || urls.length !== values.length) {
+		const values: unknown =
+			metadata.values[field] ??
+			(['ahead', 'behind'].includes(field) ? Reflect.get(repository, field) : undefined)
+		if (
+			!isValue(values) ||
+			!isStringArray(urls) ||
+			urls.length !== (Array.isArray(values) ? values.length : 1)
+		) {
 			continue
 		}
 
@@ -147,43 +159,75 @@ function restoreLinks(metadata: NonNullable<Repository['metadata']>, links: unkn
 	}
 }
 
-async function restoreCache(repository: Repository, identity?: ProjectIdentity) {
-	for (const group of persistedGroups) {
-		try {
-			const cached: unknown = JSON.parse(
-				await readFile(cachePath(repository, group, identity), 'utf8'),
-			)
-			if (
-				typeof cached !== 'object' ||
-				cached === null ||
-				!('updatedAt' in cached) ||
-				typeof cached.updatedAt !== 'string' ||
-				!Number.isFinite(Date.parse(cached.updatedAt)) ||
-				!('values' in cached) ||
-				typeof cached.values !== 'object' ||
-				cached.values === null
-			) {
-				continue
-			}
+type CachedMetadata = {
+	fields: unknown
+	group: MetadataGroup
+	links: unknown
+	updatedAt: string
+	values: Record<string, unknown>
+}
 
-			const { metadata } = repository
-			if (metadata === undefined) {
-				continue
-			}
-
-			for (const [key, value] of Object.entries(cached.values)) {
-				if (metadataColumns.some((column) => column.field === key) && isValue(value)) {
-					metadata.values[key] = value
-				}
-			}
-
-			restoreFields(repository, group, 'fields' in cached ? cached.fields : undefined)
-			restoreLinks(metadata, 'links' in cached ? cached.links : undefined)
-
-			metadata.groups[group] = { cached: true, status: 'ready', updatedAt: cached.updatedAt }
-		} catch {
-			// A missing or damaged cache never prevents a local scan.
+async function readCache(
+	repository: Repository,
+	group: MetadataGroup,
+	identity?: ProjectIdentity,
+): Promise<CachedMetadata | undefined> {
+	let restored: CachedMetadata | undefined
+	try {
+		const cached = asRecord(
+			JSON.parse(await readFile(cachePath(repository, group, identity), 'utf8')) as unknown,
+		)
+		const values = asRecord(cached?.values)
+		if (
+			values === undefined ||
+			typeof cached?.updatedAt !== 'string' ||
+			!Number.isFinite(Date.parse(cached.updatedAt))
+		) {
+			return
 		}
+
+		restored = {
+			fields: cached.fields,
+			group,
+			links: cached.links,
+			updatedAt: cached.updatedAt,
+			values,
+		}
+	} catch {
+		// A missing or damaged cache never prevents a local scan.
+	}
+
+	return restored
+}
+
+async function restoreCache(repository: Repository, identity?: ProjectIdentity) {
+	const records = await Promise.all(
+		Array.from(persistedGroups, async (group) => readCache(repository, group, identity)),
+	)
+	// Several sources enrich the same fields. Restore newer values and their links together.
+	const ordered = records
+		.filter((record) => record !== undefined)
+		.toSorted((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt))
+	const { metadata } = repository
+	if (metadata === undefined) {
+		return
+	}
+
+	for (const cached of ordered) {
+		for (const [key, value] of Object.entries(cached.values)) {
+			if (metadataColumns.every((column) => column.field !== key) || !isValue(value)) {
+				continue
+			}
+
+			metadata.values[key] = value
+			if (metadata.links !== undefined) {
+				Reflect.deleteProperty(metadata.links, key)
+			}
+		}
+
+		restoreFields(repository, cached.group, cached.fields)
+		restoreLinks(repository, cached.links)
+		metadata.groups[cached.group] = { cached: true, status: 'ready', updatedAt: cached.updatedAt }
 	}
 }
 
@@ -198,8 +242,19 @@ async function saveCache(repository: Repository, group: MetadataGroup, identity?
 		.map((column) => column.field)
 	const extraFields: Partial<Record<MetadataGroup, string[]>> = {
 		code: ['Language'],
-		github: ['Status'],
-		registry: [...releaseFields],
+		git: ['ahead', 'behind'],
+		github: [
+			'Status',
+			'Tags',
+			'Language',
+			'License',
+			'Author',
+			'Contributor',
+			'Maintainer',
+			'Contributors',
+			'Version',
+		],
+		registry: [...releaseFields, 'Version', 'ID'],
 	}
 	fields.push(...(extraFields[group] ?? []))
 
@@ -294,6 +349,42 @@ function preserveCachedRemoteValue(
 	)
 }
 
+const remoteLinkGroups = new Map<string, Array<'github' | 'registry'>>([
+	['Tags', ['github']],
+	['Version', ['github', 'registry']],
+])
+
+function keepCachedLinks(
+	metadata: NonNullable<Repository['metadata']>,
+	field: string,
+	project: Project,
+	refreshed: MetadataGroup,
+	previous: MetadataValue | undefined,
+) {
+	return (
+		project.links[field]?.some((url) => url !== '') !== true &&
+		JSON.stringify(previous) === JSON.stringify(metadata.values[field]) &&
+		(remoteLinkGroups.get(field) ?? []).some(
+			(group) =>
+				group !== refreshed && metadata.groups[group]?.cached === true && !project.available[group],
+		)
+	)
+}
+
+function applyLinks(
+	metadata: NonNullable<Repository['metadata']>,
+	field: string,
+	links: Record<string, string[] | undefined>,
+) {
+	const urls = links[field]
+	if (urls !== undefined) {
+		metadata.links ??= {}
+		metadata.links[field] = urls
+	} else if (Object.hasOwn(links, field) && metadata.links !== undefined) {
+		Reflect.deleteProperty(metadata.links, field)
+	}
+}
+
 function applyContext(
 	repository: Repository,
 	context: MetadataContext,
@@ -343,14 +434,11 @@ function applyContext(
 			continue
 		}
 
+		const previous = metadata.values[column.field]
 		metadata.values[column.field] = value
-		const links = project.links[column.field]
-		if (links === undefined) {
-			continue
+		if (!keepCachedLinks(metadata, column.field, project, refreshed, previous)) {
+			applyLinks(metadata, column.field, project.links)
 		}
-
-		metadata.links ??= {}
-		metadata.links[column.field] = links
 	}
 
 	const dependencies = [
@@ -426,6 +514,44 @@ async function applyGitSupplement(
 		'Git Dirty Files': repository.changedFiles,
 		'Latest Commit Date': repository.lastCommitDate,
 	})
+}
+
+async function supplementGroup(
+	repository: Repository,
+	context: MetadataContext,
+	group: MetadataGroup,
+	available: Project['available'],
+	supplementGit: (repository: Repository) => Promise<void>,
+) {
+	switch (group) {
+		case 'ci':
+		case 'code':
+		case 'files':
+		case 'registry':
+		case 'updates': {
+			return
+		}
+
+		case 'git': {
+			await applyGitSupplement(repository, available.git, supplementGit)
+			return
+		}
+
+		case 'github': {
+			const links = await getForkComparisonLinks(repository.path, repository.remote, context)
+			if (repository.metadata !== undefined) {
+				for (const field of Object.keys(links)) {
+					applyLinks(repository.metadata, field, links)
+				}
+			}
+
+			return
+		}
+
+		case 'local': {
+			await Promise.all([detectMonorepo(repository, context), detectReadme(repository)])
+		}
+	}
 }
 
 function needsRefresh(state: MetadataState | undefined, group: MetadataGroup, force: boolean) {
@@ -534,12 +660,8 @@ export function startWorkspaceMetadata(
 
 			contexts.set(repository.id, combined)
 			applyContext(repository, combined, group, workspace.identity)
-			const { available } = repositoryTemplate(context, {})
-			if (group === 'local') {
-				await Promise.all([detectMonorepo(repository, context), detectReadme(repository)])
-			} else if (group === 'git') {
-				await applyGitSupplement(repository, available.git, supplementGit)
-			}
+			const available = getAvailableSources(context)
+			await supplementGroup(repository, context, group, available, supplementGit)
 
 			const succeeded =
 				group === 'local' || available[group] || (group === 'git' && repository.gitStatusAvailable)

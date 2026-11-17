@@ -1,10 +1,11 @@
 import type { ProjectIdentity } from '#lib/preferences.js'
 import type { MetadataChange, Repository, Workspace } from '#lib/workspace.js'
-import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { access, readdir, realpath, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { updateGitColumnLinks } from './git-column-links.js'
+import { git, optionalGit } from './git-command.js'
 import { findReadme } from './readme.js'
 import { startWorkspaceMetadata } from './repository-metadata.js'
 
@@ -32,41 +33,6 @@ const workspaces = new Map<string, Workspace>()
 const metadataControllers = new Map<string, ReturnType<typeof startWorkspaceMetadata>>()
 type WorkspaceListener = (repository: Repository, change: MetadataChange) => void
 const workspaceListeners = new Map<string, Set<WorkspaceListener>>()
-
-async function git(directory: string, args: string[]): Promise<string> {
-	const environment = {
-		...process.env,
-		// eslint-disable-next-line ts/naming-convention -- Git expects this exact environment variable name.
-		GIT_OPTIONAL_LOCKS: '0',
-	}
-	const stdout = await new Promise<string>((resolve, reject) => {
-		execFile(
-			'git',
-			['-C', directory, ...args],
-			{
-				env: environment,
-				maxBuffer: 4 * 1024 * 1024,
-				timeout: 15_000,
-			},
-			(error, output) => {
-				if (error instanceof Error) {
-					reject(error)
-				} else {
-					resolve(output)
-				}
-			},
-		)
-	})
-	return stdout.trim()
-}
-
-async function optionalGit(directory: string, args: string[]): Promise<string> {
-	try {
-		return await git(directory, args)
-	} catch {
-		return ''
-	}
-}
 
 /**
  * Read the branch, upstream comparison, and changed file count from `git status
@@ -124,13 +90,14 @@ async function supplementGitMetadata(repository: Repository) {
 	}
 
 	// Metascope exposes the commit date but not its subject, used by the tooltip.
-	const commit = await optionalGit(repository.path, ['log', '-1', '--format=%cI%n%s'])
-	const [date = '', ...subject] = commit.split('\n')
+	const commit = await optionalGit(repository.path, ['log', '-1', '--format=%H%n%cI%n%s'])
+	const [head = '', date = '', ...subject] = commit.split('\n')
 	if (repository.lastCommitDate === '') {
 		repository.lastCommitDate = date
 	}
 
 	repository.lastCommit = subject.join('\n')
+	await updateGitColumnLinks(repository, head, async (args) => optionalGit(repository.path, args))
 }
 
 /**

@@ -1,6 +1,7 @@
 /* eslint-disable ts/naming-convention -- Frontmatter keys preserve the Metascope template spelling. */
 import type { ColumnDisplay, ColumnKind } from './metadata-columns.js'
 import type { CommandRun, MetadataGroup, Repository } from './workspace.js'
+import { getColumnDestination } from './column-links.js'
 import { parseExternalUrl } from './external-links.js'
 import { metadataColumns, metadataHint, metadataText } from './metadata-columns.js'
 
@@ -22,6 +23,17 @@ const upstreamNote =
 	'Compared with the upstream branch as last fetched. Empty without an upstream or when its ref is missing locally.'
 
 const upstreamColumns = new Set(['ahead', 'behind', 'sync'])
+// Keep these columns plain even when cached metadata or their raw values contain URLs.
+const plainTextColumns = new Set([
+	'branch',
+	'metadata:ID',
+	'metadata:Language',
+	'metadata:Latest Release Date',
+	'metadata:Secondary Language',
+	'name',
+	'remote',
+	'repoName',
+])
 
 function describeUpstream(repository: Repository) {
 	if (!repository.gitStatusAvailable) {
@@ -225,16 +237,53 @@ export function getColumnValue(
 
 /** Pair list items with their own links. Raw column values remain names. */
 export function getColumnLinkedItems(repository: Repository, columnId: string) {
+	if (plainTextColumns.has(columnId)) {
+		return
+	}
+
 	const field = columnsById.get(columnId)?.field
 	if (field === undefined) {
 		return
 	}
 
 	const values = repository.metadata?.values[field]
+	if (!Array.isArray(values)) {
+		return
+	}
+
 	const links = repository.metadata?.links?.[field]
-	return links === undefined || !Array.isArray(values)
-		? undefined
-		: values.map((label, index) => ({ label, url: parseExternalUrl(links[index]) }))
+	const items = values.map((label, index) => ({
+		label,
+		url: parseExternalUrl(links?.[index] ?? label),
+	}))
+	return links === undefined && items.every((item) => item.url === undefined) ? undefined : items
+}
+
+/** Resolve a cell's external destination without changing its sortable value. */
+export function getColumnUrl(repository: Repository, columnId: string) {
+	const column = columnsById.get(columnId)
+	const value = column?.value(repository)
+	if (
+		column === undefined ||
+		value === undefined ||
+		value === '' ||
+		value === false ||
+		column.kind === 'list' ||
+		plainTextColumns.has(columnId)
+	) {
+		return
+	}
+
+	const linkField = column.field ?? (columnId === 'sync' ? 'ahead' : columnId)
+	const links = repository.metadata?.links?.[linkField]
+	const linkedValue = repository.metadata?.values[linkField]
+	if (links !== undefined && linkedValue !== undefined && linkedValue !== value) {
+		return
+	}
+
+	return parseExternalUrl(
+		links?.[0] ?? getColumnDestination(repository, columnId, column.field) ?? value,
+	)
 }
 
 /** Snapshot one row's raw column values as environment variables. */

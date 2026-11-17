@@ -4,11 +4,22 @@ import type { Repository } from './workspace.js'
 import {
 	getGithubActionsUrl,
 	getGithubUrl,
+	getRepositoryUrl,
 	getWebsiteUrl,
 	openRepositories,
 } from './repository-links.js'
 
 describe('GitHub repository links', () => {
+	it.each([
+		['git@gitlab.com:team/subgroup/project.git', 'https://gitlab.com/team/subgroup/project'],
+		['ssh://git@bitbucket.org/team/project.git', 'https://bitbucket.org/team/project'],
+		[
+			'git+https://user:secret@github.com/team/project.git?token=secret',
+			'https://github.com/team/project',
+		],
+	])('normalizes the supported repository host for %s', (remote, expected) => {
+		expect(getRepositoryUrl(remote)).toBe(expected)
+	})
 	it.each([
 		'https://github.com/team/project.git',
 		'https://username:secret@github.com/team/project.git/?token=secret',

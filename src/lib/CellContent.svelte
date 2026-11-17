@@ -6,12 +6,11 @@
 		formatColumnCellValue,
 		getColumnDisplay,
 		getColumnLinkedItems,
+		getColumnUrl,
 		getColumnValue,
 		getMetadataPlaceholder,
 	} from './column-variables.js'
-	import { parseExternalUrl } from './external-links.js'
 	import OutputPreview from './OutputPreview.svelte'
-	import { getGithubActionsUrl } from './repository-links.js'
 	import RepositoryCell from './RepositoryCell.svelte'
 	import { formatDate, splitBreakableWords } from './table-formatting.js'
 
@@ -44,19 +43,12 @@
 	const value = $derived(formatColumnCellValue(repository, columnId, runs))
 	const raw = $derived(getColumnValue(repository, columnId, runs))
 	const missing = $derived(raw === undefined || raw === '')
-	const actionConclusion = $derived(
-		columnId === 'metadata:Actions Passed Count'
-			? 'success'
-			: columnId === 'metadata:Actions Failed Count'
-				? 'failure'
-				: undefined,
-	)
-	const url = $derived(
-		parseExternalUrl(
-			typeof raw === 'number' && actionConclusion !== undefined
-				? getGithubActionsUrl(repository.remote, actionConclusion)
-				: value,
-		),
+	const url = $derived(getColumnUrl(repository, columnId))
+	const linkLabel = $derived(
+		['metadata:Forked From', 'metadata:Template From'].includes(columnId) &&
+			url?.hostname === 'github.com'
+			? url.pathname.slice(1)
+			: value,
 	)
 	const linkedItems = $derived(getColumnLinkedItems(repository, columnId))
 	const words = $derived(splitBreakableWords(value))
@@ -83,13 +75,22 @@
 
 {#snippet placeholder(text: string)}<span class="cell-placeholder">{text}</span>{/snippet}
 
+{#snippet linkedText(text: string, className: string)}
+	{#if url !== undefined}<a
+			class="{className} cell-link"
+			href={url.href}
+			onauxclick={openLink}
+			onclick={openLink}
+			rel="external noopener noreferrer"
+			target="_blank">{text}</a
+		>{:else}<span class={className}>{text}</span>{/if}
+{/snippet}
+
 {#if columnId === 'relativePath'}<RepositoryCell {onOpen} {onRefresh} {repository} {shortcuts} />
-{:else if columnId === 'name'}<span class="project-name">{repository.name}</span>
-{:else if columnId === 'branch'}<span class="branch"
-		>⑂ {#if repository.branch === ''}{@render placeholder(
-				getMetadataPlaceholder(repository, 'branch'),
-			)}{:else}{repository.branch}{/if}</span
-	>
+{:else if columnId === 'name'}{@render linkedText(repository.name, 'project-name')}
+{:else if columnId === 'branch'}{#if repository.branch === ''}<span class="branch"
+			>⑂ {@render placeholder(getMetadataPlaceholder(repository, 'branch'))}</span
+		>{:else}{@render linkedText(`⑂ ${repository.branch}`, 'branch')}{/if}
 {:else if columnId === 'changedFiles'}<span
 		class="status-badge"
 		class:dirty={repository.changedFiles > 0}
@@ -101,16 +102,14 @@
 				)}{/if}</span
 		></span
 	>
-{:else if columnId === 'sync'}<span class="sync-value"
-		>{#if repository.ahead > 0 || repository.behind > 0}↑{repository.ahead} ↓{repository.behind}{:else}{@render placeholder(
-				'—',
-			)}{/if}</span
-	>
-{:else if columnId === 'lastCommitDate'}<span class="date-value"
-		>{#if repository.lastCommitDate === '' && repository.metadata?.groups.git?.status !== 'ready'}{@render placeholder(
-				getMetadataPlaceholder(repository, 'lastCommitDate'),
-			)}{:else}{formatDate(repository.lastCommitDate)}{/if}</span
-	>
+{:else if columnId === 'sync'}{#if repository.ahead > 0 || repository.behind > 0}{@render linkedText(
+			`↑${repository.ahead} ↓${repository.behind}`,
+			'sync-value',
+		)}{:else}<span class="sync-value">{@render placeholder('—')}</span>{/if}
+{:else if columnId === 'lastCommitDate'}{#if repository.lastCommitDate === '' && repository.metadata?.groups.git?.status !== 'ready'}<span
+			class="date-value"
+			>{@render placeholder(getMetadataPlaceholder(repository, 'lastCommitDate'))}</span
+		>{:else}{@render linkedText(formatDate(repository.lastCommitDate), 'date-value')}{/if}
 {:else if run !== undefined}{#if result !== undefined}<OutputPreview
 			label="View output for {repository.name}"
 			lineLimit={outputLines}
@@ -133,12 +132,12 @@
 	>
 {:else if url !== undefined}<a
 		class="cell-text cell-link"
-		class:monospace={display === 'number'}
+		class:monospace={display !== 'text'}
 		href={url.href}
 		onauxclick={openLink}
 		onclick={openLink}
 		rel="external noopener noreferrer"
-		target="_blank">{value}</a
+		target="_blank">{linkLabel}</a
 	>
 {:else}<span class="cell-text" class:monospace={display !== 'text'}
 		>{#if missing}{@render placeholder(

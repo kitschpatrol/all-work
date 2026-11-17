@@ -4,43 +4,64 @@ import { vscodeUrl } from './table-formatting.js'
 /** Targets the server opens with native macOS applications. */
 export type NativeOpenTarget = Exclude<OpenTarget, 'github' | 'vscode' | 'vscode-workspace'>
 
-const githubScpRemote = /^(?:[^\/@:\s]+@)?github\.com:(.+)$/iv
+const scpRemote = /^(?:[^\/@:\s]+@)?(github\.com|gitlab\.com|bitbucket\.org):(.+)$/iv
 const trailingSlashes = /\/+$/v
 const gitSuffix = /\.git$/iv
 const urlScheme = /^[a-z][a-z\d+.\-]*:/iv
+const gitProtocolPrefix = /^git\+/iv
 
-/** Convert a GitHub clone remote into a credential-free repository browser URL. */
-export function getGithubUrl(remote: string): string | undefined {
+/** Convert supported clone remotes into credential-free repository browser URLs. */
+export function getRepositoryUrl(remote: string): string | undefined {
 	try {
-		const url = new URL(remote.replace(githubScpRemote, 'https://github.com/$1'))
+		const url = new URL(remote.replace(gitProtocolPrefix, '').replace(scpRemote, 'https://$1/$2'))
 		if (
-			url.hostname !== 'github.com' ||
+			!['bitbucket.org', 'github.com', 'gitlab.com'].includes(url.hostname) ||
 			!['git:', 'http:', 'https:', 'ssh:'].includes(url.protocol)
 		) {
 			return undefined
 		}
 
 		const segments = url.pathname.replace(trailingSlashes, '').slice(1).split('/')
-		const owner = segments[0] ?? ''
-		const repository = (segments[1] ?? '').replace(gitSuffix, '')
-		return owner === '' || repository === '' || segments.length !== 2
+		const repository = (segments.at(-1) ?? '').replace(gitSuffix, '')
+		return repository === '' ||
+			segments.length < 2 ||
+			(url.hostname !== 'gitlab.com' && segments.length !== 2) ||
+			segments.includes('')
 			? undefined
-			: `https://github.com/${owner}/${repository}`
+			: `https://${url.hostname}/${[...segments.slice(0, -1), repository].join('/')}`
 	} catch {
 		return undefined
 	}
 }
 
-/** Link to successful or failed Actions history across branches and commits. */
-export function getGithubActionsUrl(remote: string, conclusion: 'failure' | 'success') {
+/** Convert a GitHub clone remote into a credential-free repository browser URL. */
+export function getGithubUrl(remote: string): string | undefined {
+	const url = getRepositoryUrl(remote)
+	return url?.startsWith('https://github.com/') === true ? url : undefined
+}
+
+/** Build a GitHub repository page with encoded search parameters. */
+export function getGithubPageUrl(
+	remote: string,
+	page: string,
+	parameters: Record<string, string> = {},
+): string | undefined {
 	const repositoryUrl = getGithubUrl(remote)
 	if (repositoryUrl === undefined) {
 		return
 	}
 
-	const url = new URL(`${repositoryUrl}/actions`)
-	url.searchParams.set('query', `is:${conclusion}`)
+	const url = new URL(`${repositoryUrl}/${page}`)
+	for (const [key, value] of Object.entries(parameters)) {
+		url.searchParams.set(key, value)
+	}
+
 	return url.href
+}
+
+/** Link to successful or failed Actions history across branches and commits. */
+export function getGithubActionsUrl(remote: string, conclusion: 'failure' | 'success') {
+	return getGithubPageUrl(remote, 'actions', { query: `is:${conclusion}` })
 }
 
 /** Return a website link unless it points back to the repository's GitHub page. */

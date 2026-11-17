@@ -9,6 +9,7 @@ import {
 	getColumnEnvironment,
 	getColumnLinkedItems,
 	getColumnTooltip,
+	getColumnUrl,
 	getColumnVariableName,
 	getColumnVariables,
 	getPendingCommandColumns,
@@ -54,6 +55,117 @@ function outputRun(id: string, output: string, number = 1): CommandRun {
 }
 
 describe('column variables', () => {
+	it('links known counts to their exact GitHub filters and leaves missing counts unlinked', () => {
+		const expanded: Repository = {
+			...repository,
+			metadata: {
+				groups: {},
+				values: { 'Issues Open': 0, 'PRs Closed': 2, 'PRs Merged': 3, 'Vulnerability Alerts': 1 },
+			},
+		}
+		expect(getColumnUrl(expanded, 'metadata:Issues Open')?.searchParams.get('q')).toBe(
+			'is:issue is:open',
+		)
+		expect(getColumnUrl(expanded, 'metadata:PRs Closed')?.searchParams.get('q')).toBe(
+			'is:pr is:closed is:unmerged',
+		)
+		expect(getColumnUrl(expanded, 'metadata:PRs Merged')?.searchParams.get('q')).toBe(
+			'is:pr is:merged',
+		)
+		expect(getColumnUrl(expanded, 'metadata:Vulnerability Alerts')?.pathname).toBe(
+			'/example/project/security/dependabot',
+		)
+		expect(getColumnUrl(repository, 'metadata:Issues Open')).toBeUndefined()
+	})
+
+	it('resolves retained external links and keeps text columns plain despite cached links or URL values', () => {
+		const run = 'https://github.com/example/project/actions/runs/1'
+		const expanded: Repository = {
+			...repository,
+			metadata: {
+				groups: {},
+				links: {
+					'Git Current Branch': ['https://github.com/example/project/tree/feature%2Fexample'],
+					ID: ['https://www.npmjs.com/package/example'],
+					Language: ['https://github.com/search?q=language:TypeScript'],
+					'Latest Release Date': ['https://github.com/example/project/releases/tag/v1.2.3'],
+					Name: ['https://example.com/'],
+					remote: ['https://github.com/example/project'],
+					repoName: ['https://github.com/example/project'],
+					'Secondary Language': ['https://github.com/search?q=language:JavaScript'],
+					Version: ['https://www.npmjs.com/package/example/v/1.2.3'],
+				},
+				values: {
+					CI: 'Failure',
+					'CI URL': run,
+					'Homepage URL': 'https://example.com/',
+					ID: 'https://www.npmjs.com/package/example',
+					Language: ['TypeScript'],
+					'Latest Release Date': '2026-10-15T12:00:00.000Z',
+					'Package URL': 'https://www.npmjs.com/package/example',
+					Published: true,
+					'Secondary Language': ['JavaScript'],
+				},
+			},
+			remote: 'https://github.com/example/project.git',
+		}
+		for (const columnId of [
+			'branch',
+			'name',
+			'remote',
+			'repoName',
+			'metadata:ID',
+			'metadata:Language',
+			'metadata:Secondary Language',
+			'metadata:Latest Release Date',
+		]) {
+			expect(getColumnUrl(expanded, columnId)).toBeUndefined()
+			expect(getColumnLinkedItems(expanded, columnId)).toBeUndefined()
+		}
+
+		expect(getColumnUrl(expanded, 'repoOwner')?.href).toBe('https://github.com/example')
+		expect(getColumnUrl(expanded, 'metadata:CI')?.href).toBe(run)
+		expect(getColumnUrl(expanded, 'metadata:CI URL')?.href).toBe(run)
+		expect(getColumnUrl(expanded, 'metadata:Published')?.href).toBe(
+			'https://www.npmjs.com/package/example',
+		)
+		expect(getColumnUrl(expanded, 'version')?.href).toBe(
+			'https://www.npmjs.com/package/example/v/1.2.3',
+		)
+		expect(getColumnEnvironment(expanded).ALL_WORK_COLUMN_VERSION).toBe('1.2.3')
+		expect(
+			getColumnUrl(
+				{
+					...expanded,
+					metadata: { groups: {}, values: { ...expanded.metadata?.values, Published: false } },
+				},
+				'metadata:Published',
+			),
+		).toBeUndefined()
+	})
+
+	it('keeps ordinary tags and local metrics plain while allowing external URLs on individual list entries', () => {
+		const expanded: Repository = {
+			...repository,
+			metadata: {
+				groups: {},
+				values: {
+					'Git Tags': 4,
+					License: ['https://example.com/license', 'Custom license'],
+					Tags: ['personal'],
+					'Total Updates': 3,
+				},
+			},
+		}
+		expect(getColumnLinkedItems(expanded, 'metadata:Tags')).toBeUndefined()
+		expect(getColumnUrl(expanded, 'metadata:Git Tags')).toBeUndefined()
+		expect(getColumnUrl(expanded, 'metadata:Total Updates')).toBeUndefined()
+		expect(getColumnLinkedItems(expanded, 'metadata:License')).toEqual([
+			{ label: 'https://example.com/license', url: new URL('https://example.com/license') },
+			{ label: 'Custom license', url: undefined },
+		])
+	})
+
 	it('sets counts as numbers, versions and locations as code, and prose, names, and booleans as text', () => {
 		const expected = {
 			ahead: 'number',

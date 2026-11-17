@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Add links to metadata columns when a matching destination is known, including individual links in comma-separated lists:
+  - **Repo owner** and **Account**: owner, organization, or group page.
+  - **Folder Name**: local repository folder.
+  - **Published**: package page when the project is published.
+  - **CI**: latest completed default-branch CI workflow run.
+  - **Actions Passed** and **Actions Failed**: each workflow's latest completed default-branch run, grouped by its outcome.
+  - **Actions Passed Count** and **Actions Failed Count**: GitHub Actions history filtered to successful or failed runs.
+  - **Issues Open** and **Issues Closed**: GitHub issues filtered by state.
+  - **PRs Open**, **PRs Merged**, and **PRs Closed**: GitHub pull requests filtered by state, excluding merged pull requests from the closed view.
+  - **Vulnerability Alerts**: open Dependabot alerts.
+  - **Stars**, **Watchers**, and **Forks**: GitHub stargazer, watcher, and fork lists.
+  - **Latest Push Date**: GitHub repository activity.
+  - **Contributors**: GitHub contributors when GitHub supplies the count.
+  - **Dependencies** and **Dev Dependencies**: each package's registry or declared repository page, excluding local dependencies and ambiguous matches.
+  - **Author**, **Contributor**, and **Maintainer**: each person's supplied website or profile.
+  - **License**: each recognized license's text or supplied web page.
+  - **Tags**: GitHub topic pages for confirmed repository topics.
+  - **Version**: matching published npm or PyPI version, or GitHub release.
+  - **Latest Release Version**: the release or registry version that supplies the value.
+  - **Releases**: GitHub releases when GitHub supplies the count.
+  - **Downloads Total** and **Downloads Monthly**: the package page or GitHub release corresponding to the metric's source.
+  - **Last commit** and **First Commit Date**: corresponding commit when known to be published on origin.
+  - **Git Commits**: hosted commit history pinned to the published current commit.
+  - **Ahead**, **Behind**, and **Sync**: GitHub comparisons between published local and upstream commits, using the appropriate comparison direction.
+  - **Fork Ahead** and **Fork Behind**: comparisons between the fork and parent default branches when both branches are known.
+  - **Git Submodules**: local `.gitmodules` file when submodules are present.
+  - Explicit URLs in other list cells: separate links for each URL.
+
 ## [1.3.0] - 2026-11-11
 
 ### Added
@@ -200,3 +232,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/kitschpatrol/all-work/compare/v1.0.0...v1.1.0
 [1.2.0]: https://github.com/kitschpatrol/all-work/compare/v1.1.0...v1.2.0
 [1.3.0]: https://github.com/kitschpatrol/all-work/compare/v1.2.0...v1.3.0
+[unreleased]: https://github.com/kitschpatrol/all-work/compare/v1.3.0...HEAD
