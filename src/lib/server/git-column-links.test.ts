@@ -3,6 +3,7 @@ import { sourceNames } from 'metascope'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Repository } from '../workspace.js'
 import { getForkComparisonLinks } from './fork-links.js'
@@ -98,9 +99,8 @@ describe('published Git column links', () => {
 		}
 
 		await updateGitColumnLinks(repository, head, git)
-		expect(repository.metadata?.links?.['Git Submodules']).toEqual([
-			new URL('.gitmodules', `file://${directory}/`).href,
-		])
+		const links = repository.metadata?.links?.['Git Submodules'] ?? []
+		expect(links.map((link) => fileURLToPath(link))).toEqual([path.join(directory, '.gitmodules')])
 	})
 
 	it('uses known parent and fork defaults, including renamed forks, and skips unknown parents', async () => {
