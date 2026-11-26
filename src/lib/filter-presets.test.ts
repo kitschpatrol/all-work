@@ -22,7 +22,6 @@ describe('saved filter presets', () => {
 		expect(resolved.map((preset) => preset.id)).toEqual([
 			'clean',
 			'changed',
-			'outOfSync',
 			'failingCi',
 			'github',
 			'mine',
@@ -30,6 +29,7 @@ describe('saved filter presets', () => {
 			'needsAttention',
 			'noRemote',
 			'openPrs',
+			'outOfSync',
 			'publishedPackages',
 			'readyToPull',
 			'readyToPush',

@@ -106,7 +106,7 @@ describe('row filter state', () => {
 	})
 
 	it.each([
-		{ column: 'changedFiles', operator: 'is', value: '' },
+		{ column: 'changedFiles', operator: 'greaterThan', value: '0' },
 		{ column: 'lastCommitDate', operator: 'inLast', value: '' },
 		{ column: 'metadata:Public', operator: 'isYes', value: '' },
 		{ column: 'metadata:Tags', operator: 'includes', value: '' },
@@ -376,6 +376,20 @@ describe('row filter state', () => {
 		)
 		expect(state.selectedPreset?.label).toBe('Main branch')
 		expect(state.modified).toBe(true)
+	})
+
+	it('upgrades only an explicitly selected built-in GitHub substring filter', () => {
+		const { state } = setup()
+		const saved = {
+			match: 'all',
+			rules: [{ column: 'remote', operator: 'contains', value: 'github' }],
+		} as const
+		const legacy = () => ({ match: saved.match, rules: [...saved.rules] })
+		state.restore(legacy(), 'github')
+		expect(state.selectedPreset?.id).toBe('github')
+		expect(state.filter.rules).toEqual([{ column: 'remote', operator: 'isGithub', value: '' }])
+		state.restore(legacy())
+		expect(state.filter).toEqual(saved)
 	})
 
 	it('restores saved rules without reporting a change', () => {

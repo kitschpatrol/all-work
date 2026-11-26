@@ -560,8 +560,12 @@
 					pruneSelection(repositories)
 				}
 
-				// Loading states alone change no values the filter or sort read
-				if (!event.snapshot && event.repositories.length > 0) {
+				// A status-only update can settle a pending filter or start an on-demand scan.
+				if (
+					!event.snapshot &&
+					(event.repositories.length > 0 ||
+						(event.statuses.length > 0 && rowFilter.activeRules > 0))
+				) {
 					tableRows.changed()
 				}
 

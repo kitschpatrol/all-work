@@ -1,8 +1,11 @@
+import type { FilterOperator } from './filter-comparisons.js'
 import type { ColumnKind } from './metadata-columns.js'
 import type { ProjectIdentity } from './preferences.js'
 import type { CommandRun, MetadataGroup, MetadataValue, Repository } from './workspace.js'
 import { repositoryColumns } from './column-variables.js'
+import { isFilterOperator, supportsOperator } from './filter-comparisons.js'
 import { asRecord } from './record.js'
+import { getGithubUrl } from './repository-links.js'
 
 /** How a group combines its rules: every rule, at least one, or none of them. */
 export type FilterMatch = 'all' | 'any' | 'none'
@@ -19,47 +22,6 @@ export type DateUnit = 'days' | 'months' | 'weeks' | 'years'
 
 /** Command result states a run output rule can test. */
 export type RunStatus = 'cancelled' | 'failed' | 'notIncluded' | 'running' | 'success'
-
-/**
- * The value a rule needs: nothing, free text, a number, a numeric range, a
- * count of calendar units, a calendar date, or a command status.
- */
-export type OperandShape = 'date' | 'duration' | 'none' | 'number' | 'range' | 'status' | 'text'
-
-const operandShapes = {
-	after: 'date',
-	atLeast: 'number',
-	atMost: 'number',
-	before: 'date',
-	between: 'range',
-	contains: 'text',
-	doesNotContain: 'text',
-	doesNotInclude: 'text',
-	doesNotIncludeMe: 'none',
-	endsWith: 'text',
-	greaterThan: 'number',
-	includes: 'text',
-	includesMe: 'none',
-	inLast: 'duration',
-	is: 'text',
-	isEmpty: 'none',
-	isMe: 'none',
-	isNo: 'none',
-	isNot: 'text',
-	isNotEmpty: 'none',
-	isNotMe: 'none',
-	isYes: 'none',
-	lessThan: 'number',
-	matches: 'text',
-	notInLast: 'duration',
-	on: 'date',
-	startsWith: 'text',
-	statusIs: 'status',
-	statusIsNot: 'status',
-} as const satisfies Record<string, OperandShape>
-
-/** Every comparison a rule can make; each column kind offers a subset. */
-export type FilterOperator = keyof typeof operandShapes
 
 /**
  * One comparison against a column. Operands stay as typed so a half-entered
@@ -108,107 +70,6 @@ type CompileContext = {
 	now: number
 	runs: readonly CommandRun[]
 }
-
-// Menu order for each kind; the first operator starts new rules
-const operatorsByKind = {
-	account: [
-		'isMe',
-		'isNotMe',
-		'contains',
-		'doesNotContain',
-		'is',
-		'isNot',
-		'startsWith',
-		'endsWith',
-		'matches',
-		'isEmpty',
-		'isNotEmpty',
-	],
-	boolean: ['isYes', 'isNo', 'isEmpty', 'isNotEmpty'],
-	date: ['inLast', 'notInLast', 'on', 'before', 'after', 'isEmpty', 'isNotEmpty'],
-	list: ['includes', 'doesNotInclude', 'isEmpty', 'isNotEmpty'],
-	number: [
-		'is',
-		'isNot',
-		'greaterThan',
-		'atLeast',
-		'lessThan',
-		'atMost',
-		'between',
-		'isEmpty',
-		'isNotEmpty',
-	],
-	output: [
-		'statusIs',
-		'statusIsNot',
-		'contains',
-		'doesNotContain',
-		'matches',
-		'isEmpty',
-		'isNotEmpty',
-	],
-	people: [
-		'isMe',
-		'includesMe',
-		'doesNotIncludeMe',
-		'includes',
-		'doesNotInclude',
-		'isEmpty',
-		'isNotEmpty',
-	],
-	text: [
-		'contains',
-		'doesNotContain',
-		'is',
-		'isNot',
-		'startsWith',
-		'endsWith',
-		'matches',
-		'isEmpty',
-		'isNotEmpty',
-	],
-} as const satisfies Record<FilterKind, readonly [FilterOperator, ...FilterOperator[]]>
-
-const operatorLabels: Record<FilterOperator, string> = {
-	after: 'is after',
-	atLeast: 'is at least',
-	atMost: 'is at most',
-	before: 'is before',
-	between: 'is between',
-	contains: 'contains',
-	doesNotContain: 'does not contain',
-	doesNotInclude: 'does not include',
-	doesNotIncludeMe: 'does not include me',
-	endsWith: 'ends with',
-	greaterThan: 'is greater than',
-	includes: 'includes',
-	includesMe: 'includes me',
-	inLast: 'is within the last',
-	is: 'is',
-	isEmpty: 'is empty',
-	isMe: 'is me',
-	isNo: 'is No',
-	isNot: 'is not',
-	isNotEmpty: 'is not empty',
-	isNotMe: 'is not me',
-	isYes: 'is Yes',
-	lessThan: 'is less than',
-	matches: 'matches pattern',
-	notInLast: 'is not within the last',
-	on: 'is on',
-	startsWith: 'begins with',
-	statusIs: 'status is',
-	statusIsNot: 'status is not',
-}
-
-// Text operators on run columns read as "output contains" rather than "contains"
-const outputOperators = new Set<FilterOperator>([
-	'contains',
-	'doesNotContain',
-	'isEmpty',
-	'isNotEmpty',
-	'matches',
-])
 
 // Both sides are lowercased before comparison
 const textTests: Partial<Record<FilterOperator, (text: string, needle: string) => boolean>> = {
@@ -275,85 +136,8 @@ export function starterFilter(): FilterGroup {
 	return { match: 'all', rules: [blankRule()] }
 }
 
-/** The operators a column kind supports, in menu order. */
-export function getOperators(kind: FilterKind): readonly FilterOperator[] {
-	return operatorsByKind[kind]
-}
-
-/**
- * Describe an operator in the wording its column kind uses. In the menu, an
- * operator that needs a value ends with an ellipsis until it is selected and
- * its value field appears.
- */
-export function getOperatorLabel(
-	kind: FilterKind,
-	operator: FilterOperator,
-	selected: boolean,
-): string {
-	if (kind === 'account') {
-		if (operator === 'isMe') {
-			return 'is mine'
-		}
-
-		if (operator === 'isNotMe') {
-			return 'is not mine'
-		}
-	}
-
-	const label = operatorLabels[operator]
-	const worded = kind === 'output' && outputOperators.has(operator) ? `output ${label}` : label
-	return selected || getOperandShape(kind, operator) === 'none' ? worded : `${worded}…`
-}
-
-/** The operand an operator needs for a column kind. */
-export function getOperandShape(kind: FilterKind, operator: FilterOperator): OperandShape {
-	return kind === 'number' && (operator === 'is' || operator === 'isNot')
-		? 'number'
-		: operandShapes[operator]
-}
-
 function getColumnKind(column: { id: string; kind: ColumnKind }): FilterKind {
 	return identityColumns.get(column.id) ?? column.kind
-}
-
-/** Start a rule on a column with its first operator and no value. */
-export function createRule(column: FilterColumn): FilterRule {
-	const [operator] = operatorsByKind[column.kind]
-	return {
-		column: column.id,
-		operator,
-		value: operandShapes[operator] === 'status' ? 'failed' : '',
-	}
-}
-
-/**
- * Point a rule at another column, keeping its operator and value only when the
- * new column's kind offers that operator with the same kind of value.
- */
-export function retargetRule(rule: FilterRule, from: FilterKind, to: FilterColumn): FilterRule {
-	return getOperators(to.kind).includes(rule.operator) &&
-		getOperandShape(from, rule.operator) === getOperandShape(to.kind, rule.operator)
-		? { ...rule, column: to.id }
-		: createRule(to)
-}
-
-/** Change a rule's operator, clearing a value whose format no longer fits. */
-export function changeOperator(
-	rule: FilterRule,
-	kind: FilterKind,
-	operator: FilterOperator,
-): FilterRule {
-	const shape = getOperandShape(kind, operator)
-	if (shape === getOperandShape(kind, rule.operator)) {
-		return { ...rule, operator }
-	}
-
-	return {
-		column: rule.column,
-		operator,
-		value: shape === 'status' ? 'failed' : '',
-		...(shape === 'duration' && { unit: 'days' as const }),
-	}
 }
 
 /**
@@ -658,8 +442,32 @@ function compileRule(rule: FilterRule, context: CompileContext): FilterPredicate
 	const column = columnsById.get(rule.column)
 	const kind =
 		run === undefined ? (column === undefined ? undefined : getColumnKind(column)) : 'output'
-	if (kind === undefined || !getOperators(kind).includes(rule.operator)) {
+	if (kind === undefined || !supportsOperator(rule.column, kind, rule.operator)) {
 		return undefined
+	}
+
+	if (rule.operator === 'hasDiverged') {
+		return (repository) => {
+			const { pending, value } = readRepositoryValue('sync', repository)
+			return pending
+				? undefined
+				: typeof value === 'number' && repository.ahead > 0 && repository.behind > 0
+		}
+	}
+
+	if (rule.operator === 'isGithub') {
+		return settled(rule.column, asText, (remote) => getGithubUrl(remote) !== undefined)
+	}
+
+	if (rule.operator === 'notScanned') {
+		return (repository) => {
+			if (repository.metadata?.values['Total Updates'] !== undefined) {
+				return false
+			}
+
+			const state = repository.metadata?.groups.updates?.status
+			return state === 'loading' || state === 'queued' ? undefined : state === undefined
+		}
 	}
 
 	switch (kind) {
@@ -863,18 +671,14 @@ export function getValueSuggestions(
 
 function parseRule(record: Record<string, unknown>): FilterRule | undefined {
 	const { column, end, operator, unit, value } = record
-	if (
-		typeof column !== 'string' ||
-		typeof operator !== 'string' ||
-		!Object.hasOwn(operandShapes, operator)
-	) {
+	if (typeof column !== 'string' || !isFilterOperator(operator)) {
 		return undefined
 	}
 
 	return {
 		column,
 		...(typeof end === 'string' && { end }),
-		operator: operator as FilterOperator,
+		operator,
 		...(dateUnits.includes(unit as DateUnit) && { unit: unit as DateUnit }),
 		value: typeof value === 'string' ? value : '',
 	}

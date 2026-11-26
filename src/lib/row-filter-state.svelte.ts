@@ -2,11 +2,11 @@ import type { FilterPreset, FilterPresetId } from './filter-presets.js'
 import type { ProjectIdentity } from './preferences.js'
 import type { FilterGroup } from './row-filter.js'
 import type { CommandRun, Repository } from './workspace.js'
+import { createRule } from './filter-comparisons.js'
 import { getPresetFilter, resolveFilterPresets } from './filter-presets.js'
 import {
 	compileFilter,
 	countActiveRules,
-	createRule,
 	emptyFilter,
 	getFilterColumns,
 	getFilterMetadataGroups,
@@ -59,8 +59,8 @@ export function createRowFilter(options: RowFilterOptions) {
 	const modified = $derived(selectedPreset !== undefined && !sameRules(selectedPreset.filter))
 	const groups = $derived(getFilterMetadataGroups(filter, ruleRuns))
 
-	function sameRules(other: FilterGroup) {
-		return JSON.stringify(parseFilter(other)) === JSON.stringify(parseFilter(filter))
+	function sameRules(other: FilterGroup, current = filter) {
+		return JSON.stringify(parseFilter(other)) === JSON.stringify(parseFilter(current))
 	}
 
 	// Editing keeps a saved preset selected; editing a built-in starts a custom filter
@@ -172,7 +172,18 @@ export function createRowFilter(options: RowFilterOptions) {
 
 	// Replace the rules without side effects, as when restoring a view
 	function restore(next: FilterGroup, sourceId?: FilterPresetId) {
-		filter = next
+		// Older views saved the GitHub preset as a substring match. Only upgrade an
+		// explicit selection of that built-in, preserving custom rules and overrides.
+		const oldGithub: FilterGroup = {
+			match: 'all',
+			rules: [{ column: 'remote', operator: 'contains', value: 'github' }],
+		}
+		filter =
+			sourceId === 'github' &&
+			savedPresets.every((preset) => preset.id !== sourceId) &&
+			sameRules(oldGithub, next)
+				? getPresetFilter(sourceId, presets)
+				: next
 		selectedId = sourceId
 	}
 

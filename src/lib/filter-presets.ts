@@ -57,7 +57,7 @@ export const filterPresets: readonly FilterPreset[] = [
 			],
 		},
 		id: 'outOfSync',
-		label: 'Diverged',
+		label: 'Out of Sync',
 	},
 	{
 		description: 'Latest completed CI run on the default branch failed.',
@@ -67,7 +67,7 @@ export const filterPresets: readonly FilterPreset[] = [
 	},
 	{
 		description: 'Repositories with a GitHub remote.',
-		filter: { match: 'all', rules: [{ column: 'remote', operator: 'contains', value: 'github' }] },
+		filter: { match: 'all', rules: [{ column: 'remote', operator: 'isGithub', value: '' }] },
 		id: 'github',
 		label: 'GitHub',
 	},

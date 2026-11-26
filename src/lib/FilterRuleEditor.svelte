@@ -1,19 +1,18 @@
 <script lang="ts">
 	import type { FilterColumn, FilterRule } from './row-filter.js'
 	import type { CommandRun, Repository } from './workspace.js'
-	import FilterRowActions from './FilterRowActions.svelte'
-	import FilterValueInput from './FilterValueInput.svelte'
 	import {
 		changeOperator,
-		dateUnits,
+		comparisonKey,
+		getComparisons,
 		getOperandShape,
 		getOperatorLabel,
-		getOperators,
-		getValueSuggestions,
-		isRuleActive,
 		retargetRule,
-		runStatuses,
-	} from './row-filter.js'
+		selectedComparison,
+	} from './filter-comparisons.js'
+	import FilterRowActions from './FilterRowActions.svelte'
+	import FilterValueInput from './FilterValueInput.svelte'
+	import { dateUnits, getValueSuggestions, isRuleActive, runStatuses } from './row-filter.js'
 
 	const {
 		altHeld,
@@ -39,7 +38,13 @@
 	const categories = $derived([...new Set(columns.map((column) => column.category))])
 	const column = $derived(columns.find((entry) => entry.id === rule.column))
 	const kind = $derived(column?.kind ?? 'text')
-	const shape = $derived(getOperandShape(kind, rule.operator))
+	// A manually typed zero can equal a helper. Keep the input focused while editing it.
+	let editingOperand = $state.raw<FilterRule>()
+	const choices = $derived(getComparisons(rule.column, kind, rule.operator))
+	const selected = $derived(selectedComparison(choices, rule, editingOperand === rule))
+	const shape = $derived(
+		selected.value === undefined ? getOperandShape(kind, rule.operator) : 'none',
+	)
 	const suggestions = $derived(
 		shape === 'text' ? getValueSuggestions(rule.column, repositories) : [],
 	)
@@ -53,7 +58,9 @@
 	}
 
 	function edit(changes: Partial<FilterRule>) {
-		onChange({ ...rule, ...changes })
+		const next = { ...rule, ...changes }
+		editingOperand = next
+		onChange(next)
 	}
 </script>
 
@@ -80,16 +87,28 @@
 		aria-label="Comparison"
 		onchange={(event) => {
 			const { value } = event.currentTarget
-			const operator = getOperators(kind).find((entry) => entry === value)
-			if (operator !== undefined) {
-				onChange(changeOperator(rule, kind, operator))
+			const choice = choices.find((entry) => comparisonKey(entry) === value)
+			if (choice === undefined) {
+				return
 			}
+
+			const next =
+				choice.value === undefined
+					? changeOperator(rule, kind, choice.operator)
+					: { column: rule.column, operator: choice.operator, value: choice.value }
+			editingOperand = choice.value === undefined ? next : undefined
+			onChange(next)
 		}}
-		value={rule.operator}
+		value={comparisonKey(selected)}
 	>
-		{#each getOperators(kind) as operator (operator)}
-			<option value={operator}
-				>{getOperatorLabel(kind, operator, operator === rule.operator)}</option
+		{#each choices as choice (comparisonKey(choice))}
+			<option value={comparisonKey(choice)}
+				>{choice.label ??
+					getOperatorLabel(
+						kind,
+						choice.operator,
+						comparisonKey(choice) === comparisonKey(selected),
+					)}</option
 			>
 		{/each}
 	</select>

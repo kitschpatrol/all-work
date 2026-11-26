@@ -9,21 +9,26 @@ import type {
 	MetadataValue,
 	Repository,
 } from './workspace.js'
-import { getPresetFilter } from './filter-presets.js'
 import {
 	changeOperator,
-	compileFilter,
-	countActiveRules,
+	comparisonKey,
 	createRule,
-	getFilterColumns,
-	getFilterMetadataGroups,
+	getComparisons,
 	getOperatorLabel,
 	getOperators,
+	retargetRule,
+	selectedComparison,
+} from './filter-comparisons.js'
+import { getPresetFilter } from './filter-presets.js'
+import {
+	compileFilter,
+	countActiveRules,
+	getFilterColumns,
+	getFilterMetadataGroups,
 	getValueSuggestions,
 	isRuleActive,
 	parseFilter,
 	pruneFilter,
-	retargetRule,
 } from './row-filter.js'
 
 const ready: MetadataState = { status: 'ready' }
@@ -514,6 +519,34 @@ describe('editing rules', () => {
 		expect(createRule(column('metadata:Fork')).operator).toBe('isYes')
 	})
 
+	it('restores named helpers and keeps the generic operand editable when it also matches a helper', () => {
+		const dirty = createRule(column('changedFiles'))
+		const choices = getComparisons('changedFiles', 'number')
+		expect(choices.slice(0, 2).map((entry) => entry.label)).toEqual(['is dirty', 'is clean'])
+		expect(comparisonKey(selectedComparison(choices, dirty, false))).toBe('greaterThan:0')
+		expect(comparisonKey(selectedComparison(choices, dirty, true))).toBe('greaterThan')
+		expect(selectedComparison(choices, rule('changedFiles', 'is', '0'), false).label).toBe(
+			'is clean',
+		)
+	})
+
+	it.each(['atLeast', 'atMost'] as const)(
+		'preserves a saved %s without offering it for new rules',
+		(operator) => {
+			const columnId = 'metadata:Libyears'
+			const original = all(rule(columnId, operator, '1.5'))
+			const restored = parseFilter(original)
+			expect(restored).toEqual(original)
+			expect(getComparisons(columnId, 'number').map((entry) => entry.operator)).not.toContain(
+				operator,
+			)
+			expect(getComparisons(columnId, 'number', operator).map((entry) => entry.operator)).toContain(
+				operator,
+			)
+			expect(evaluate(restored, repository('decimal', {}, { Libyears: 1.5 }))).toBe(true)
+		},
+	)
+
 	it('offers identity comparisons only on account, owner, and people columns', () => {
 		for (const id of ['metadata:Account', 'repoOwner']) {
 			expect(column(id).kind).toBe('account')
@@ -577,8 +610,8 @@ describe('editing rules', () => {
 		expect(retargetRule(original, 'text', column('name'))).toEqual({ ...original, column: 'name' })
 		expect(retargetRule(original, 'text', column('changedFiles'))).toEqual({
 			column: 'changedFiles',
-			operator: 'is',
-			value: '',
+			operator: 'greaterThan',
+			value: '0',
 		})
 	})
 
@@ -703,6 +736,54 @@ describe('saved filters', () => {
 		])
 	})
 
+	it('requires a known upstream with commits in both directions for divergence', () => {
+		const filter = all(rule('sync', 'hasDiverged'))
+		const tracked = { ahead: 2, behind: 1, upstream: 'origin/main' }
+		for (const [fields, matches] of [
+			[tracked, true],
+			[{ ...tracked, ahead: 0 }, false],
+			[{ ...tracked, behind: 0 }, false],
+			[{ ...tracked, upstream: '' }, false],
+			[{ ...tracked, upstreamGone: true }, false],
+		] as const) {
+			expect(evaluate(filter, repository('repo', fields))).toBe(matches)
+		}
+
+		const pending = repository(
+			'loading',
+			{ gitStatusAvailable: false },
+			{},
+			{ git: { status: 'loading' } },
+		)
+		expect(evaluate(none(filter), pending)).toBeUndefined()
+		expect(isRuleActive(rule('ahead', 'hasDiverged'), [])).toBe(false)
+	})
+
+	it('separates dependency scans that never started from pending, completed and unavailable results', () => {
+		const columnId = 'metadata:Total Updates'
+		const filter = all(rule(columnId, 'notScanned'))
+		expect(evaluate(filter, repository('new'))).toBe(true)
+		for (const status of ['queued', 'loading'] as const) {
+			const pending = repository('pending', {}, {}, { updates: { status } })
+			expect(evaluate(none(filter), pending)).toBeUndefined()
+			expect(evaluate(any(filter, rule('name', 'is', 'pending')), pending)).toBe(true)
+		}
+
+		for (const status of ['ready', 'unavailable', 'error'] as const) {
+			expect(evaluate(filter, repository('checked', {}, {}, { updates: { status } }))).toBe(false)
+		}
+
+		const checked = repository(
+			'cached',
+			{},
+			{ 'Total Updates': 0 },
+			{ updates: { status: 'loading' } },
+		)
+		expect(evaluate(filter, checked)).toBe(false)
+		expect(evaluate(all(rule(columnId, 'is', '0')), checked)).toBe(true)
+		expect(isRuleActive(rule('metadata:Stars', 'notScanned'), [])).toBe(false)
+	})
+
 	it('finds clean repositories with commits to push and nothing to pull', () => {
 		const tracked = { upstream: 'origin/main' }
 		const rows = [
@@ -725,7 +806,7 @@ describe('saved filters', () => {
 		const rows = [
 			repository('ssh', { remote: 'git@github.com:kitschpatrol/all-work.git' }),
 			repository('https', { remote: 'https://GitHub.com/kitschpatrol/all-work' }),
-			repository('elsewhere', { remote: 'https://gitlab.com/someone/project.git' }),
+			repository('elsewhere', { remote: 'https://gitlab.com/someone/github-tools.git' }),
 			repository('local'),
 		]
 		expect(rows.map((row) => evaluate(getPresetFilter('github'), row))).toEqual([

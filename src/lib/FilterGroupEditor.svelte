@@ -7,10 +7,11 @@
 		FilterRule,
 	} from './row-filter.js'
 	import type { CommandRun, Repository } from './workspace.js'
+	import { createRule } from './filter-comparisons.js'
 	import FilterGroupEditor from './FilterGroupEditor.svelte'
 	import FilterRowActions from './FilterRowActions.svelte'
 	import FilterRuleEditor from './FilterRuleEditor.svelte'
-	import { blankRule, createRule, isFilterGroup } from './row-filter.js'
+	import { blankRule, isFilterGroup } from './row-filter.js'
 
 	/**
 	 * Edit the rules and nested groups inside one group. Nested groups render

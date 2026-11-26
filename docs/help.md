@@ -141,12 +141,18 @@ Rules can reference hidden columns. The value field suggests values already load
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Text                            | Contains, exact equality, begins/ends with, their available negative forms, pattern matching, and empty/not empty. Text comparisons are case-insensitive.            |
 | Account, Repo owner             | Text comparisons plus **is mine** and **is not mine**, using your GitHub accounts in Preferences.                                                                    |
-| Numbers                         | Equality, inequality, greater/less than, inclusive bounds, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                              |
+| Numbers                         | Equality, inequality, strict greater/less than, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                                         |
 | Dates                           | Within or outside the last N days, weeks, months, or years. **Is on**, **before**, and **after** compare local calendar days. Empty and nonempty are also available. |
 | Yes/no                          | **is Yes**, **is No**, and empty/not empty. Missing values do not count as No.                                                                                       |
 | Lists                           | Includes/does not include an exact list item, case-insensitively, and empty/not empty. This is not a substring search.                                               |
 | Author, Contributor, Maintainer | List comparisons plus **is me** (every listed name is one of yours), **includes me**, and **does not include me**, using your author names.                          |
 | Run output                      | Status is/is not, output contains/does not contain, pattern matching, and empty/not empty. Queued jobs count as running for status rules.                            |
+
+**Working tree** offers **is dirty** and **is clean**. Both use the changed-file count, including untracked files, and require a known Git status. **Ahead** and **Behind** can select repositories with commits to push or pull. **Sync** distinguishes **is in sync** (both counts zero), **is out of sync** (either positive), and **has diverged** (both positive). All three require a usable upstream ref.
+
+**Remote** offers **has origin**, **has no origin**, and **is on GitHub**. The last choice recognizes supported clone URLs on `github.com`, including SSH remotes. Use **contains** to search arbitrary remote text.
+
+Open PRs, open issues, vulnerability alerts, failed workflow counts, and dependency update counts each offer named positive and zero comparisons. **Has no alerts** requires a reported zero. **Total Updates → not scanned** finds repositories awaiting their first explicit dependency check. Applying an update filter leaves scans under your control. Saved **at least** and **at most** rules retain their original inclusive thresholds.
 
 Relative date windows include both their starting instant and the current reference time. A one-month window ending March 31 starts on the last day of February at the same local time. Future timestamps fall outside the window.
 
@@ -160,22 +166,22 @@ For output text rules, All Work waits until that repository's command finishes b
 
 The selector offers **None** plus these built-in presets. Presets replace the current rules while keeping search and Selected only in effect.
 
-| Preset             | Repositories shown                                                                          | Data and qualifications                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| None               | All repositories allowed by search and Selected only                                        | Clears filter rules.                                                                                                      |
-| Clean              | Working tree equals 0                                                                       | Requires known local Git status; an unavailable count is not clean.                                                       |
-| Dirty              | Working tree is greater than 0                                                              | Local Git status, including untracked files.                                                                              |
-| Diverged           | Ahead or Behind is nonzero                                                                  | Either direction is enough; both do not need to be nonzero. Requires a known upstream comparison.                         |
-| Failing CI         | CI equals Failure                                                                           | Latest completed default-branch run of a workflow named CI. Requests CI metadata.                                         |
-| GitHub             | Origin remote URL contains `github`, case-insensitively                                     | Uses local remote metadata. This is a text match and does not validate the hostname or request GitHub metadata by itself. |
-| Mine               | Author includes one of your author names, or Repo owner matches one of your GitHub accounts | Uses Identity preferences. Either authorship or ownership is enough.                                                      |
-| Needs Attention    | Working tree, Ahead, or Behind is greater than 0, or CI equals Failure                      | Uses local Git and requests CI metadata. A known local match can appear before CI finishes loading.                       |
-| No Remote          | Origin remote is empty                                                                      | Other named remotes can still exist.                                                                                      |
-| Open PRs           | PRs Open is greater than 0                                                                  | Requests GitHub metadata.                                                                                                 |
-| Published Packages | Published is Yes                                                                            | Requests package-registry metadata.                                                                                       |
-| Ready to Pull      | Working tree equals 0, Ahead equals 0, and Behind is greater than 0                         | All three conditions must hold; requires a known upstream comparison.                                                     |
-| Ready to Push      | Working tree equals 0, Ahead is greater than 0, and Behind equals 0                         | All three conditions must hold; requires a known upstream comparison.                                                     |
-| Recently Active    | Last commit is within the last 30 days                                                      | Uses the latest local commit timestamp.                                                                                   |
+| Preset             | Repositories shown                                                                          | Data and qualifications                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| None               | All repositories allowed by search and Selected only                                        | Clears filter rules.                                                                                |
+| Clean              | Working tree equals 0                                                                       | Requires known local Git status; an unavailable count is not clean.                                 |
+| Dirty              | Working tree is greater than 0                                                              | Local Git status, including untracked files.                                                        |
+| Out of Sync        | Ahead or Behind is nonzero                                                                  | Either direction qualifies. Requires a known upstream comparison.                                   |
+| Failing CI         | CI equals Failure                                                                           | Latest completed default-branch run of a workflow named CI. Requests CI metadata.                   |
+| GitHub             | Origin is a recognized GitHub remote                                                        | Uses the same local URL check as the GitHub shortcut.                                               |
+| Mine               | Author includes one of your author names, or Repo owner matches one of your GitHub accounts | Uses Identity preferences. Either authorship or ownership is enough.                                |
+| Needs Attention    | Working tree, Ahead, or Behind is greater than 0, or CI equals Failure                      | Uses local Git and requests CI metadata. A known local match can appear before CI finishes loading. |
+| No Remote          | Origin remote is empty                                                                      | Other named remotes can still exist.                                                                |
+| Open PRs           | PRs Open is greater than 0                                                                  | Requests GitHub metadata.                                                                           |
+| Published Packages | Published is Yes                                                                            | Requests package-registry metadata.                                                                 |
+| Ready to Pull      | Working tree equals 0, Ahead equals 0, and Behind is greater than 0                         | All three conditions must hold; requires a known upstream comparison.                               |
+| Ready to Push      | Working tree equals 0, Ahead is greater than 0, and Behind equals 0                         | All three conditions must hold; requires a known upstream comparison.                               |
+| Recently Active    | Last commit is within the last 30 days                                                      | Uses the latest local commit timestamp.                                                             |
 
 Upstream-based presets use locally cached refs and do not fetch. Missing upstream counts do not match numeric conditions. For remote fields, rows can remain hidden until enough metadata loads to decide the filter.
 
