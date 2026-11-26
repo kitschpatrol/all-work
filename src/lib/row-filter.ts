@@ -112,7 +112,7 @@ export const runStatuses: ReadonlyArray<{ label: string; value: RunStatus }> = [
 	{ label: 'succeeded', value: 'success' },
 	{ label: 'failed', value: 'failed' },
 	{ label: 'cancelled', value: 'cancelled' },
-	{ label: 'running', value: 'running' },
+	{ label: 'queued or running', value: 'running' },
 	{ label: 'not included', value: 'notIncluded' },
 ]
 
@@ -653,18 +653,30 @@ export function getValueSuggestions(
 		return []
 	}
 
-	const counts = new Map<string, number>()
+	const counts = new Map<string, { count: number; value: string }>()
 	for (const repository of repositories) {
 		const { value } = readRepositoryValue(columnId, repository)
 		const items = column.kind === 'list' ? asItems(value) : [asText(value)]
+		const seen = new Set<string>()
 		for (const item of items) {
-			if (item.trim() !== '' && item.length <= 200) {
-				counts.set(item, (counts.get(item) ?? 0) + 1)
+			const key = item.toLowerCase()
+			if (item.trim() === '' || item.length > 200 || seen.has(key)) {
+				continue
+			}
+
+			seen.add(key)
+			const entry = counts.get(key)
+			if (entry === undefined) {
+				counts.set(key, { count: 1, value: item })
+			} else {
+				entry.count++
 			}
 		}
 	}
 
-	return Array.from(counts, ([value, count]) => ({ count, value }))
+	return counts
+		.values()
+		.toArray()
 		.toSorted((a, b) => (a.count === b.count ? a.value.localeCompare(b.value) : b.count - a.count))
 		.slice(0, limit)
 }

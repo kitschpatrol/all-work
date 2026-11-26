@@ -100,7 +100,7 @@ describe('row filter state', () => {
 		expect(state.filter.match).toBe('any')
 		expect(state.filter.rules).toEqual([
 			...existing.rules,
-			{ column: 'branch', operator: 'contains', value: '' },
+			{ column: 'branch', operator: 'is', value: '' },
 		])
 		expect(onChange).toHaveBeenCalledOnce()
 	})

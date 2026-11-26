@@ -58,7 +58,7 @@ The data table should then start to populate, with one repository per row. The f
 
 Select a few repositories using the checkbox in each row, enter `git status --short` in the **Command** field, and click the blue **Run** button. Each command runs in the selected repositories. Its output appears in a new column at the end of the table.
 
-You might want to open **All Work → Preferences…** and enter your author names and GitHub account names under **Identity**. These identify your authored and maintained projects and power filter rules such as **is me** and **includes me**.
+You might want to open **All Work → Preferences…** and enter your author names and GitHub account names under **Identity**. These identify your authored and maintained projects and power filter rules such as **includes only me** and **includes me**.
 
 For additional GitHub metadata, All Work looks for `$GITHUB_TOKEN`, then `$GH_TOKEN`, in its process environment, then tries `gh auth token` through your login shell. The easiest setup when launching from Finder is to install the [GitHub CLI](https://cli.github.com/) (`brew install gh`) and run `gh auth login` in a terminal before loading a workspace.
 

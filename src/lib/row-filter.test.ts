@@ -13,6 +13,7 @@ import {
 	changeOperator,
 	comparisonKey,
 	createRule,
+	getCategoryValues,
 	getComparisons,
 	getOperatorLabel,
 	getOperators,
@@ -512,7 +513,7 @@ describe('editing rules', () => {
 	it('starts each kind with its first operator', () => {
 		expect(createRule(column('branch'))).toEqual({
 			column: 'branch',
-			operator: 'contains',
+			operator: 'is',
 			value: '',
 		})
 		expect(createRule(column('run-1')).operator).toBe('statusIs')
@@ -560,11 +561,44 @@ describe('editing rules', () => {
 			expect(column(id).kind).toBe('people')
 		}
 
-		expect(createRule(column('metadata:Author')).operator).toBe('isMe')
+		expect(createRule(column('metadata:Author')).operator).toBe('includesMe')
 		expect(getOperators('people')).toContain('includesMe')
 		expect(column('metadata:Tags').kind).toBe('list')
 		expect(getOperators('list')).not.toContain('includesMe')
 		expect(getOperatorLabel('people', 'doesNotIncludeMe', false)).toBe('does not include me')
+	})
+
+	it('offers categories before metadata loads and preserves older free-text rules', () => {
+		expect(getCategoryValues('metadata:CI', 'is')).toContain('Timed Out')
+		expect(getCategoryValues('metadata:Status', 'isNot')).toContain('Unknown')
+		expect(getCategoryValues('metadata:Status', 'matches')).toBeUndefined()
+		expect(getComparisons('metadata:CI', 'text').map((choice) => choice.operator)).toEqual([
+			'is',
+			'isNot',
+			'isEmpty',
+			'isNotEmpty',
+		])
+		expect(
+			getComparisons('metadata:CI', 'text', 'matches').map((choice) => choice.operator),
+		).toContain('matches')
+		expect(
+			retargetRule(rule('metadata:CI', 'is', 'Failure'), 'text', column('metadata:Status')),
+		).toEqual(rule('metadata:Status', 'is'))
+		const filter = all(rule('metadata:Status', 'is', 'Unknown'))
+		expect(evaluate(filter, repository('classified', {}, { Status: 'unknown' }))).toBe(true)
+		expect(evaluate(filter, repository('absent'))).toBe(false)
+	})
+
+	it('offers only reported LFS states and labels availability separately from false', () => {
+		expect(getComparisons('metadata:Git LFS', 'boolean').map((choice) => choice.label)).toEqual([
+			'LFS detected',
+			'no detection result',
+		])
+		expect(getOperatorLabel('boolean', 'isEmpty', false)).toBe('is unknown')
+		expect(getOperatorLabel('people', 'isMe', true)).toBe('includes only me')
+		expect(
+			getComparisons('metadata:Git LFS', 'boolean', 'isNo').map((choice) => choice.operator),
+		).toContain('isNo')
 	})
 
 	it('marks comparisons that need a value with an ellipsis until selected', () => {
@@ -656,8 +690,8 @@ describe('maintaining filters', () => {
 
 	it('suggests common text values and individual list items', () => {
 		const rows = [
-			repository('a', { branch: 'main' }, { Tags: ['cli', 'git'] }),
-			repository('b', { branch: 'main' }, { Tags: ['git'] }),
+			repository('a', { branch: 'main' }, { Tags: ['cli', 'git', 'GIT'] }),
+			repository('b', { branch: 'main' }, { Tags: ['Git'] }),
 			repository('c', { branch: 'develop' }, { Tags: [] }),
 			repository('d', { branch: '' }),
 		]

@@ -143,10 +143,10 @@ Rules can reference hidden columns. The value field suggests values already load
 | Account, Repo owner             | Text comparisons plus **is mine** and **is not mine**, using your GitHub accounts in Preferences.                                                                    |
 | Numbers                         | Equality, inequality, strict greater/less than, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                                         |
 | Dates                           | Within or outside the last N days, weeks, months, or years. **Is on**, **before**, and **after** compare local calendar days. Empty and nonempty are also available. |
-| Yes/no                          | **is Yes**, **is No**, and empty/not empty. Missing values do not count as No.                                                                                       |
+| Yes/no                          | Named choices such as **is a fork** and **is not a fork**, plus **is known** and **is unknown**. Git LFS offers **LFS detected** and **no detection result**.        |
 | Lists                           | Includes/does not include an exact list item, case-insensitively, and empty/not empty. This is not a substring search.                                               |
-| Author, Contributor, Maintainer | List comparisons plus **is me** (every listed name is one of yours), **includes me**, and **does not include me**, using your author names.                          |
-| Run output                      | Status is/is not, output contains/does not contain, pattern matching, and empty/not empty. Queued jobs count as running for status rules.                            |
+| Author, Contributor, Maintainer | List comparisons plus **includes only me** (every listed name is one of yours), **includes me**, and **does not include me**, using your author names.               |
+| Run output                      | Status is/is not, output contains/does not contain, pattern matching, and empty/not empty. The **queued or running** status covers both active states.               |
 
 **Working tree** offers **is dirty** and **is clean**. Both use the changed-file count, including untracked files, and require a known Git status. **Ahead** and **Behind** can select repositories with commits to push or pull. **Sync** distinguishes **is in sync** (both counts zero), **is out of sync** (either positive), and **has diverged** (both positive). All three require a usable upstream ref.
 
@@ -155,6 +155,8 @@ Rules can reference hidden columns. The value field suggests values already load
 Open PRs, open issues, vulnerability alerts, failed workflow counts, and dependency update counts each offer named positive and zero comparisons. **Has no alerts** requires a reported zero. **Total Updates → not scanned** finds repositories awaiting their first explicit dependency check. Applying an update filter leaves scans under your control. Saved **at least** and **at most** rules retain their original inclusive thresholds.
 
 Relative date windows include both their starting instant and the current reference time. A one-month window ending March 31 starts on the last day of February at the same local time. Future timestamps fall outside the window.
+
+**CI** and **Status** provide exact-value pickers before metadata loads. The Status value **Unknown** selects a reported relationship classification. **Is empty** selects a missing classification. Branch, versions, package manager, and ID also start with exact matching.
 
 **Matches pattern** takes a regular expression without `/…/` delimiters. Matching is case-insensitive and multiline, so `^` and `$` can match individual output lines.
 
@@ -492,14 +494,14 @@ Saving a named filter or column preset, or toggling **View → Show Repo Shortcu
 
 The two identity fields have different roles:
 
-| Field           | What to enter                                                                                         | Where it is used                                                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Author names    | Your names or aliases as they appear in extracted project author, contributor, or maintainer metadata | People-column **is me**, **includes me**, and **does not include me** rules; the author part of **Mine**; project Status classification. |
-| GitHub accounts | GitHub usernames and organization account names that you want treated as yours                        | Account and Repo owner **is mine** and **is not mine** rules; the ownership part of **Mine**; project Status classification.             |
+| Field           | What to enter                                                                                         | Where it is used                                                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Author names    | Your names or aliases as they appear in extracted project author, contributor, or maintainer metadata | People-column **includes only me**, **includes me**, and **does not include me** rules; the author part of **Mine**; project Status classification. |
+| GitHub accounts | GitHub usernames and organization account names that you want treated as yours                        | Account and Repo owner **is mine** and **is not mine** rules; the ownership part of **Mine**; project Status classification.                        |
 
 Use one entry per line or separate entries with commas. Leading/trailing whitespace and empty entries are removed, duplicate entries are collapsed, and a leading `@` is removed from GitHub accounts. Each field accepts up to 100 entries of up to 200 characters. Both lists can be empty.
 
-The identity-specific filter comparisons ignore case and match complete names or owner values. For people columns, **is me** requires a nonempty list containing only your aliases; **includes me** also allows other people. If a Repo owner contains a nested namespace, its entire owner value is compared with your configured accounts.
+The identity-specific filter comparisons ignore case and match complete names or owner values. For people columns, **includes only me** requires a nonempty list containing only your aliases; **includes me** also allows other people. If a Repo owner contains a nested namespace, its entire owner value is compared with your configured accounts.
 
 These fields do not sign in to GitHub, change Git's `user.name` or `user.email`, or change a repository's remote URL. They describe your relationship to the metadata. For example, adding an organization's account makes its repositories count as yours for owner rules; it does not grant access to private repositories. Configure credentials separately as described under [GitHub authentication](#github-authentication).
 

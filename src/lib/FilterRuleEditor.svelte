@@ -4,6 +4,7 @@
 	import {
 		changeOperator,
 		comparisonKey,
+		getCategoryValues,
 		getComparisons,
 		getOperandShape,
 		getOperatorLabel,
@@ -45,8 +46,14 @@
 	const shape = $derived(
 		selected.value === undefined ? getOperandShape(kind, rule.operator) : 'none',
 	)
+	const categoryValues = $derived(getCategoryValues(rule.column, rule.operator))
+	const categoryValue = $derived(
+		categoryValues?.find((value) => value.toLowerCase() === rule.value.toLowerCase()) ?? rule.value,
+	)
 	const suggestions = $derived(
-		shape === 'text' ? getValueSuggestions(rule.column, repositories) : [],
+		categoryValues === undefined && shape === 'text' && rule.operator !== 'matches'
+			? getValueSuggestions(rule.column, repositories)
+			: [],
 	)
 	const invalid = $derived(rule.value !== '' && !isRuleActive(rule, runs))
 
@@ -112,7 +119,21 @@
 			>
 		{/each}
 	</select>
-	{#if shape === 'text'}<FilterValueInput
+	{#if categoryValues !== undefined}
+		<select
+			aria-label="Value"
+			onchange={(event) => edit({ value: event.currentTarget.value })}
+			value={categoryValue}
+		>
+			<option value="">Choose a value…</option>
+			{#if categoryValue !== '' && !categoryValues.includes(categoryValue)}
+				<option value={categoryValue}>{categoryValue}</option>
+			{/if}
+			{#each categoryValues as value (value)}
+				<option {value}>{value}</option>
+			{/each}
+		</select>
+	{:else if shape === 'text'}<FilterValueInput
 			{invalid}
 			onChange={(value: string) => {
 				edit({ value })

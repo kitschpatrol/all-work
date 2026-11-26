@@ -55,9 +55,9 @@ const operatorsByKind = {
 		'isNot',
 		'startsWith',
 		'endsWith',
-		'matches',
 		'isEmpty',
 		'isNotEmpty',
+		'matches',
 	],
 	boolean: ['isYes', 'isNo', 'isEmpty', 'isNotEmpty'],
 	date: ['inLast', 'notInLast', 'on', 'before', 'after', 'isEmpty', 'isNotEmpty'],
@@ -78,13 +78,13 @@ const operatorsByKind = {
 		'statusIsNot',
 		'contains',
 		'doesNotContain',
-		'matches',
 		'isEmpty',
 		'isNotEmpty',
+		'matches',
 	],
 	people: [
-		'isMe',
 		'includesMe',
+		'isMe',
 		'doesNotIncludeMe',
 		'includes',
 		'doesNotInclude',
@@ -98,9 +98,9 @@ const operatorsByKind = {
 		'isNot',
 		'startsWith',
 		'endsWith',
-		'matches',
 		'isEmpty',
 		'isNotEmpty',
+		'matches',
 	],
 } as const satisfies Record<FilterKind, readonly [FilterOperator, ...FilterOperator[]]>
 
@@ -123,7 +123,7 @@ const operatorLabels: Record<FilterOperator, string> = {
 	is: 'is',
 	isEmpty: 'is empty',
 	isGithub: 'is on GitHub',
-	isMe: 'is me',
+	isMe: 'includes only me',
 	isNo: 'is No',
 	isNot: 'is not',
 	isNotEmpty: 'is not empty',
@@ -173,6 +173,10 @@ export function getOperatorLabel(
 		}
 	}
 
+	if (kind === 'boolean' && (operator === 'isEmpty' || operator === 'isNotEmpty')) {
+		return operator === 'isEmpty' ? 'is unknown' : 'is known'
+	}
+
 	const label = operatorLabels[operator]
 	const worded = kind === 'output' && outputOperators.has(operator) ? `output ${label}` : label
 	return selected || getOperandShape(kind, operator) === 'none' ? worded : `${worded}…`
@@ -201,7 +205,48 @@ function countComparisons(positive: string, zero?: string): FilterComparison[] {
 	return choices
 }
 
+const categories = new Map<string, readonly string[]>([
+	[
+		'metadata:CI',
+		[
+			'Success',
+			'Failure',
+			'Cancelled',
+			'Skipped',
+			'Neutral',
+			'Timed Out',
+			'Action Required',
+			'Startup Failure',
+			'Stale',
+		],
+	],
+	['metadata:Status', ['Author', 'Maintainer', 'Observer', 'Unknown']],
+])
+
+/** The predefined values for exact comparisons on a categorical column. */
+export function getCategoryValues(
+	id: string,
+	operator: FilterOperator,
+): readonly string[] | undefined {
+	return operator === 'is' || operator === 'isNot' ? categories.get(id) : undefined
+}
+
+function booleanComparisons(yes: string, no: string): FilterComparison[] {
+	return [
+		{ label: yes, operator: 'isYes' },
+		{ label: no, operator: 'isNo' },
+	]
+}
+
 const columnComparisons = new Map<string, FilterComparison[]>([
+	...[
+		'branch',
+		'packageManager',
+		'version',
+		'metadata:ID',
+		'metadata:Latest Release Version',
+		...categories.keys(),
+	].map((id): [string, FilterComparison[]] => [id, [{ operator: 'is' }]]),
 	['ahead', countComparisons('has commits to push')],
 	['behind', countComparisons('has commits to pull')],
 	['changedFiles', countComparisons('is dirty', 'is clean')],
@@ -209,8 +254,21 @@ const columnComparisons = new Map<string, FilterComparison[]>([
 		'metadata:Actions Failed Count',
 		countComparisons('has failed workflows', 'has no failed workflows'),
 	],
+	['metadata:Fork', booleanComparisons('is a fork', 'is not a fork')],
+	[
+		'metadata:Git LFS',
+		[
+			{ label: 'LFS detected', operator: 'isYes' },
+			{ label: 'no detection result', operator: 'isEmpty' },
+		],
+	],
+	['metadata:Homebrew', booleanComparisons('uses brewpub', 'does not use brewpub')],
 	['metadata:Issues Open', countComparisons('has open issues', 'has no open issues')],
+	['metadata:Monorepo', booleanComparisons('is a monorepo', 'is not a monorepo')],
+	['metadata:Organization', booleanComparisons('is organization-owned', 'is user-owned')],
 	['metadata:PRs Open', countComparisons('has open PRs', 'has no open PRs')],
+	['metadata:Public', booleanComparisons('is non-private', 'is private')],
+	['metadata:Published', booleanComparisons('is published', 'no publication found')],
 	[
 		'metadata:Total Updates',
 		[...countComparisons('has updates', 'has no updates'), { operator: 'notScanned' }],
@@ -258,9 +316,16 @@ export function getComparisons(
 	current?: FilterOperator,
 ): FilterComparison[] {
 	const preferred = columnComparisons.get(id) ?? []
+	// Retain legacy comparisons on the specific saved rule that uses them.
+	const offered = categories.has(id)
+		? ['is', 'isNot', 'isEmpty', 'isNotEmpty']
+		: id === 'metadata:Git LFS'
+			? ['isYes', 'isEmpty']
+			: getOperators(kind)
 	const ordinary = getOperators(kind).filter(
 		(operator) =>
-			(operator === current || (operator !== 'atLeast' && operator !== 'atMost')) &&
+			(operator === current ||
+				(offered.includes(operator) && operator !== 'atLeast' && operator !== 'atMost')) &&
 			preferred.every((entry) => entry.operator !== operator || entry.value !== undefined),
 	)
 	return [...preferred, ...ordinary.map((operator) => ({ operator }))]
@@ -304,8 +369,11 @@ export function createRule(column: FilterColumn): FilterRule {
  * new column's kind offers that operator with the same kind of value.
  */
 export function retargetRule(rule: FilterRule, from: FilterKind, to: FilterColumn): FilterRule {
+	const values = getCategoryValues(to.id, rule.operator)
 	return (rule.value !== '' || getOperandShape(from, rule.operator) === 'none') &&
-		supportsOperator(to.id, to.kind, rule.operator) &&
+		(values === undefined ||
+			values.some((value) => value.toLowerCase() === rule.value.toLowerCase())) &&
+		getComparisons(to.id, to.kind).some((choice) => choice.operator === rule.operator) &&
 		getOperandShape(from, rule.operator) === getOperandShape(to.kind, rule.operator)
 		? { ...rule, column: to.id }
 		: createRule(to)
