@@ -322,6 +322,8 @@ export function getComparisons(
 		: id === 'metadata:Git LFS'
 			? ['isYes', 'isEmpty']
 			: getOperators(kind)
+	// In 2.0, migrate saved views and presets that use atLeast or atMost to preserve
+	// matches at the threshold, then remove both operators.
 	const ordinary = getOperators(kind).filter(
 		(operator) =>
 			(operator === current ||
