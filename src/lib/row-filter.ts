@@ -52,6 +52,7 @@ const operandShapes = {
 	lessThan: 'number',
 	matches: 'text',
 	notInLast: 'duration',
+	on: 'date',
 	startsWith: 'text',
 	statusIs: 'status',
 	statusIsNot: 'status',
@@ -124,7 +125,7 @@ const operatorsByKind = {
 		'isNotEmpty',
 	],
 	boolean: ['isYes', 'isNo', 'isEmpty', 'isNotEmpty'],
-	date: ['inLast', 'notInLast', 'before', 'after', 'isEmpty', 'isNotEmpty'],
+	date: ['inLast', 'notInLast', 'on', 'before', 'after', 'isEmpty', 'isNotEmpty'],
 	list: ['includes', 'doesNotInclude', 'isEmpty', 'isNotEmpty'],
 	number: [
 		'is',
@@ -194,6 +195,7 @@ const operatorLabels: Record<FilterOperator, string> = {
 	lessThan: 'is less than',
 	matches: 'matches pattern',
 	notInLast: 'is not within the last',
+	on: 'is on',
 	startsWith: 'begins with',
 	statusIs: 'status is',
 	statusIsNot: 'status is not',
@@ -393,8 +395,10 @@ function parseDay(text: string): number | undefined {
 		return undefined
 	}
 
-	const date = new Date(year, month - 1, day)
-	return date.getMonth() === month - 1 ? date.getTime() : undefined
+	const date = new Date(0)
+	date.setFullYear(year, month - 1, day)
+	date.setHours(0, 0, 0, 0)
+	return date.getMonth() === month - 1 && date.getDate() === day ? date.getTime() : undefined
 }
 
 function parsePattern(text: string): RegExp | undefined {
@@ -408,26 +412,14 @@ function parsePattern(text: string): RegExp | undefined {
 
 function subtractUnits(now: number, count: number, unit: DateUnit): number {
 	const date = new Date(now)
-	switch (unit) {
-		case 'days': {
-			date.setDate(date.getDate() - count)
-			break
-		}
-
-		case 'months': {
-			date.setMonth(date.getMonth() - count)
-			break
-		}
-
-		case 'weeks': {
-			date.setDate(date.getDate() - count * 7)
-			break
-		}
-
-		case 'years': {
-			date.setFullYear(date.getFullYear() - count)
-			break
-		}
+	if (unit === 'days' || unit === 'weeks') {
+		date.setDate(date.getDate() - count * (unit === 'weeks' ? 7 : 1))
+	} else {
+		const day = date.getDate()
+		const months = unit === 'years' ? count * 12 : count
+		// Land on the last day of the target month, then clamp the original day.
+		date.setMonth(date.getMonth() - months + 1, 0)
+		date.setDate(Math.min(day, date.getDate()))
 	}
 
 	return date.getTime()
@@ -476,6 +468,10 @@ function asNumber(value: MetadataValue | undefined): number | undefined {
 }
 
 function asDate(value: MetadataValue | undefined): number | undefined {
+	if (typeof value === 'string' && dayPattern.test(value)) {
+		return parseDay(value)
+	}
+
 	const time = typeof value === 'string' ? Date.parse(value) : NaN
 	return Number.isFinite(time) ? time : undefined
 }
@@ -533,7 +529,7 @@ function compileNumber(rule: FilterRule): Test<number | undefined> | undefined {
 }
 
 function compileDate(rule: FilterRule, now: number): Test<number | undefined> | undefined {
-	if (rule.operator === 'before' || rule.operator === 'after') {
+	if (rule.operator === 'before' || rule.operator === 'after' || rule.operator === 'on') {
 		const day = parseDay(rule.value)
 		if (day === undefined) {
 			return undefined
@@ -542,6 +538,10 @@ function compileDate(rule: FilterRule, now: number): Test<number | undefined> | 
 		const nextDay = new Date(day)
 		nextDay.setDate(nextDay.getDate() + 1)
 		const after = nextDay.getTime()
+		if (rule.operator === 'on') {
+			return (value) => value !== undefined && value >= day && value < after
+		}
+
 		return rule.operator === 'before'
 			? (value) => value !== undefined && value < day
 			: (value) => value !== undefined && value >= after
@@ -554,9 +554,8 @@ function compileDate(rule: FilterRule, now: number): Test<number | undefined> | 
 		}
 
 		const threshold = subtractUnits(now, count, rule.unit ?? 'days')
-		return rule.operator === 'inLast'
-			? (value) => value !== undefined && value >= threshold
-			: (value) => value !== undefined && value < threshold
+		const within = rule.operator === 'inLast'
+		return (value) => value !== undefined && (value >= threshold && value <= now) === within
 	}
 
 	return emptiness(rule.operator, (value: number | undefined) => value === undefined)

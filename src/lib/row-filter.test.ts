@@ -329,6 +329,49 @@ describe('compiling filters', () => {
 		)
 		expect(evaluate(all(rule('lastCommitDate', 'notInLast', '1')), repository('empty'))).toBe(false)
 	})
+
+	it('matches a whole local day including date-only metadata', () => {
+		const day = all(rule('lastCommitDate', 'on', '2026-03-08'))
+		for (const [date, matches] of [
+			['2026-03-08', true],
+			[new Date(2026, 2, 8, 23, 59, 59).toISOString(), true],
+			[new Date(2026, 2, 9).toISOString(), false],
+			['', false],
+		] as const) {
+			expect(evaluate(day, repository('day', { lastCommitDate: date }))).toBe(matches)
+		}
+	})
+
+	it.each([
+		[new Date(2026, 2, 31, 12), 'months', new Date(2026, 1, 28, 12)],
+		[new Date(2024, 1, 29, 12), 'years', new Date(2023, 1, 28, 12)],
+	] as const)(
+		'clamps calendar windows ending at %s and excludes future timestamps',
+		(end, unit, start) => {
+			const inside = compileFilter(
+				all(rule('lastCommitDate', 'inLast', '1', { unit })),
+				[],
+				identity,
+				end.getTime(),
+			)
+			const outside = compileFilter(
+				all(rule('lastCommitDate', 'notInLast', '1', { unit })),
+				[],
+				identity,
+				end.getTime(),
+			)
+			for (const [time, matches] of [
+				[start.getTime() - 1, false],
+				[start.getTime(), true],
+				[end.getTime(), true],
+				[end.getTime() + 1, false],
+			] as const) {
+				const row = repository('dated', { lastCommitDate: new Date(time).toISOString() })
+				expect(inside?.(row)).toBe(matches)
+				expect(outside?.(row)).toBe(!matches)
+			}
+		},
+	)
 })
 
 describe('loading metadata', () => {

@@ -137,16 +137,18 @@ The **Filter** preset selector applies a preset directly. Open its adjacent disc
 
 Rules can reference hidden columns. The value field suggests values already loaded from repositories. Blank, incomplete, and invalid rules are ignored, so an unfinished rule does not restrict the table. Invalid regular expressions are also ignored.
 
-| Column kind                     | Comparisons and behavior                                                                                                                                  |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Text                            | Contains, exact equality, begins/ends with, their available negative forms, pattern matching, and empty/not empty. Text comparisons are case-insensitive. |
-| Account, Repo owner             | Text comparisons plus **is mine** and **is not mine**, using your GitHub accounts in Preferences.                                                         |
-| Numbers                         | Equality, inequality, greater/less than, inclusive bounds, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                   |
-| Dates                           | Within/not within the last N days, weeks, months, or years; before/after a date; empty/not empty. Before/after excludes the chosen local calendar day.    |
-| Yes/no                          | **is Yes**, **is No**, and empty/not empty. Missing values do not count as No.                                                                            |
-| Lists                           | Includes/does not include an exact list item, case-insensitively, and empty/not empty. This is not a substring search.                                    |
-| Author, Contributor, Maintainer | List comparisons plus **is me** (every listed name is one of yours), **includes me**, and **does not include me**, using your author names.               |
-| Run output                      | Status is/is not, output contains/does not contain, pattern matching, and empty/not empty. Queued jobs count as running for status rules.                 |
+| Column kind                     | Comparisons and behavior                                                                                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Text                            | Contains, exact equality, begins/ends with, their available negative forms, pattern matching, and empty/not empty. Text comparisons are case-insensitive.            |
+| Account, Repo owner             | Text comparisons plus **is mine** and **is not mine**, using your GitHub accounts in Preferences.                                                                    |
+| Numbers                         | Equality, inequality, greater/less than, inclusive bounds, inclusive ranges, and empty/not empty. Missing numbers do not count as zero.                              |
+| Dates                           | Within or outside the last N days, weeks, months, or years. **Is on**, **before**, and **after** compare local calendar days. Empty and nonempty are also available. |
+| Yes/no                          | **is Yes**, **is No**, and empty/not empty. Missing values do not count as No.                                                                                       |
+| Lists                           | Includes/does not include an exact list item, case-insensitively, and empty/not empty. This is not a substring search.                                               |
+| Author, Contributor, Maintainer | List comparisons plus **is me** (every listed name is one of yours), **includes me**, and **does not include me**, using your author names.                          |
+| Run output                      | Status is/is not, output contains/does not contain, pattern matching, and empty/not empty. Queued jobs count as running for status rules.                            |
+
+Relative date windows include both their starting instant and the current reference time. A one-month window ending March 31 starts on the last day of February at the same local time. Future timestamps fall outside the window.
 
 **Matches pattern** takes a regular expression without `/…/` delimiters. Matching is case-insensitive and multiline, so `^` and `$` can match individual output lines.
 
