@@ -67,7 +67,7 @@ type CompileContext = {
 	accounts: ReadonlySet<string>
 	/** Lowercased author names that `includesMe` rules compare against. */
 	authorNames: ReadonlySet<string>
-	now: number
+	now: () => number
 	runs: readonly CommandRun[]
 }
 
@@ -312,7 +312,7 @@ function compileNumber(rule: FilterRule): Test<number | undefined> | undefined {
 	return operand === undefined ? undefined : (value) => value !== undefined && test(value, operand)
 }
 
-function compileDate(rule: FilterRule, now: number): Test<number | undefined> | undefined {
+function compileDate(rule: FilterRule, clock: () => number): Test<number | undefined> | undefined {
 	if (rule.operator === 'before' || rule.operator === 'after' || rule.operator === 'on') {
 		const day = parseDay(rule.value)
 		if (day === undefined) {
@@ -337,7 +337,12 @@ function compileDate(rule: FilterRule, now: number): Test<number | undefined> | 
 			return undefined
 		}
 
+		const now = clock()
 		const threshold = subtractUnits(now, count, rule.unit ?? 'days')
+		if (!Number.isFinite(threshold)) {
+			return undefined
+		}
+
 		const within = rule.operator === 'inLast'
 		return (value) => value !== undefined && (value >= threshold && value <= now) === within
 	}
@@ -561,7 +566,7 @@ function compileGroup(group: FilterGroup, context: CompileContext): FilterPredic
  *
  * @param filter The root group.
  * @param runs Command runs whose output columns rules may reference.
- * @param identity Your GitHub accounts, which "is me" rules match, and author
+ * @param identity Your GitHub accounts, which "is mine" rules match, and author
  *   names, which "includes me" rules match.
  * @param now Reference time for relative date rules.
  */
@@ -569,12 +574,12 @@ export function compileFilter(
 	filter: FilterGroup,
 	runs: readonly CommandRun[],
 	identity: ProjectIdentity,
-	now = Date.now(),
+	now: (() => number) | number = Date.now,
 ): FilterPredicate | undefined {
 	return compileGroup(filter, {
 		accounts: lowercaseSet(identity.githubAccounts),
 		authorNames: lowercaseSet(identity.authorNames),
-		now,
+		now: typeof now === 'number' ? () => now : now,
 		runs,
 	})
 }
@@ -585,7 +590,7 @@ export function isRuleActive(rule: FilterRule, runs: readonly CommandRun[]): boo
 	const context = {
 		accounts: new Set<string>(),
 		authorNames: new Set<string>(),
-		now: Date.now(),
+		now: Date.now,
 		runs,
 	}
 	return compileRule(rule, context) !== undefined

@@ -136,6 +136,7 @@ describe('compiling filters', () => {
 			rule('branch', 'matches', '('),
 			rule('lastCommitDate', 'before', '2026-02-30'),
 			rule('lastCommitDate', 'inLast', '1.5'),
+			rule('lastCommitDate', 'notInLast', '1e308'),
 			rule('changedFiles', 'between', '1'),
 			rule('name', 'isMe'),
 		]

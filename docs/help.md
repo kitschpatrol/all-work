@@ -154,7 +154,7 @@ Rules can reference hidden columns. The value field suggests values already load
 
 Open PRs, open issues, vulnerability alerts, failed workflow counts, and dependency update counts each offer named positive and zero comparisons. **Has no alerts** requires a reported zero. **Total Updates → not scanned** finds repositories awaiting their first explicit dependency check. Applying an update filter leaves scans under your control. Saved **at least** and **at most** rules retain their original inclusive thresholds.
 
-Relative date windows include both their starting instant and the current reference time. A one-month window ending March 31 starts on the last day of February at the same local time. Future timestamps fall outside the window.
+Relative date windows include both their starting instant and the current reference time. A one-month window ending March 31 starts on the last day of February at the same local time. Future timestamps fall outside the window. The table refreshes active relative date filters every minute.
 
 **CI** and **Status** provide exact-value pickers before metadata loads. The Status value **Unknown** selects a reported relationship classification. **Is empty** selects a missing classification. Branch, versions, package manager, and ID also start with exact matching.
 

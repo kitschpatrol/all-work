@@ -1,3 +1,4 @@
+import { createSubscriber } from 'svelte/reactivity'
 import type { FilterPreset, FilterPresetId } from './filter-presets.js'
 import type { ProjectIdentity } from './preferences.js'
 import type { FilterGroup } from './row-filter.js'
@@ -16,10 +17,21 @@ import {
 	starterFilter,
 } from './row-filter.js'
 
+// Only compiled relative date rules subscribe, and the last subscriber stops the timer.
+const subscribeClock = createSubscriber((update) => {
+	const timer = setInterval(update, 60_000)
+	return () => clearInterval(timer)
+})
+
+function filterTime() {
+	subscribeClock()
+	return Date.now()
+}
+
 type RowFilterOptions = {
 	/** Runs whose columns were cleared but whose output rules still filter by. */
 	clearedRuns: () => CommandRun[]
-	/** Your accounts and names, which "is me" and "includes me" rules match. */
+	/** Your accounts and names, which "is mine" and "includes me" rules match. */
 	identity: () => ProjectIdentity
 	/** Called after the rules change so newly shown rows can load metadata. */
 	onChange: () => void
@@ -45,7 +57,7 @@ export function createRowFilter(options: RowFilterOptions) {
 	const ruleColumns = $derived(getRuleColumns(filter))
 	const savedPresets = $derived(options.presets?.() ?? [])
 	const presets = $derived(resolveFilterPresets(savedPresets))
-	const predicate = $derived(compileFilter(filter, ruleRuns, options.identity()))
+	const predicate = $derived(compileFilter(filter, ruleRuns, options.identity(), filterTime))
 	// Blank or invalid rules take no part in filtering
 	const activeRules = $derived(countActiveRules(filter, ruleRuns))
 	// Only an explicit choice selects a preset. A saved preset stays selected while
