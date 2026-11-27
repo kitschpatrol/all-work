@@ -6,7 +6,7 @@ function numberAfter(runs: readonly CommandRun[], floor: number) {
 }
 
 async function deleteRun(runId: string) {
-	await request(`/api/runs/${runId}`, {}, 'DELETE')
+	await request(`/api/runs/${runId}`, {}, { method: 'DELETE' })
 }
 
 /**
@@ -32,7 +32,7 @@ export function createRunHistory(isFiltered: (runId: string) => boolean) {
 			return
 		}
 
-		await request(`/api/runs/${runId}`, {}, 'PATCH')
+		await request(`/api/runs/${runId}`, {}, { method: 'PATCH' })
 		cleared = [...cleared, run]
 	}
 

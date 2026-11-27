@@ -129,7 +129,7 @@ type FittingColumn = {
 type FittingTable = {
 	getRowModel: () => { rows: ReadonlyArray<{ original: Repository }> }
 	getVisibleLeafColumns: () => FittingColumn[]
-	setColumnSizing(update: (previous: Record<string, number>) => Record<string, number>): void
+	setColumnSizing: (update: (previous: Record<string, number>) => Record<string, number>) => void
 }
 
 type ColumnFittingOptions = {
@@ -155,7 +155,11 @@ export function createColumnFitting(options: ColumnFittingOptions) {
 	const { table } = options
 
 	// Fit the given columns, or every visible one
-	function fit(columnIds?: string[], { automatic = true, growOnly = false } = {}) {
+	function fit({
+		automatic = true,
+		columnIds,
+		growOnly = false,
+	}: { automatic?: boolean; columnIds?: string[]; growOnly?: boolean } = {}) {
 		const scroller = options.scroller()
 		const runs = options.runs()
 		const followEnd =
@@ -214,7 +218,7 @@ export function createColumnFitting(options: ColumnFittingOptions) {
 		const followEnd =
 			reveal || scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2
 		await tick()
-		fit([runId])
+		fit({ columnIds: [runId] })
 		await tick()
 		if (followEnd) {
 			scroller.scrollLeft = scroller.scrollWidth

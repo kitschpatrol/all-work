@@ -4,7 +4,7 @@ import type { ProjectIdentity } from './preferences.js'
 import type { FilterGroup, FilterNode, FilterRule } from './row-filter.js'
 import type {
 	CommandRun,
-	MetadataGroup,
+	MetadataGroups,
 	MetadataState,
 	MetadataValue,
 	Repository,
@@ -39,7 +39,7 @@ const identity: ProjectIdentity = {
 	githubAccounts: ['KitschPatrol', 'slopforest'],
 }
 
-const loadedGroups: Partial<Record<MetadataGroup, MetadataState>> = {
+const loadedGroups: MetadataGroups = {
 	git: ready,
 	github: ready,
 	local: ready,
@@ -47,9 +47,14 @@ const loadedGroups: Partial<Record<MetadataGroup, MetadataState>> = {
 
 function repository(
 	id: string,
-	fields: Partial<Repository> = {},
-	values: Record<string, MetadataValue> = {},
-	groups = loadedGroups,
+	{
+		groups = loadedGroups,
+		values = {},
+		...fields
+	}: Partial<Repository> & {
+		groups?: MetadataGroups
+		values?: Record<string, MetadataValue>
+	} = {},
 ): Repository {
 	return {
 		ahead: 0,
@@ -90,13 +95,8 @@ function none(...rules: FilterNode[]): FilterGroup {
 	return { match: 'none', rules }
 }
 
-function rule(
-	column: string,
-	operator: FilterRule['operator'],
-	value = '',
-	extra = {},
-): FilterRule {
-	return { column, operator, value, ...extra }
+function rule(column: string, operator: FilterRule['operator'], value = ''): FilterRule {
+	return { column, operator, value }
 }
 
 function evaluate(filter: FilterGroup, row: Repository, runs: CommandRun[] = []) {
@@ -161,9 +161,9 @@ describe('compiling filters', () => {
 
 	it('matches Account metadata against your GitHub accounts independently of the repo owner', () => {
 		const rows = [
-			repository('mine', { repoOwner: 'someone' }, { Account: 'kitschpatrol' }),
-			repository('studio', {}, { Account: 'SlopForest' }),
-			repository('theirs', { repoOwner: 'kitschpatrol' }, { Account: 'someone' }),
+			repository('mine', { repoOwner: 'someone', values: { Account: 'kitschpatrol' } }),
+			repository('studio', { values: { Account: 'SlopForest' } }),
+			repository('theirs', { repoOwner: 'kitschpatrol', values: { Account: 'someone' } }),
 			repository('local'),
 		]
 		const results = (filter: FilterGroup) => rows.map((row) => evaluate(filter, row))
@@ -179,11 +179,10 @@ describe('compiling filters', () => {
 
 	it('matches no owner or author as you when no identity is set', () => {
 		const nobody = { authorNames: [], githubAccounts: [] }
-		const mine = repository(
-			'mine',
-			{ repoOwner: 'kitschpatrol' },
-			{ Account: 'kitschpatrol', Author: ['Eric Mika'] },
-		)
+		const mine = repository('mine', {
+			repoOwner: 'kitschpatrol',
+			values: { Account: 'kitschpatrol', Author: ['Eric Mika'] },
+		})
 		const owner = compileFilter(all(rule('repoOwner', 'isMe')), [], nobody, now)
 		const account = compileFilter(all(rule('metadata:Account', 'isMe')), [], nobody, now)
 		const author = compileFilter(all(rule('metadata:Author', 'includesMe')), [], nobody, now)
@@ -194,10 +193,10 @@ describe('compiling filters', () => {
 
 	it('finds your author names in Author, Contributor, and Maintainer without regard to case', () => {
 		const rows = [
-			repository('authored', {}, { Author: ['eric mika', 'Ada Lovelace'] }),
-			repository('contributed', {}, { Contributor: ['Grace Hopper', 'KITSCHPATROL'] }),
-			repository('maintained', {}, { Maintainer: ['Eric Mika'] }),
-			repository('theirs', {}, { Author: ['someone'] }),
+			repository('authored', { values: { Author: ['eric mika', 'Ada Lovelace'] } }),
+			repository('contributed', { values: { Contributor: ['Grace Hopper', 'KITSCHPATROL'] } }),
+			repository('maintained', { values: { Maintainer: ['Eric Mika'] } }),
+			repository('theirs', { values: { Author: ['someone'] } }),
 			repository('anonymous'),
 		]
 		const results = (filter: FilterGroup) => rows.map((row) => evaluate(filter, row))
@@ -227,10 +226,10 @@ describe('compiling filters', () => {
 
 	it('matches "is me" on people columns only when every listed name is yours', () => {
 		const rows = [
-			repository('sole', {}, { Maintainer: ['Eric Mika'] }),
-			repository('aliases', {}, { Maintainer: ['eric mika', 'Kitschpatrol'] }),
-			repository('shared', {}, { Maintainer: ['Eric Mika', 'Ada Lovelace'] }),
-			repository('theirs', {}, { Maintainer: ['Ada Lovelace'] }),
+			repository('sole', { values: { Maintainer: ['Eric Mika'] } }),
+			repository('aliases', { values: { Maintainer: ['eric mika', 'Kitschpatrol'] } }),
+			repository('shared', { values: { Maintainer: ['Eric Mika', 'Ada Lovelace'] } }),
+			repository('theirs', { values: { Maintainer: ['Ada Lovelace'] } }),
 			repository('unmaintained'),
 		]
 		expect(rows.map((row) => evaluate(all(rule('metadata:Maintainer', 'isMe')), row))).toEqual([
@@ -243,13 +242,13 @@ describe('compiling filters', () => {
 	})
 
 	it('leaves owner and author rules undecided until local metadata loads', () => {
-		const loading = repository('loading', {}, {}, { local: { status: 'loading' } })
+		const loading = repository('loading', { groups: { local: { status: 'loading' } } })
 		expect(evaluate(all(rule('repoOwner', 'isNotMe')), loading)).toBeUndefined()
 		expect(evaluate(all(rule('metadata:Author', 'doesNotIncludeMe')), loading)).toBeUndefined()
 	})
 
 	it('leaves Account identity rules undecided until GitHub metadata loads', () => {
-		const loading = repository('loading', {}, {}, { github: { status: 'loading' } })
+		const loading = repository('loading', { groups: { github: { status: 'loading' } } })
 		expect(evaluate(all(rule('metadata:Account', 'isMe')), loading)).toBeUndefined()
 		expect(evaluate(all(rule('metadata:Account', 'isNotMe')), loading)).toBeUndefined()
 		expect(getFilterMetadataGroups(all(rule('metadata:Account', 'isMe')), [])).toEqual(['github'])
@@ -273,18 +272,21 @@ describe('compiling filters', () => {
 		const unavailable = repository('unavailable', { gitStatusAvailable: false })
 		expect(evaluate(all(rule('changedFiles', 'greaterThan', '0')), dirty)).toBe(true)
 		expect(evaluate(all(rule('changedFiles', 'atMost', '3')), dirty)).toBe(true)
-		expect(evaluate(all(rule('changedFiles', 'between', '5', { end: '3' })), dirty)).toBe(true)
-		expect(evaluate(all(rule('changedFiles', 'between', '4', { end: '9' })), dirty)).toBe(false)
+		expect(evaluate(all({ ...rule('changedFiles', 'between', '5'), end: '3' }), dirty)).toBe(true)
+		expect(evaluate(all({ ...rule('changedFiles', 'between', '4'), end: '9' }), dirty)).toBe(false)
 		expect(evaluate(all(rule('changedFiles', 'is', '0')), unavailable)).toBe(false)
 		expect(evaluate(all(rule('changedFiles', 'isNot', '0')), unavailable)).toBe(false)
 		expect(evaluate(all(rule('changedFiles', 'isEmpty')), unavailable)).toBe(true)
 		expect(
-			evaluate(all(rule('metadata:Stars', 'atLeast', '10')), repository('x', {}, { Stars: 12 })),
+			evaluate(
+				all(rule('metadata:Stars', 'atLeast', '10')),
+				repository('x', { values: { Stars: 12 } }),
+			),
 		).toBe(true)
 	})
 
 	it('tests yes or no values and treats a missing one as empty', () => {
-		const fork = repository('fork', {}, { Fork: true })
+		const fork = repository('fork', { values: { Fork: true } })
 		const unknown = repository('unknown')
 		expect(evaluate(all(rule('metadata:Fork', 'isYes')), fork)).toBe(true)
 		expect(evaluate(all(rule('metadata:Fork', 'isNo')), fork)).toBe(false)
@@ -293,8 +295,8 @@ describe('compiling filters', () => {
 	})
 
 	it('matches whole list items rather than substrings', () => {
-		const row = repository('alpha', {}, { Dependencies: ['svelte-check', 'Svelte'] })
-		const bare = repository('bare', {}, { Dependencies: [] })
+		const row = repository('alpha', { values: { Dependencies: ['svelte-check', 'Svelte'] } })
+		const bare = repository('bare', { values: { Dependencies: [] } })
 		expect(evaluate(all(rule('metadata:Dependencies', 'includes', 'svelte')), row)).toBe(true)
 		expect(evaluate(all(rule('metadata:Dependencies', 'includes', 'svelte-')), row)).toBe(false)
 		expect(evaluate(all(rule('metadata:Dependencies', 'doesNotInclude', 'react')), row)).toBe(true)
@@ -303,17 +305,15 @@ describe('compiling filters', () => {
 	})
 
 	it('filters Actions names as list items and their counts as numbers', () => {
-		const row = repository(
-			'project',
-			{},
-			{
+		const row = repository('project', {
+			groups: { ci: ready },
+			values: {
 				'Actions Failed': [],
 				'Actions Failed Count': 0,
 				'Actions Passed': ['CI', 'Build, Windows'],
 				'Actions Passed Count': 2,
 			},
-			{ ci: ready },
-		)
+		})
 		expect(evaluate(all(rule('metadata:Actions Passed', 'includes', 'Build, Windows')), row)).toBe(
 			true,
 		)
@@ -330,10 +330,12 @@ describe('compiling filters', () => {
 		expect(evaluate(all(rule('lastCommitDate', 'after', '2026-10-01')), row)).toBe(false)
 		expect(evaluate(all(rule('lastCommitDate', 'after', '2026-09-30')), row)).toBe(true)
 		expect(evaluate(all(rule('lastCommitDate', 'inLast', '14')), row)).toBe(false)
-		expect(evaluate(all(rule('lastCommitDate', 'inLast', '3', { unit: 'weeks' })), row)).toBe(true)
-		expect(evaluate(all(rule('lastCommitDate', 'notInLast', '1', { unit: 'months' })), row)).toBe(
-			false,
+		expect(evaluate(all({ ...rule('lastCommitDate', 'inLast', '3'), unit: 'weeks' }), row)).toBe(
+			true,
 		)
+		expect(
+			evaluate(all({ ...rule('lastCommitDate', 'notInLast', '1'), unit: 'months' }), row),
+		).toBe(false)
 		expect(evaluate(all(rule('lastCommitDate', 'notInLast', '1')), repository('empty'))).toBe(false)
 	})
 
@@ -356,13 +358,13 @@ describe('compiling filters', () => {
 		'clamps calendar windows ending at %s and excludes future timestamps',
 		(end, unit, start) => {
 			const inside = compileFilter(
-				all(rule('lastCommitDate', 'inLast', '1', { unit })),
+				all({ ...rule('lastCommitDate', 'inLast', '1'), unit }),
 				[],
 				identity,
 				end.getTime(),
 			)
 			const outside = compileFilter(
-				all(rule('lastCommitDate', 'notInLast', '1', { unit })),
+				all({ ...rule('lastCommitDate', 'notInLast', '1'), unit }),
 				[],
 				identity,
 				end.getTime(),
@@ -382,12 +384,11 @@ describe('compiling filters', () => {
 })
 
 describe('loading metadata', () => {
-	const loading = repository(
-		'loading',
-		{ branch: '', gitStatusAvailable: false },
-		{},
-		{ git: { status: 'loading' }, local: ready },
-	)
+	const loading = repository('loading', {
+		branch: '',
+		gitStatusAvailable: false,
+		groups: { git: { status: 'loading' }, local: ready },
+	})
 	const pending = all(rule('changedFiles', 'greaterThan', '0'))
 
 	it('leaves a row undecided while a value it needs is loading', () => {
@@ -405,17 +406,17 @@ describe('loading metadata', () => {
 	})
 
 	it('uses a loaded value while its group refreshes', () => {
-		const refreshing = repository(
-			'refreshing',
-			{ changedFiles: 2 },
-			{},
-			{ git: { status: 'loading' } },
-		)
+		const refreshing = repository('refreshing', {
+			changedFiles: 2,
+			groups: { git: { status: 'loading' } },
+		})
 		expect(evaluate(pending, refreshing)).toBe(true)
 	})
 
 	it('treats unavailable metadata as empty rather than pending', () => {
-		const unavailable = repository('x', {}, {}, { github: { status: 'unavailable' }, local: ready })
+		const unavailable = repository('x', {
+			groups: { github: { status: 'unavailable' }, local: ready },
+		})
 		expect(evaluate(all(rule('metadata:Stars', 'isEmpty')), unavailable)).toBe(true)
 	})
 })
@@ -545,7 +546,7 @@ describe('editing rules', () => {
 			expect(getComparisons(columnId, 'number', operator).map((entry) => entry.operator)).toContain(
 				operator,
 			)
-			expect(evaluate(restored, repository('decimal', {}, { Libyears: 1.5 }))).toBe(true)
+			expect(evaluate(restored, repository('decimal', { values: { Libyears: 1.5 } }))).toBe(true)
 		},
 	)
 
@@ -586,7 +587,7 @@ describe('editing rules', () => {
 			retargetRule(rule('metadata:CI', 'is', 'Failure'), 'text', column('metadata:Status')),
 		).toEqual(rule('metadata:Status', 'is'))
 		const filter = all(rule('metadata:Status', 'is', 'Unknown'))
-		expect(evaluate(filter, repository('classified', {}, { Status: 'unknown' }))).toBe(true)
+		expect(evaluate(filter, repository('classified', { values: { Status: 'unknown' } }))).toBe(true)
 		expect(evaluate(filter, repository('absent'))).toBe(false)
 	})
 
@@ -651,7 +652,7 @@ describe('editing rules', () => {
 	})
 
 	it('clears a value whose format the new operator cannot use', () => {
-		const days = rule('lastCommitDate', 'inLast', '30', { unit: 'weeks' })
+		const days: FilterRule = { ...rule('lastCommitDate', 'inLast', '30'), unit: 'weeks' }
 		expect(changeOperator(days, 'date', 'notInLast')).toEqual({ ...days, operator: 'notInLast' })
 		expect(changeOperator(days, 'date', 'before')).toEqual({
 			column: 'lastCommitDate',
@@ -691,9 +692,9 @@ describe('maintaining filters', () => {
 
 	it('suggests common text values and individual list items', () => {
 		const rows = [
-			repository('a', { branch: 'main' }, { Tags: ['cli', 'git', 'GIT'] }),
-			repository('b', { branch: 'main' }, { Tags: ['Git'] }),
-			repository('c', { branch: 'develop' }, { Tags: [] }),
+			repository('a', { branch: 'main', values: { Tags: ['cli', 'git', 'GIT'] } }),
+			repository('b', { branch: 'main', values: { Tags: ['Git'] } }),
+			repository('c', { branch: 'develop', values: { Tags: [] } }),
 			repository('d', { branch: '' }),
 		]
 		expect(getValueSuggestions('branch', rows)).toEqual([
@@ -784,12 +785,10 @@ describe('saved filters', () => {
 			expect(evaluate(filter, repository('repo', fields))).toBe(matches)
 		}
 
-		const pending = repository(
-			'loading',
-			{ gitStatusAvailable: false },
-			{},
-			{ git: { status: 'loading' } },
-		)
+		const pending = repository('loading', {
+			gitStatusAvailable: false,
+			groups: { git: { status: 'loading' } },
+		})
 		expect(evaluate(none(filter), pending)).toBeUndefined()
 		expect(isRuleActive(rule('ahead', 'hasDiverged'), [])).toBe(false)
 	})
@@ -799,21 +798,21 @@ describe('saved filters', () => {
 		const filter = all(rule(columnId, 'notScanned'))
 		expect(evaluate(filter, repository('new'))).toBe(true)
 		for (const status of ['queued', 'loading'] as const) {
-			const pending = repository('pending', {}, {}, { updates: { status } })
+			const pending = repository('pending', { groups: { updates: { status } } })
 			expect(evaluate(none(filter), pending)).toBeUndefined()
 			expect(evaluate(any(filter, rule('name', 'is', 'pending')), pending)).toBe(true)
 		}
 
 		for (const status of ['ready', 'unavailable', 'error'] as const) {
-			expect(evaluate(filter, repository('checked', {}, {}, { updates: { status } }))).toBe(false)
+			expect(evaluate(filter, repository('checked', { groups: { updates: { status } } }))).toBe(
+				false,
+			)
 		}
 
-		const checked = repository(
-			'cached',
-			{},
-			{ 'Total Updates': 0 },
-			{ updates: { status: 'loading' } },
-		)
+		const checked = repository('cached', {
+			groups: { updates: { status: 'loading' } },
+			values: { 'Total Updates': 0 },
+		})
 		expect(evaluate(filter, checked)).toBe(false)
 		expect(evaluate(all(rule(columnId, 'is', '0')), checked)).toBe(true)
 		expect(isRuleActive(rule('metadata:Stars', 'notScanned'), [])).toBe(false)
@@ -854,9 +853,12 @@ describe('saved filters', () => {
 
 	it('finds repositories you authored or own', () => {
 		const rows = [
-			repository('authored', { repoOwner: 'someone' }, { Author: ['Ada Lovelace', 'Eric Mika'] }),
-			repository('owned', { repoOwner: 'kitschpatrol' }, { Author: ['Ada Lovelace'] }),
-			repository('theirs', { repoOwner: 'someone' }, { Author: ['Ada Lovelace'] }),
+			repository('authored', {
+				repoOwner: 'someone',
+				values: { Author: ['Ada Lovelace', 'Eric Mika'] },
+			}),
+			repository('owned', { repoOwner: 'kitschpatrol', values: { Author: ['Ada Lovelace'] } }),
+			repository('theirs', { repoOwner: 'someone', values: { Author: ['Ada Lovelace'] } }),
 			repository('local'),
 		]
 		expect(rows.map((row) => evaluate(getPresetFilter('mine'), row))).toEqual([

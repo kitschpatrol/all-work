@@ -25,7 +25,7 @@ export default defineConfig(({ command }) => ({
 		renderer: {
 			...rendererConfig,
 			// Satisfies electron-vite's renderer validation; SvelteKit's dev server ignores it
-			build: { rollupOptions: { input: 'src/app.html' } },
+			build: { rolldownOptions: { input: 'src/app.html' } },
 			root: '.',
 		},
 	}),

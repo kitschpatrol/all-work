@@ -368,14 +368,15 @@ export function startColumnDrag(event: PointerEvent, options: ColumnDragOptions)
 			blankEdge = carrier
 		}
 
-		if (carrier !== undefined) {
+		const hasCarrier = carrier !== undefined
+		if (hasCarrier) {
 			for (const element of columnElements(scroller, carrier)) {
 				element.dataset.blankEdge ??= ''
 			}
 		}
 
-		if ((carrier !== undefined) !== shadowCarried) {
-			markFillers(carrier !== undefined)
+		if (hasCarrier !== shadowCarried) {
+			markFillers(hasCarrier)
 		}
 	}
 

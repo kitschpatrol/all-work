@@ -53,7 +53,7 @@ describe('shared JSON view persistence', () => {
 		expect(request).toHaveBeenLastCalledWith(
 			'/api/settings',
 			{ kind: 'preferences', value: preferences },
-			'PUT',
+			{ method: 'PUT' },
 		)
 	})
 
@@ -78,8 +78,7 @@ describe('shared JSON view persistence', () => {
 		expect(request).toHaveBeenLastCalledWith(
 			'/api/settings',
 			{ kind: 'view', value: view, writer: { id: expect.any(String) as unknown, sequence: 1 } },
-			'PUT',
-			{ keepalive: false },
+			{ keepalive: false, method: 'PUT' },
 		)
 		writer.queue({ ...view, command: 'latest draft' })
 		await writer.flush(true)
@@ -90,8 +89,7 @@ describe('shared JSON view persistence', () => {
 				value: { ...view, command: 'latest draft' },
 				writer: { id: expect.any(String) as unknown, sequence: 2 },
 			},
-			'PUT',
-			{ keepalive: true },
+			{ keepalive: true, method: 'PUT' },
 		)
 		expect(onError).not.toHaveBeenCalled()
 	})
@@ -156,7 +154,7 @@ describe('shared JSON view persistence', () => {
 		expect(request).toHaveBeenLastCalledWith(
 			'/api/settings',
 			{ kind: 'view', writer: { id: expect.any(String) as unknown, sequence: 1 } },
-			'DELETE',
+			{ method: 'DELETE' },
 		)
 	})
 
@@ -177,7 +175,7 @@ describe('shared JSON view persistence', () => {
 		expect(request).toHaveBeenLastCalledWith(
 			'/api/settings',
 			{ kind: 'view', writer: { id: expect.any(String) as unknown, sequence: 2 } },
-			'DELETE',
+			{ method: 'DELETE' },
 		)
 	})
 

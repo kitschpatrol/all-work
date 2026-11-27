@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 	}
 
 	try {
-		const workspace = await scanWorkspace(body.directory.trim(), recursive, identity)
+		const workspace = await scanWorkspace(body.directory.trim(), { identity, recursive })
 		if (typeof body.previousWorkspaceId === 'string') {
 			forgetWorkspace(body.previousWorkspaceId)
 		}

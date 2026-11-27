@@ -502,7 +502,9 @@
 			} else if (next.directory === workspace?.directory) {
 				pruneSelection(next.repositories)
 			} else {
-				await Promise.all(runs.map(async (run) => request(`/api/runs/${run.id}`, {}, 'DELETE')))
+				await Promise.all(
+					runs.map(async (run) => request(`/api/runs/${run.id}`, {}, { method: 'DELETE' })),
+				)
 				closeStreams()
 				runs = []
 				columnDocking = {
@@ -532,12 +534,12 @@
 			directory = next.directory
 			await tick()
 			if (restored === undefined || Object.keys(restored.columnSizing).length === 0) {
-				fitColumns(
-					table
+				fitColumns({
+					columnIds: table
 						.getAllLeafColumns()
 						.filter((column) => !resizedColumns.has(column.id))
 						.map((column) => column.id),
-				)
+				})
 			}
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
@@ -573,15 +575,15 @@
 				sizingTimer ??= setTimeout(() => {
 					sizingTimer = undefined
 					void tick().then(() =>
-						fitColumns(
-							table
+						fitColumns({
+							columnIds: table
 								.getVisibleLeafColumns()
 								.filter(
 									(column) => !resizedColumns.has(column.id) && repositoryColumnIds.has(column.id),
 								)
 								.map((column) => column.id),
-							{ growOnly: true },
-						),
+							growOnly: true,
+						}),
 					)
 				}, 1000)
 			},
@@ -668,11 +670,11 @@
 		const previous = table.atoms.columnVisibility.get()
 		table.setColumnVisibility({ ...previous, ...changes })
 		await tick()
-		fitColumns(
-			Object.keys(changes).filter(
+		fitColumns({
+			columnIds: Object.keys(changes).filter(
 				(id) => changes[id] === true && previous[id] === false && !resizedColumns.has(id),
 			),
-		)
+		})
 		scheduleMetadata()
 	}
 
@@ -801,11 +803,9 @@
 
 	async function stop(runId: string, repositoryId?: string) {
 		try {
-			await request(
-				`/api/runs/${runId}`,
-				repositoryId === undefined ? {} : { repositoryId },
-				'PATCH',
-			)
+			await request(`/api/runs/${runId}`, repositoryId === undefined ? {} : { repositoryId }, {
+				method: 'PATCH',
+			})
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : String(error)
 		}
@@ -1392,7 +1392,7 @@
 														aria-label="Resize column"
 														ondblclick={() => {
 															resizedColumns.delete(header.column.id)
-															fitColumns([header.column.id], { automatic: false })
+															fitColumns({ automatic: false, columnIds: [header.column.id] })
 														}}
 														onmousedown={(event) => startResize(event, header)}
 														ontouchstart={(event) => startResize(event, header)}

@@ -78,7 +78,7 @@
 	async function stop() {
 		stopping = true
 		try {
-			await request(`/api/runs/${runId}`, { repositoryId }, 'PATCH')
+			await request(`/api/runs/${runId}`, { repositoryId }, { method: 'PATCH' })
 		} catch (error) {
 			message = error instanceof Error ? error.message : 'Could not stop the command.'
 		} finally {

@@ -13,13 +13,12 @@ function field() {
 	}
 }
 
-const key = (name: string, editing = false, modifiers = {}) => ({
+const key = (name: string, { editing = false, metaKey = false } = {}) => ({
 	altKey: false,
 	ctrlKey: false,
 	editing,
 	key: name,
-	metaKey: false,
-	...modifiers,
+	metaKey,
 })
 
 describe('focus source', () => {
@@ -40,8 +39,8 @@ describe('focus source', () => {
 		const search = field()
 		source.pointerdown()
 		source.focus(search)
-		source.keydown(key('a', true))
-		source.keydown(key('ArrowLeft', true))
+		source.keydown(key('a', { editing: true }))
+		source.keydown(key('ArrowLeft', { editing: true }))
 		// Switching windows and back focuses the field again
 		source.focus(search)
 		expect(search.marks).toEqual([true, true])
@@ -51,7 +50,7 @@ describe('focus source', () => {
 		const source = createFocusSource()
 		const next = field()
 		source.pointerdown()
-		source.keydown(key('Escape', true))
+		source.keydown(key('Escape', { editing: true }))
 		source.focus(next)
 		expect(next.marks).toEqual([false])
 	})
@@ -69,7 +68,7 @@ describe('focus source', () => {
 		const source = createFocusSource()
 		const search = field()
 		source.pointerdown()
-		source.keydown(key('f', false, { metaKey: true }))
+		source.keydown(key('f', { metaKey: true }))
 		source.focus(search)
 		source.keyboard()
 		source.focus(search)

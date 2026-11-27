@@ -28,10 +28,7 @@ const runs: CommandRun[] = [
 	},
 ]
 
-function menu(
-	onError = vi.fn<(error: unknown) => void>(),
-	overrides: Partial<Parameters<typeof createColumnMenu>[0]> = {},
-) {
+function menu(overrides: Partial<Parameters<typeof createColumnMenu>[0]> = {}) {
 	return createColumnMenu({
 		beforeSort: vi.fn<() => void>(),
 		docked: () => ({ start: ['select'], end: [] }),
@@ -48,7 +45,7 @@ function menu(
 		getRows: () => [],
 		getRuns: () => runs,
 		onDock: vi.fn<(id: string, side: 'end' | 'start') => void>(),
-		onError,
+		onError: vi.fn<(error: unknown) => void>(),
 		onFilter: vi.fn<(id: string) => void>(),
 		onHide: vi.fn<(id: string) => Promise<void>>(),
 		onRemoveRuns: vi.fn<(ids: readonly string[]) => void>(),
@@ -91,7 +88,7 @@ describe('copying a column variable', () => {
 	it('reports a clipboard failure', async () => {
 		const onError = vi.fn<(error: unknown) => void>()
 		writeText.mockRejectedValueOnce(new Error('Clipboard denied'))
-		menu(onError).actions['column.copyVariable']('branch')
+		menu({ onError }).actions['column.copyVariable']('branch')
 		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Clipboard denied')))
 	})
 
@@ -120,7 +117,7 @@ describe('copying a run column’s command', () => {
 	it('reports a clipboard failure', async () => {
 		const onError = vi.fn<(error: unknown) => void>()
 		writeText.mockRejectedValueOnce(new Error('Clipboard denied'))
-		menu(onError).actions['column.copyCommand']('run-id')
+		menu({ onError }).actions['column.copyCommand']('run-id')
 		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Clipboard denied')))
 	})
 })
@@ -135,7 +132,7 @@ describe('clearing finished runs beside a run column', () => {
 	const order = ['select', 'd', 'branch', 'b', 'c', 'a']
 
 	function besideMenu(onRemoveRuns = vi.fn<(ids: readonly string[]) => void>()) {
-		return menu(undefined, { getColumnOrder: () => order, getRuns: () => besideRuns, onRemoveRuns })
+		return menu({ getColumnOrder: () => order, getRuns: () => besideRuns, onRemoveRuns })
 	}
 
 	it('clears only finished runs on the chosen side, in display order', () => {
@@ -198,7 +195,7 @@ describe('showing hidden columns from the empty header space', () => {
 	it('reports a menu failure', async () => {
 		const onError = vi.fn<(error: unknown) => void>()
 		showHiddenColumnsMenu.mockRejectedValueOnce(new Error('Invalid hidden columns menu request.'))
-		await menu(onError).showHidden(rightClick)
+		await menu({ onError }).showHidden(rightClick)
 		expect(onError).toHaveBeenCalledWith(new Error('Invalid hidden columns menu request.'))
 	})
 
@@ -215,7 +212,7 @@ describe('showing hidden columns from the empty header space', () => {
 	it('reports a failure to show the column', async () => {
 		const onError = vi.fn<(error: unknown) => void>()
 		onShow.mockRejectedValueOnce(new Error('Could not show column'))
-		menu(onError).actions['column.show']('sync')
+		menu({ onError }).actions['column.show']('sync')
 		await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('Could not show column')))
 	})
 })
@@ -253,7 +250,7 @@ describe('adding hidden columns beside a header', () => {
 	it('adds nothing if the clicked header disappears while the menu is open', async () => {
 		let order = ['branch']
 		showColumnMenu.mockResolvedValueOnce('sync')
-		const showing = menu(undefined, { getColumnOrder: () => order }).show(rightClick, 'branch')
+		const showing = menu({ getColumnOrder: () => order }).show(rightClick, 'branch')
 		order = []
 		await showing
 		expect(onShow).not.toHaveBeenCalled()
@@ -263,7 +260,7 @@ describe('adding hidden columns beside a header', () => {
 		const onError = vi.fn<(error: unknown) => void>()
 		showColumnMenu.mockResolvedValueOnce('sync')
 		onShow.mockRejectedValueOnce(new Error('Could not show column'))
-		await menu(onError).show(rightClick, 'branch')
+		await menu({ onError }).show(rightClick, 'branch')
 		expect(onError).toHaveBeenCalledWith(new Error('Could not show column'))
 	})
 })
@@ -272,7 +269,7 @@ describe('sorting from a column menu', () => {
 	function sortable() {
 		const toggleSorting = vi.fn<(descending: boolean, multiple: boolean) => void>()
 		const sortByExitCode = vi.fn<(runId: string, byExitCode: boolean) => void>()
-		const { actions } = menu(undefined, {
+		const { actions } = menu({
 			getColumn: (id) => ({
 				getCanFilter: () => true,
 				getCanHide: () => true,
@@ -321,7 +318,7 @@ describe('sorting from a column menu', () => {
 describe('docking from a column menu', () => {
 	it('docks a column at either edge and reports where it is docked', async () => {
 		const onDock = vi.fn<(id: string, side: 'end' | 'start') => void>()
-		const docked = menu(undefined, {
+		const docked = menu({
 			docked: () => ({ start: ['select', 'branch'], end: ['run-id'] }),
 			onDock,
 		})
@@ -345,7 +342,7 @@ describe('docking from a column menu', () => {
 
 	it('never docks or undocks a fixed column', async () => {
 		const onDock = vi.fn<(id: string, side: 'end' | 'start') => void>()
-		const fixed = menu(undefined, { onDock })
+		const fixed = menu({ onDock })
 		fixed.actions['column.dockEnd']('select')
 		fixed.actions['column.dockStart']()
 		expect(onDock).not.toHaveBeenCalled()

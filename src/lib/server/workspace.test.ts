@@ -148,7 +148,7 @@ beforeAll(async () => {
 	await git(first, ['config', 'branch.worktree-test.remote', 'origin'])
 	await git(first, ['config', 'branch.worktree-test.merge', 'refs/heads/deleted'])
 	await symlink(first, path.join(temporaryDirectory, 'symlinked-repository'))
-	workspace = await scanWorkspace(temporaryDirectory, true)
+	workspace = await scanWorkspace(temporaryDirectory, { recursive: true })
 	await vi.waitFor(
 		() => {
 			if (
@@ -196,7 +196,7 @@ describe('repository discovery and Metascope metadata', () => {
 	})
 
 	it('limits non-recursive discovery to immediate children', async () => {
-		const shallow = await scanWorkspace(temporaryDirectory, false)
+		const shallow = await scanWorkspace(temporaryDirectory, { recursive: false })
 		expect(shallow.recursive).toBe(false)
 		expect(shallow.repositories.map((repository) => repository.relativePath).toSorted()).toEqual([
 			'empty-repository',
@@ -229,7 +229,7 @@ describe('repository discovery and Metascope metadata', () => {
 			await symlink(path.join(elsewhere, 'missing'), path.join(root, 'broken'))
 
 			const realTarget = await realpath(target)
-			const scanned = await scanWorkspace(root, true)
+			const scanned = await scanWorkspace(root, { recursive: true })
 			expect(scanned.warnings).toEqual([])
 			expect(
 				scanned.repositories.map(({ name, path: directory, relativePath }) => ({
@@ -254,7 +254,7 @@ describe('repository discovery and Metascope metadata', () => {
 			await expect(verifyRepository(linked)).resolves.toBeUndefined()
 			forgetWorkspace(scanned.id)
 
-			const shallow = await scanWorkspace(root, false)
+			const shallow = await scanWorkspace(root, { recursive: false })
 			expect(shallow.repositories.map((repository) => repository.relativePath)).toEqual([
 				'direct',
 				'linked',
@@ -267,7 +267,9 @@ describe('repository discovery and Metascope metadata', () => {
 	})
 
 	it('includes the chosen repository itself when recursion is disabled', async () => {
-		const shallow = await scanWorkspace(path.join(temporaryDirectory, 'group/plain-git'), false)
+		const shallow = await scanWorkspace(path.join(temporaryDirectory, 'group/plain-git'), {
+			recursive: false,
+		})
 		expect(shallow.repositories.map((repository) => repository.relativePath)).toEqual(['.'])
 		forgetWorkspace(shallow.id)
 	})
@@ -349,7 +351,7 @@ describe('repository discovery and Metascope metadata', () => {
 		expect(byPath('project with spaces')).toMatchObject({ upstream: '', upstreamGone: false })
 	})
 	it('keeps repository identifiers stable when metadata is refreshed', async () => {
-		const refreshed = await scanWorkspace(temporaryDirectory, true)
+		const refreshed = await scanWorkspace(temporaryDirectory, { recursive: true })
 		expect(refreshed.id).not.toBe(workspace.id)
 		expect(refreshed.repositories.map((repository) => repository.id)).toEqual(
 			workspace.repositories.map((repository) => repository.id),
@@ -359,7 +361,7 @@ describe('repository discovery and Metascope metadata', () => {
 	})
 
 	it('scans again with cached names and branches already applied', async () => {
-		const refreshed = await scanWorkspace(temporaryDirectory, true)
+		const refreshed = await scanWorkspace(temporaryDirectory, { recursive: true })
 		try {
 			expect(
 				refreshed.repositories.find(

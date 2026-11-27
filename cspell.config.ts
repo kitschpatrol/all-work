@@ -1,28 +1,7 @@
 import { cspellConfig } from '@kitschpatrol/cspell-config'
 
 export default cspellConfig({
-	ignorePaths: ['build', 'out', '**/changelog.md'],
-	words: [
-		'chagent',
-		'fullscreenable',
-		'gita',
-		'googlecode',
-		'gpgsign',
-		'httpx',
-		'iterm',
-		'kovidgoyal',
-		'maximizable',
-		'mitchellh',
-		'NSURL',
-		'objectname',
-		'onfocusincapture',
-		'onkeydowncapture',
-		'onpointerdowncapture',
-		'pycache',
-		'slopforest',
-		'togglefullscreen',
-		'undock',
-		'wezterm',
-		'ZDOTDIR',
-	],
+	// Case Police also reads these paths when fixing capitalization.
+	ignorePaths: ['build', 'out'],
+	words: ['gita', 'httpx', 'objectname', 'slopforest', 'togglefullscreen'],
 })

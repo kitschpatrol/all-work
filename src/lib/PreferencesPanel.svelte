@@ -255,7 +255,7 @@
 					class="button subtle"
 					onclick={async () =>
 						action(async () => {
-							await request('/api/cache', {}, 'DELETE')
+							await request('/api/cache', {}, { method: 'DELETE' })
 						}, 'Metadata cache cleared.')}
 					type="button">Clear Metadata Cache</button
 				><span>Rebuild metadata on the next refresh or reload.</span>

@@ -2,6 +2,8 @@
 
 _The [readme](../readme.md) is handwritten, but this file provides some AI-generated documentation that might be helpful in a pinch. Apologies for its tortured prose._
 
+<!-- toc({ heading: 'Contents', depth: 2 }) -->
+
 ## Contents
 
 - [Overview](#overview)
@@ -18,6 +20,8 @@ _The [readme](../readme.md) is handwritten, but this file provides some AI-gener
 - [Example workflows](#example-workflows)
 - [Troubleshooting](#troubleshooting)
 - [Development and packaging](#development-and-packaging)
+
+<!-- /toc -->
 
 ## Overview
 

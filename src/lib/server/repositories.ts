@@ -1,4 +1,3 @@
-import type { ProjectIdentity } from '#lib/preferences.js'
 import type { MetadataChange, Repository, Workspace } from '#lib/workspace.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { access, readdir, realpath, stat } from 'node:fs/promises'
@@ -171,8 +170,7 @@ async function linksToRepository(link: string): Promise<boolean> {
  */
 export async function scanWorkspace(
 	input: string,
-	recursive = false,
-	identity?: ProjectIdentity,
+	{ identity, recursive }: Partial<Pick<Workspace, 'identity' | 'recursive'>> = {},
 ): Promise<Workspace> {
 	const expanded =
 		input === '~'
@@ -190,7 +188,7 @@ export async function scanWorkspace(
 		directory,
 		id: randomUUID(),
 		identity,
-		recursive,
+		recursive: recursive === true,
 		repositories: [],
 		warnings: [],
 	}
@@ -226,7 +224,7 @@ export async function scanWorkspace(
 				repositories.push({ directory: current, readme: findReadme(entries), realPath })
 			}
 
-			if (!recursive && current !== directory) {
+			if (current !== directory && !workspace.recursive) {
 				continue
 			}
 

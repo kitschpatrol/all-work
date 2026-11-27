@@ -146,7 +146,7 @@ export async function loadSettings(defaultDirectory: string) {
 
 /** Save identity preferences independently of the frequently updated view. */
 export async function savePreferences(preferences: Preferences) {
-	await request('/api/settings', { kind: 'preferences', value: preferences }, 'PUT')
+	await request('/api/settings', { kind: 'preferences', value: preferences }, { method: 'PUT' })
 }
 
 /** Debounce view writes and send the latest snapshot when the page closes. */
@@ -177,8 +177,7 @@ export function createViewWriter(onError: () => void) {
 		const write = request<unknown>(
 			'/api/settings',
 			{ kind: 'view', value, writer: { id, sequence: ++sequence } },
-			'PUT',
-			{ keepalive },
+			{ keepalive, method: 'PUT' },
 		)
 		active.add(write)
 		try {
@@ -212,7 +211,7 @@ export function createViewWriter(onError: () => void) {
 				await request(
 					'/api/settings',
 					{ kind: 'view', writer: { id, sequence: ++sequence } },
-					'DELETE',
+					{ method: 'DELETE' },
 				)
 			} finally {
 				resetting = false

@@ -2,8 +2,7 @@
 export async function request<T>(
 	url: string,
 	body: Record<string, unknown>,
-	method = 'POST',
-	{ keepalive = false } = {},
+	{ keepalive = false, method = 'POST' } = {},
 ): Promise<T> {
 	const response = await fetch(url, {
 		body: JSON.stringify(body),

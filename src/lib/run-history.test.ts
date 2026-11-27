@@ -4,12 +4,10 @@ import { request } from './client-request.js'
 import { createRunHistory } from './run-history.svelte.js'
 
 vi.mock('./client-request.js', () => ({
-	request: vi.fn<(url: string, body: Record<string, unknown>, method?: string) => Promise<unknown>>(
-		async () => {
-			await Promise.resolve()
-			return {}
-		},
-	),
+	request: vi.fn(async () => {
+		await Promise.resolve()
+		return {}
+	}),
 }))
 
 const requestMock = vi.mocked(request)
@@ -19,7 +17,7 @@ function run(id: string, number: number): CommandRun {
 }
 
 function calls() {
-	return requestMock.mock.calls.map(([url, , method]) => `${method} ${url}`)
+	return requestMock.mock.calls.map(([url, , options]) => `${options?.method ?? 'POST'} ${url}`)
 }
 
 beforeEach(() => {

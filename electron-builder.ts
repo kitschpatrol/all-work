@@ -17,7 +17,7 @@ const config: Configuration = {
 	},
 	nsis: { allowToChangeInstallationDirectory: true, oneClick: false },
 	productName: 'All Work',
-	publish: { provider: 'github', releaseType: 'release', vPrefixedTagName: true },
+	publish: { provider: 'github', releaseType: 'release', tagNamePrefix: 'v' },
 	win: { icon: 'electron/resources/icons/win/icon.ico', target: 'nsis' },
 }
 
